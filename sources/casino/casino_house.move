@@ -297,7 +297,6 @@ module casino::CasinoHouse {
         // Validate settlement math (payout + profit should equal bet amount)
         let bet_amount = payout + profit;
         assert!(bet_amount > 0, E_INVALID_SETTLEMENT);
-        assert!(payout <= treasury_balance, E_INSUFFICIENT_TREASURY);
 
         let treasury = borrow_global_mut<Treasury>(@casino);
         let treasury_balance = coin::value(&treasury.vault);
