@@ -299,7 +299,7 @@ module casino::InvestorTokenTest {
         let small_profit = 1234;
         // Simulate profit injection via proper bet flow
         let bet_coins = coin::withdraw<AptosCoin>(&casino_account, small_profit);
-        let bet_id = CasinoHouse::place_bet_internal(bet_coins, @0x123, 1);
+        let bet_id = CasinoHouse::place_bet_internal(bet_coins, @0x123, @casino);
         CasinoHouse::test_settle_bet(
             signer::address_of(&casino_account),
             bet_id,
@@ -376,7 +376,7 @@ module casino::InvestorTokenTest {
         let large_profit = 1000000; // 0.01 APT profit (within max_bet limit)
         // Simulate profit injection via proper bet flow
         let bet_coins = coin::withdraw<AptosCoin>(&casino_account, large_profit);
-        let bet_id = CasinoHouse::place_bet_internal(bet_coins, @0x123, 1);
+        let bet_id = CasinoHouse::place_bet_internal(bet_coins, @0x123, @casino);
         CasinoHouse::test_settle_bet(
             signer::address_of(&casino_account),
             bet_id,
@@ -1137,7 +1137,7 @@ module casino::InvestorTokenTest {
         InvestorToken::deposit_and_mint(&user_account, 1000);
         // Simulate profit injection via proper bet flow
         let bet_coins = coin::withdraw<AptosCoin>(&casino_account, 1000000);
-        let bet_id = CasinoHouse::place_bet_internal(bet_coins, @0x123, 1);
+        let bet_id = CasinoHouse::place_bet_internal(bet_coins, @0x123, @casino);
         CasinoHouse::test_settle_bet(
             signer::address_of(&casino_account),
             bet_id,
