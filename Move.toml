@@ -1,0 +1,19 @@
+[package]
+name = "ChainCasino"
+version = "0.0.1"
+authors = ["PersonaNormale"]
+
+[addresses]
+casino = "_"
+dice_game = "_"
+
+[dev-addresses]
+casino = "0xCC"
+dice_game = "0xD1CE"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-framework.git"
+rev = "mainnet"
+subdir = "aptos-framework"
+
+[dev-dependencies]
