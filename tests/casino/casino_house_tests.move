@@ -1,4 +1,4 @@
-//! Test suite for CasinoHouse module - updated for address-based games
+//! Test suite for CasinoHouse module - updated for new function signatures
 
 #[test_only]
 module casino::CasinoHouseTest {
@@ -42,14 +42,14 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             casino_account,
             game_account,
-            b"Test",
+            string::utf8(b"Test"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
         );
 
         let coins = coin::withdraw<AptosCoin>(casino_account, MIN_BET);
-        let _bet_id = CasinoHouse::place_bet_internal(coins, @0x123, @0x123);
+        let _bet_id = CasinoHouse::place_bet(@0x123, coins, @0x123);
     }
 
     //
@@ -90,7 +90,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Dice Game",
+            string::utf8(b"Dice Game"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
@@ -119,7 +119,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &game_account, // Wrong signer
             &game_account,
-            b"Dice Game",
+            string::utf8(b"Dice Game"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
@@ -140,7 +140,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Bad Game",
+            string::utf8(b"Bad Game"),
             MAX_BET, // min_bet > max_bet
             MIN_BET,
             HOUSE_EDGE
@@ -161,7 +161,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Zero Bet Game",
+            string::utf8(b"Zero Bet Game"),
             0, // min_bet = 0 should fail
             MAX_BET,
             HOUSE_EDGE
@@ -182,7 +182,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Game 1",
+            string::utf8(b"Game 1"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
@@ -192,7 +192,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Game 2",
+            string::utf8(b"Game 2"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
@@ -207,7 +207,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Dice Game",
+            string::utf8(b"Dice Game"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
@@ -247,7 +247,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Test Game",
+            string::utf8(b"Test Game"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
@@ -265,7 +265,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Dice Game",
+            string::utf8(b"Dice Game"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
@@ -307,7 +307,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Test Game",
+            string::utf8(b"Test Game"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
@@ -328,7 +328,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game1,
-            b"Dice Game",
+            string::utf8(b"Dice Game"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
@@ -337,7 +337,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game2,
-            b"Poker Game",
+            string::utf8(b"Poker Game"),
             MIN_BET * 2,
             MAX_BET * 2,
             HOUSE_EDGE + 50
@@ -351,24 +351,24 @@ module casino::CasinoHouseTest {
     }
 
     //
-    // Package Function Tests (Internal)
+    // Public Function Tests (Updated)
     //
 
     #[test]
-    fun test_place_bet_internal() {
+    fun test_place_bet() {
         let (_, casino_account, game_account) = setup_test();
         CasinoHouse::init(&casino_account);
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Test",
+            string::utf8(b"Test"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
         );
 
         let coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET);
-        let bet_id = CasinoHouse::place_bet_internal(coins, @0x123, @0x123);
+        let bet_id = CasinoHouse::place_bet(@0x123, coins, @0x123);
 
         assert!(bet_id == 1, 1);
         assert!(CasinoHouse::treasury_balance() == MIN_BET, 2);
@@ -377,17 +377,17 @@ module casino::CasinoHouseTest {
     #[test]
     #[
         expected_failure(
-            abort_code = casino::CasinoHouse::E_GAME_NOT_REGISTERED,
+            abort_code = casino::CasinoHouse::E_GAME_INACTIVE,
             location = casino::CasinoHouse
         )
     ]
-    fun test_place_bet_internal_inactive_game() {
+    fun test_place_bet_inactive_game() {
         let (_, casino_account, game_account) = setup_test();
         CasinoHouse::init(&casino_account);
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Test",
+            string::utf8(b"Test"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
@@ -395,7 +395,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::toggle_game(&casino_account, @0x123, false);
 
         let coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET);
-        CasinoHouse::place_bet_internal(coins, @0x123, @0x123);
+        CasinoHouse::place_bet(@0x123, coins, @0x123);
     }
 
     #[test]
@@ -410,7 +410,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::init(&casino_account);
 
         let coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET);
-        CasinoHouse::place_bet_internal(coins, @0x123, @0x999); // Non-existent game
+        CasinoHouse::place_bet(@0x999, coins, @0x123); // Non-existent game
     }
 
     #[test]
@@ -426,14 +426,14 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Test",
+            string::utf8(b"Test"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
         );
 
         let coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET - 1);
-        CasinoHouse::place_bet_internal(coins, @0x123, @0x123);
+        CasinoHouse::place_bet(@0x123, coins, @0x123);
     }
 
     #[test]
@@ -449,24 +449,24 @@ module casino::CasinoHouseTest {
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Test",
+            string::utf8(b"Test"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
         );
 
         let coins = coin::withdraw<AptosCoin>(&casino_account, MAX_BET + 1);
-        CasinoHouse::place_bet_internal(coins, @0x123, @0x123);
+        CasinoHouse::place_bet(@0x123, coins, @0x123);
     }
 
     #[test]
-    fun test_settle_bet_internal() {
+    fun test_settle_bet() {
         let (_, casino_account, game_account) = setup_test();
         CasinoHouse::init(&casino_account);
         CasinoHouse::register_game(
             &casino_account,
             &game_account,
-            b"Test",
+            string::utf8(b"Test"),
             MIN_BET,
             MAX_BET,
             HOUSE_EDGE
@@ -474,7 +474,7 @@ module casino::CasinoHouseTest {
 
         // Place bet first
         let coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET);
-        let bet_id = CasinoHouse::place_bet_internal(coins, @0x123, @0x123);
+        let bet_id = CasinoHouse::place_bet(@0x123, coins, @0x123);
 
         // Register winner's account
         let winner_addr = signer::address_of(&game_account);
@@ -482,7 +482,7 @@ module casino::CasinoHouseTest {
 
         // Settle bet using test helper
         CasinoHouse::test_settle_bet(
-            winner_addr,
+            @0x123,
             bet_id,
             winner_addr,
             MIN_BET / 2,
@@ -501,13 +501,7 @@ module casino::CasinoHouseTest {
         let (_, casino_account, game_account) = setup_test();
         setup_game_and_bet(&casino_account, &game_account);
 
-        CasinoHouse::test_settle_bet(
-            signer::address_of(&game_account),
-            1,
-            @0x123,
-            0,
-            0
-        );
+        CasinoHouse::test_settle_bet(@0x123, 1, @0x123, 0, 0);
     }
 
     #[test]
@@ -522,13 +516,25 @@ module casino::CasinoHouseTest {
         setup_game_and_bet(&casino_account, &game_account);
 
         // Try to payout more than treasury has
-        CasinoHouse::test_settle_bet(
-            signer::address_of(&game_account),
-            1,
-            @0x123,
-            MIN_BET * 2,
-            0
-        );
+        CasinoHouse::test_settle_bet(@0x123, 1, @0x123, MIN_BET * 2, 0);
+    }
+
+    #[test]
+    #[
+        expected_failure(
+            abort_code = casino::CasinoHouse::E_GAME_INACTIVE,
+            location = casino::CasinoHouse
+        )
+    ]
+    fun test_settle_bet_inactive_game() {
+        let (_, casino_account, game_account) = setup_test();
+        setup_game_and_bet(&casino_account, &game_account);
+
+        // Deactivate game
+        CasinoHouse::toggle_game(&casino_account, @0x123, false);
+
+        // Try to settle bet on inactive game
+        CasinoHouse::test_settle_bet(@0x123, 1, @0x123, MIN_BET / 2, MIN_BET / 2);
     }
 
     #[test]
@@ -539,13 +545,7 @@ module casino::CasinoHouseTest {
         let winner = account::create_account_for_test(@0x999);
         coin::register<AptosCoin>(&winner);
 
-        CasinoHouse::test_settle_bet(
-            signer::address_of(&game_account),
-            1,
-            @0x999,
-            MIN_BET / 2,
-            MIN_BET / 2
-        );
+        CasinoHouse::test_settle_bet(@0x123, 1, @0x999, MIN_BET / 2, MIN_BET / 2);
 
         assert!(
             coin::balance<AptosCoin>(@0x999) == MIN_BET / 2,

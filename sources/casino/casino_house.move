@@ -32,6 +32,8 @@ module casino::CasinoHouse {
     const E_INVALID_SETTLEMENT: u64 = 0x07;
     /// Game capability missing or invalid
     const E_MISSING_CAPABILITY: u64 = 0x08;
+    /// Game is inactive
+    const E_GAME_INACTIVE: u64 = 0x09;
 
     //
     // Constants
@@ -65,7 +67,7 @@ module casino::CasinoHouse {
     }
 
     /// Game authorization capability
-    struct GameCapability has key, store {
+    struct GameCapability has key {
         game_address: address
     }
 
@@ -156,7 +158,7 @@ module casino::CasinoHouse {
     public entry fun register_game(
         admin: &signer,
         game_signer: &signer,
-        name: vector<u8>,
+        name: String,
         min_bet: u64,
         max_bet: u64,
         house_edge_bps: u64
@@ -178,7 +180,7 @@ module casino::CasinoHouse {
 
         // Store game info
         let game_info = GameInfo {
-            name: string::utf8(name),
+            name,
             module_address: game_addr,
             min_bet,
             max_bet,
@@ -192,11 +194,7 @@ module casino::CasinoHouse {
         move_to(game_signer, GameCapability { game_address: game_addr });
 
         event::emit(
-            GameRegisteredEvent {
-                game_address: game_addr,
-                name: string::utf8(name),
-                module_address: game_addr
-            }
+            GameRegisteredEvent { game_address: game_addr, name, module_address: game_addr }
         );
     }
 
@@ -216,9 +214,7 @@ module casino::CasinoHouse {
             &mut registry.registered_games, &game_address
         );
 
-        event::emit(
-            GameUnregisteredEvent { game_address, name: game_info.name }
-        );
+        event::emit(GameUnregisteredEvent { game_address, name: game_info.name });
     }
 
     /// Toggle game active status
@@ -241,22 +237,29 @@ module casino::CasinoHouse {
     }
 
     //
-    // Bet Flow Interface (Package Functions)
+    // Bet Flow Interface (Public Functions)
     //
 
     /// Accept bet from authorized game
-    package fun place_bet_internal(
-        coins: Coin<AptosCoin>, player: address, game_address: address
-    ): u64 acquires Treasury, BetIndex, GameRegistry {
-        // Validate game is registered and active
+    public fun place_bet(
+        game_addr: address, coins: Coin<AptosCoin>, player: address
+    ): u64 acquires Treasury, BetIndex, GameRegistry, GameCapability {
+        // Step 1: Verify game has capability (proves registration)
+        assert!(exists<GameCapability>(game_addr), E_GAME_NOT_REGISTERED);
+
+        // Step 2: Check active status
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
-            ordered_map::contains(&registry.registered_games, &game_address),
+            ordered_map::contains(&registry.registered_games, &game_addr),
             E_GAME_NOT_REGISTERED
         );
 
-        let game_info = ordered_map::borrow(&registry.registered_games, &game_address);
-        assert!(game_info.active, E_GAME_NOT_REGISTERED);
+        let game_info = ordered_map::borrow(&registry.registered_games, &game_addr);
+        assert!(game_info.active, E_GAME_INACTIVE);
+
+        // Step 3: Verify capability integrity
+        let cap = borrow_global<GameCapability>(game_addr);
+        assert!(cap.game_address == game_addr, E_MISSING_CAPABILITY);
 
         let amount = coin::value(&coins);
         assert!(amount >= game_info.min_bet, E_INVALID_AMOUNT);
@@ -272,31 +275,31 @@ module casino::CasinoHouse {
         bet_index.next = bet_id + 1;
 
         event::emit(
-            BetAcceptedEvent { bet_id, game_address, player, amount }
+            BetAcceptedEvent { bet_id, game_address: game_addr, player, amount }
         );
 
         bet_id
     }
 
     /// Settle bet with payout from treasury
-    package fun settle_bet_internal(
-        cap: &GameCapability,
+    public fun settle_bet(
+        game_addr: address,
         bet_id: u64,
         winner: address,
         payout: u64,
         profit: u64
-    ) acquires Treasury, GameRegistry {
-        // Validate game capability
-        let registry = borrow_global<GameRegistry>(@casino);
-        assert!(
-            ordered_map::contains(&registry.registered_games, &cap.game_address),
-            E_MISSING_CAPABILITY
-        );
+    ) acquires Treasury, GameRegistry, GameCapability {
+        // Step 1: Verify game has capability
+        assert!(exists<GameCapability>(game_addr), E_GAME_NOT_REGISTERED);
 
-        let game_info = ordered_map::borrow(
-            &registry.registered_games, &cap.game_address
-        );
-        assert!(game_info.active, E_GAME_NOT_REGISTERED);
+        // Step 2: Check active status
+        let registry = borrow_global<GameRegistry>(@casino);
+        let game_info = ordered_map::borrow(&registry.registered_games, &game_addr);
+        assert!(game_info.active, E_GAME_INACTIVE);
+
+        // Step 3: Verify capability integrity
+        let cap = borrow_global<GameCapability>(game_addr);
+        assert!(cap.game_address == game_addr, E_MISSING_CAPABILITY);
 
         // Validate settlement math (payout + profit should equal bet amount)
         let bet_amount = payout + profit;
@@ -320,7 +323,7 @@ module casino::CasinoHouse {
     }
 
     /// Extract funds from treasury for InvestorToken redemptions
-    package fun redeem_from_treasury(amount: u64): Coin<AptosCoin> acquires Treasury {
+    public fun redeem_from_treasury(amount: u64): Coin<AptosCoin> acquires Treasury {
         let treasury = borrow_global_mut<Treasury>(@casino);
         let treasury_balance = coin::value(&treasury.vault);
         assert!(amount <= treasury_balance, E_INSUFFICIENT_TREASURY);
@@ -329,7 +332,7 @@ module casino::CasinoHouse {
     }
 
     /// Deposit coins to treasury (for InvestorToken deposits)
-    package fun deposit_to_treasury(coins: Coin<AptosCoin>) acquires Treasury {
+    public fun deposit_to_treasury(coins: Coin<AptosCoin>) acquires Treasury {
         let treasury = borrow_global_mut<Treasury>(@casino);
         coin::merge(&mut treasury.vault, coins);
     }
@@ -428,7 +431,7 @@ module casino::CasinoHouse {
     }
 
     #[test_only]
-    /// Test helper to access GameCapability
+    /// Test helper to access settle_bet
     public fun test_settle_bet(
         game_addr: address,
         bet_id: u64,
@@ -436,16 +439,7 @@ module casino::CasinoHouse {
         payout: u64,
         profit: u64
     ) acquires Treasury, GameRegistry, GameCapability {
-        let cap = borrow_global<GameCapability>(game_addr);
-
-        // Validate game is still active
-        let registry = borrow_global<GameRegistry>(@casino);
-        let game_info = ordered_map::borrow(
-            &registry.registered_games, &cap.game_address
-        );
-        assert!(game_info.active, E_GAME_NOT_REGISTERED);
-
-        settle_bet_internal(cap, bet_id, winner, payout, profit);
+        settle_bet(game_addr, bet_id, winner, payout, profit);
     }
 
     #[test_only]
