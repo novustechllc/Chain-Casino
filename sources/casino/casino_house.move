@@ -4,7 +4,7 @@
 //! Integrates with InvestorToken for profit distribution to token holders.
 
 module casino::CasinoHouse {
-    use std::string::{Self, String};
+    use std::string::{String};
     use std::vector;
     use std::signer;
     use aptos_framework::coin::{Self, Coin};

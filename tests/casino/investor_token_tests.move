@@ -3,7 +3,6 @@
 #[test_only]
 module casino::InvestorTokenTest {
     use std::string;
-    use std::signer;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::coin;
