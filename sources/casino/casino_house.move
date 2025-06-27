@@ -39,8 +39,6 @@ module casino::CasinoHouse {
 
     /// Default house edge (1.5%)
     const DEFAULT_HOUSE_EDGE_BPS: u64 = 150;
-    /// Maximum number of games supported
-    const MAX_GAMES: u8 = 255;
 
     //
     // Resource Specifications
@@ -53,8 +51,7 @@ module casino::CasinoHouse {
 
     /// Registry of authorized casino games
     struct GameRegistry has key {
-        registered_games: OrderedMap<u8, GameInfo>,
-        next_game_id: u8
+        registered_games: OrderedMap<address, GameInfo>
     }
 
     /// Auto-incrementing bet identifier
@@ -69,7 +66,7 @@ module casino::CasinoHouse {
 
     /// Game authorization capability
     struct GameCapability has key, store {
-        game_id: u8
+        game_address: address
     }
 
     /// Game metadata and configuration
@@ -90,7 +87,7 @@ module casino::CasinoHouse {
     /// Emitted when bet is accepted by casino
     struct BetAcceptedEvent has drop, store {
         bet_id: u64,
-        game_id: u8,
+        game_address: address,
         player: address,
         amount: u64
     }
@@ -107,7 +104,7 @@ module casino::CasinoHouse {
     #[event]
     /// Emitted when new game is registered
     struct GameRegisteredEvent has drop, store {
-        game_id: u8,
+        game_address: address,
         name: String,
         module_address: address
     }
@@ -115,14 +112,14 @@ module casino::CasinoHouse {
     #[event]
     /// Emitted when game is unregistered
     struct GameUnregisteredEvent has drop, store {
-        game_id: u8,
+        game_address: address,
         name: String
     }
 
     #[event]
     /// Emitted when game status changes
     struct GameToggleEvent has drop, store {
-        game_id: u8,
+        game_address: address,
         active: bool
     }
 
@@ -142,8 +139,7 @@ module casino::CasinoHouse {
         move_to(
             owner,
             GameRegistry {
-                registered_games: ordered_map::new<u8, GameInfo>(),
-                next_game_id: 1
+                registered_games: ordered_map::new<address, GameInfo>()
             }
         );
 
@@ -167,17 +163,18 @@ module casino::CasinoHouse {
     ) acquires GameRegistry {
         assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
 
+        let game_addr = signer::address_of(game_signer);
         let registry = borrow_global_mut<GameRegistry>(@casino);
-        assert!(registry.next_game_id < MAX_GAMES, E_INVALID_GAME_INTERFACE);
 
-        let game_id = registry.next_game_id;
-        registry.next_game_id = game_id + 1;
+        // Check if game already registered
+        assert!(
+            !ordered_map::contains(&registry.registered_games, &game_addr),
+            E_GAME_ALREADY_REGISTERED
+        );
 
         // Validate game info
         assert!(min_bet > 0, E_INVALID_AMOUNT);
         assert!(max_bet >= min_bet, E_INVALID_AMOUNT);
-
-        let game_addr = signer::address_of(game_signer);
 
         // Store game info
         let game_info = GameInfo {
@@ -189,14 +186,14 @@ module casino::CasinoHouse {
             active: true
         };
 
-        ordered_map::add(&mut registry.registered_games, game_id, game_info);
+        ordered_map::add(&mut registry.registered_games, game_addr, game_info);
 
         // Grant capability to game
-        move_to(game_signer, GameCapability { game_id });
+        move_to(game_signer, GameCapability { game_address: game_addr });
 
         event::emit(
             GameRegisteredEvent {
-                game_id,
+                game_address: game_addr,
                 name: string::utf8(name),
                 module_address: game_addr
             }
@@ -204,36 +201,39 @@ module casino::CasinoHouse {
     }
 
     /// Permanently remove game from registry
-    public entry fun unregister_game(admin: &signer, game_id: u8) acquires GameRegistry {
+    public entry fun unregister_game(admin: &signer, game_address: address) acquires GameRegistry {
         assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
 
         let registry = borrow_global_mut<GameRegistry>(@casino);
         assert!(
-            ordered_map::contains(&registry.registered_games, &game_id),
+            ordered_map::contains(&registry.registered_games, &game_address),
             E_GAME_NOT_REGISTERED
         );
 
-        let game_info = ordered_map::remove(&mut registry.registered_games, &game_id);
+        let game_info = ordered_map::remove(&mut registry.registered_games, &game_address);
 
-        event::emit(GameUnregisteredEvent { game_id, name: game_info.name });
+        event::emit(GameUnregisteredEvent { 
+            game_address, 
+            name: game_info.name 
+        });
     }
 
     /// Toggle game active status
     public entry fun toggle_game(
-        admin: &signer, game_id: u8, active: bool
+        admin: &signer, game_address: address, active: bool
     ) acquires GameRegistry {
         assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
 
         let registry = borrow_global_mut<GameRegistry>(@casino);
         assert!(
-            ordered_map::contains(&registry.registered_games, &game_id),
+            ordered_map::contains(&registry.registered_games, &game_address),
             E_GAME_NOT_REGISTERED
         );
 
-        let game_info = ordered_map::borrow_mut(&mut registry.registered_games, &game_id);
+        let game_info = ordered_map::borrow_mut(&mut registry.registered_games, &game_address);
         game_info.active = active;
 
-        event::emit(GameToggleEvent { game_id, active });
+        event::emit(GameToggleEvent { game_address, active });
     }
 
     //
@@ -242,16 +242,16 @@ module casino::CasinoHouse {
 
     /// Accept bet from authorized game
     package fun place_bet_internal(
-        coins: Coin<AptosCoin>, player: address, game_id: u8
+        coins: Coin<AptosCoin>, player: address, game_address: address
     ): u64 acquires Treasury, BetIndex, GameRegistry {
         // Validate game is registered and active
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
-            ordered_map::contains(&registry.registered_games, &game_id),
+            ordered_map::contains(&registry.registered_games, &game_address),
             E_GAME_NOT_REGISTERED
         );
 
-        let game_info = ordered_map::borrow(&registry.registered_games, &game_id);
+        let game_info = ordered_map::borrow(&registry.registered_games, &game_address);
         assert!(game_info.active, E_GAME_NOT_REGISTERED);
 
         let amount = coin::value(&coins);
@@ -268,15 +268,13 @@ module casino::CasinoHouse {
         bet_index.next = bet_id + 1;
 
         event::emit(
-            BetAcceptedEvent { bet_id, game_id, player, amount }
+            BetAcceptedEvent { bet_id, game_address, player, amount }
         );
 
         bet_id
     }
 
     /// Settle bet with payout from treasury
-    /// Should check if original bet payout and profit were the arguments passed to the function
-    /// Or take that parameters from the bet_id
     package fun settle_bet_internal(
         cap: &GameCapability,
         bet_id: u64,
@@ -287,11 +285,11 @@ module casino::CasinoHouse {
         // Validate game capability
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
-            ordered_map::contains(&registry.registered_games, &cap.game_id),
+            ordered_map::contains(&registry.registered_games, &cap.game_address),
             E_MISSING_CAPABILITY
         );
 
-        let game_info = ordered_map::borrow(&registry.registered_games, &cap.game_id);
+        let game_info = ordered_map::borrow(&registry.registered_games, &cap.game_address);
         assert!(game_info.active, E_GAME_NOT_REGISTERED);
 
         // Validate settlement math (payout + profit should equal bet amount)
@@ -343,8 +341,8 @@ module casino::CasinoHouse {
         let keys = ordered_map::keys(&registry.registered_games);
         let i = 0;
         while (i < vector::length(&keys)) {
-            let game_id = *vector::borrow(&keys, i);
-            let game_info = *ordered_map::borrow(&registry.registered_games, &game_id);
+            let game_address = *vector::borrow(&keys, i);
+            let game_info = *ordered_map::borrow(&registry.registered_games, &game_address);
             vector::push_back(&mut games, game_info);
             i = i + 1;
         };
@@ -354,13 +352,13 @@ module casino::CasinoHouse {
 
     #[view]
     /// Get specific game information
-    public fun get_game_info(game_id: u8): GameInfo acquires GameRegistry {
+    public fun get_game_info(game_address: address): GameInfo acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
-            ordered_map::contains(&registry.registered_games, &game_id),
+            ordered_map::contains(&registry.registered_games, &game_address),
             E_GAME_NOT_REGISTERED
         );
-        *ordered_map::borrow(&registry.registered_games, &game_id)
+        *ordered_map::borrow(&registry.registered_games, &game_address)
     }
 
     #[view]
@@ -379,10 +377,10 @@ module casino::CasinoHouse {
 
     #[view]
     /// Check if game is registered and active
-    public fun is_game_active(game_id: u8): bool acquires GameRegistry {
+    public fun is_game_active(game_address: address): bool acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@casino);
-        if (ordered_map::contains(&registry.registered_games, &game_id)) {
-            let game_info = ordered_map::borrow(&registry.registered_games, &game_id);
+        if (ordered_map::contains(&registry.registered_games, &game_address)) {
+            let game_info = ordered_map::borrow(&registry.registered_games, &game_address);
             game_info.active
         } else { false }
     }
@@ -433,7 +431,7 @@ module casino::CasinoHouse {
 
         // Validate game is still active
         let registry = borrow_global<GameRegistry>(@casino);
-        let game_info = ordered_map::borrow(&registry.registered_games, &cap.game_id);
+        let game_info = ordered_map::borrow(&registry.registered_games, &cap.game_address);
         assert!(game_info.active, E_GAME_NOT_REGISTERED);
 
         settle_bet_internal(cap, bet_id, winner, payout, profit);
