@@ -4,6 +4,7 @@
 module casino::CasinoHouseTest {
     use std::string;
     use std::vector;
+    use std::debug;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::coin;
@@ -643,7 +644,11 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
-        let bet_amount = 1000003; // Odd number
+        let bet_amount = 1000003;
+
+        let winner = account::create_account_for_test(@0x999);
+        coin::register<AptosCoin>(&winner);
+
         let coins = coin::withdraw<AptosCoin>(&casino_account, bet_amount);
         let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
 

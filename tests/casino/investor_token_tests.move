@@ -107,9 +107,11 @@ module casino::InvestorTokenTest {
     }
 
     #[test]
-    #[expected_failure(
-        abort_code = E_INSUFFICIENT_BALANCE, location = casino::InvestorToken
-    )]
+    #[
+        expected_failure(
+            abort_code = E_INSUFFICIENT_BALANCE, location = casino::InvestorToken
+        )
+    ]
     fun test_redeem_insufficient_balance() {
         let (_casino_account, user_account) = setup_test();
 
@@ -327,9 +329,11 @@ module casino::InvestorTokenTest {
     }
 
     #[test]
-    #[expected_failure(
-        abort_code = E_INSUFFICIENT_TREASURY, location = casino::InvestorToken
-    )]
+    #[
+        expected_failure(
+            abort_code = E_INSUFFICIENT_TREASURY, location = casino::InvestorToken
+        )
+    ]
     fun test_redeem_exceeds_treasury() {
         let (casino_account, user_account) = setup_test();
 
