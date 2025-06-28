@@ -73,7 +73,6 @@ module dice_game::DiceGame {
     //
 
     #[lint::allow_unsafe_randomness]
-    #[randomness]
     /// Play dice game
     /// Both game operator and player must sign transaction
     public entry fun play_dice(
@@ -108,7 +107,7 @@ module dice_game::DiceGame {
             );
 
         // Roll the dice (1-6)
-        let dice_result = randomness::u8_range(1, 7);
+        let dice_result = roll_dice_internal();
 
         // Determine outcome
         let player_won = dice_result == guess;
@@ -136,6 +135,11 @@ module dice_game::DiceGame {
                 payout: actual_payout
             }
         );
+    }
+
+    #[lint::allow_unsafe_randomness]
+    fun roll_dice_internal(): u8 {
+        randomness::u8_range(1, 7)
     }
 
     //
