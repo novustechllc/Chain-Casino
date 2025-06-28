@@ -43,6 +43,14 @@ module casino::CasinoHouseTest {
         (aptos_framework, casino_account, game_account)
     }
 
+    // Helper function to create a player with appropriate balance for testing
+    fun create_player_with_balance(aptos_framework: &signer, player_address: address, balance: u64): signer {
+        let player = account::create_account_for_test(player_address);
+        coin::register<AptosCoin>(&player);
+        aptos_coin::mint(aptos_framework, player_address, balance);
+        player
+    }
+
     //
     // Initialization Tests
     //
@@ -244,7 +252,7 @@ module casino::CasinoHouseTest {
 
     #[test]
     fun test_place_bet_success() {
-        let (_, casino_account, game_account) = setup_test();
+        let (aptos_framework, casino_account, game_account) = setup_test();
 
         CasinoHouse::init_module_for_test(&casino_account);
         CasinoHouse::register_game(
@@ -256,7 +264,11 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
-        let coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET);
+        // Create player with appropriate balance for test
+        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
+
+        // Player funds bet through game
+        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
         let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
 
         assert!(bet_id == 1, 1);
@@ -266,19 +278,23 @@ module casino::CasinoHouseTest {
     #[test]
     #[expected_failure(abort_code = E_GAME_NOT_REGISTERED, location = casino::CasinoHouse)]
     fun test_place_bet_unregistered_game() {
-        let (_, casino_account, game_account) = setup_test();
+        let (aptos_framework, casino_account, game_account) = setup_test();
 
         CasinoHouse::init_module_for_test(&casino_account);
         // Don't register the game
 
-        let coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET);
+        // Create player with appropriate balance for test
+        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
+
+        // Player funds bet through game
+        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
         CasinoHouse::place_bet(&game_account, coins, @0x999);
     }
 
     #[test]
     #[expected_failure(abort_code = E_INVALID_AMOUNT, location = casino::CasinoHouse)]
     fun test_place_bet_below_minimum() {
-        let (_, casino_account, game_account) = setup_test();
+        let (aptos_framework, casino_account, game_account) = setup_test();
 
         CasinoHouse::init_module_for_test(&casino_account);
         CasinoHouse::register_game(
@@ -290,14 +306,18 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
-        let coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET - 1);
+        // Create player with appropriate balance for test
+        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
+
+        // Player funds bet through game with amount below minimum
+        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET - 1);
         CasinoHouse::place_bet(&game_account, coins, @0x999);
     }
 
     #[test]
     #[expected_failure(abort_code = E_INVALID_AMOUNT, location = casino::CasinoHouse)]
     fun test_place_bet_above_maximum() {
-        let (_, casino_account, game_account) = setup_test();
+        let (aptos_framework, casino_account, game_account) = setup_test();
 
         CasinoHouse::init_module_for_test(&casino_account);
         CasinoHouse::register_game(
@@ -309,13 +329,17 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
-        let coins = coin::withdraw<AptosCoin>(&casino_account, MAX_BET + 1);
+        // Create player with appropriate balance for test
+        let player = create_player_with_balance(&aptos_framework, @0x999, MAX_BET * 2);
+
+        // Player funds bet through game with amount above maximum
+        let coins = coin::withdraw<AptosCoin>(&player, MAX_BET + 1);
         CasinoHouse::place_bet(&game_account, coins, @0x999);
     }
 
     #[test]
     fun test_multiple_bets_incrementing_id() {
-        let (_, casino_account, game_account) = setup_test();
+        let (aptos_framework, casino_account, game_account) = setup_test();
 
         CasinoHouse::init_module_for_test(&casino_account);
         CasinoHouse::register_game(
@@ -327,10 +351,15 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
-        let coins1 = coin::withdraw<AptosCoin>(&casino_account, MIN_BET);
+        // Create players with appropriate balances for test
+        let player1 = create_player_with_balance(&aptos_framework, @0x111, MIN_BET * 2);
+        let player2 = create_player_with_balance(&aptos_framework, @0x222, MIN_BET * 4);
+
+        // Players fund bets through game
+        let coins1 = coin::withdraw<AptosCoin>(&player1, MIN_BET);
         let bet_id1 = CasinoHouse::place_bet(&game_account, coins1, @0x111);
 
-        let coins2 = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
+        let coins2 = coin::withdraw<AptosCoin>(&player2, MIN_BET * 2);
         let bet_id2 = CasinoHouse::place_bet(&game_account, coins2, @0x222);
 
         assert!(bet_id1 == 1, 1);
@@ -347,7 +376,7 @@ module casino::CasinoHouseTest {
 
     #[test]
     fun test_settle_bet_winner_payout() {
-        let (_, casino_account, game_account) = setup_test();
+        let (aptos_framework, casino_account, game_account) = setup_test();
 
         CasinoHouse::init_module_for_test(&casino_account);
         CasinoHouse::register_game(
@@ -359,13 +388,12 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
-        // Place bet first
-        let coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET);
-        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
+        // Create player with appropriate balance for test
+        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
 
-        // Create winner account
-        let winner = account::create_account_for_test(@0x999);
-        coin::register<AptosCoin>(&winner);
+        // Player funds bet through game
+        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
+        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
 
         // Settle with payout
         CasinoHouse::settle_bet(
@@ -388,7 +416,7 @@ module casino::CasinoHouseTest {
 
     #[test]
     fun test_settle_bet_house_wins() {
-        let (_, casino_account, game_account) = setup_test();
+        let (aptos_framework, casino_account, game_account) = setup_test();
 
         CasinoHouse::init_module_for_test(&casino_account);
         CasinoHouse::register_game(
@@ -400,7 +428,11 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
-        let coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET);
+        // Create player with appropriate balance for test
+        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
+
+        // Player funds bet through game
+        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
         let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
 
         // Settle with no payout (house wins all)
@@ -611,7 +643,7 @@ module casino::CasinoHouseTest {
 
     #[test]
     fun test_large_bet_amounts() {
-        let (_, casino_account, game_account) = setup_test();
+        let (aptos_framework, casino_account, game_account) = setup_test();
 
         CasinoHouse::init_module_for_test(&casino_account);
         CasinoHouse::register_game(
@@ -623,7 +655,11 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
-        let coins = coin::withdraw<AptosCoin>(&casino_account, 1000000000);
+        // Create player with appropriate balance for test
+        let player = create_player_with_balance(&aptos_framework, @0x999, 1000000000 * 2);
+
+        // Player funds bet through game
+        let coins = coin::withdraw<AptosCoin>(&player, 1000000000);
         let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
 
         assert!(bet_id == 1, 1);
@@ -632,7 +668,7 @@ module casino::CasinoHouseTest {
 
     #[test]
     fun test_bet_settlement_math_precision() {
-        let (_, casino_account, game_account) = setup_test();
+        let (aptos_framework, casino_account, game_account) = setup_test();
 
         CasinoHouse::init_module_for_test(&casino_account);
         CasinoHouse::register_game(
@@ -646,10 +682,11 @@ module casino::CasinoHouseTest {
 
         let bet_amount = 1000003;
 
-        let winner = account::create_account_for_test(@0x999);
-        coin::register<AptosCoin>(&winner);
+        // Create player with appropriate balance for test
+        let player = create_player_with_balance(&aptos_framework, @0x999, bet_amount * 2);
 
-        let coins = coin::withdraw<AptosCoin>(&casino_account, bet_amount);
+        // Player funds bet through game
+        let coins = coin::withdraw<AptosCoin>(&player, bet_amount);
         let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
 
         // Settle with exact split
@@ -662,14 +699,14 @@ module casino::CasinoHouseTest {
 
     #[test]
     fun test_concurrent_operations() {
-        let (_, casino_account, _) = setup_test();
+        let (aptos_framework, casino_account, _) = setup_test();
         let game1 = account::create_account_for_test(@0x111);
         let game2 = account::create_account_for_test(@0x222);
 
         coin::register<AptosCoin>(&game1);
         coin::register<AptosCoin>(&game2);
-        aptos_coin::mint(&game1, @0x111, INITIAL_BALANCE);
-        aptos_coin::mint(&game2, @0x222, INITIAL_BALANCE);
+        aptos_coin::mint(&aptos_framework, @0x111, INITIAL_BALANCE);
+        aptos_coin::mint(&aptos_framework, @0x222, INITIAL_BALANCE);
 
         CasinoHouse::init_module_for_test(&casino_account);
 
@@ -691,9 +728,13 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
-        // Concurrent bets
-        let coins1 = coin::withdraw<AptosCoin>(&game1, MIN_BET);
-        let coins2 = coin::withdraw<AptosCoin>(&game2, MIN_BET * 2);
+        // Create players with appropriate balances for test
+        let player1 = create_player_with_balance(&aptos_framework, @0x333, MIN_BET * 2);
+        let player2 = create_player_with_balance(&aptos_framework, @0x444, MIN_BET * 4);
+
+        // Players fund concurrent bets through games
+        let coins1 = coin::withdraw<AptosCoin>(&player1, MIN_BET);
+        let coins2 = coin::withdraw<AptosCoin>(&player2, MIN_BET * 2);
 
         let bet_id1 = CasinoHouse::place_bet(&game1, coins1, @0x333);
         let bet_id2 = CasinoHouse::place_bet(&game2, coins2, @0x444);
