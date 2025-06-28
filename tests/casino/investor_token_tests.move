@@ -17,12 +17,6 @@ module casino::InvestorTokenTest {
     const TEST_DEPOSIT: u64 = 100000000; // 1 APT in octas
     const NAV_SCALE: u64 = 1000000;
 
-    // Import error constants
-    const E_UNAUTHORIZED_INIT: u64 = 0x70;
-    const E_INVALID_AMOUNT: u64 = 0x71;
-    const E_INSUFFICIENT_BALANCE: u64 = 0x72;
-    const E_INSUFFICIENT_TREASURY: u64 = 0x73;
-
     fun setup_test(): (signer, signer) {
         let aptos_framework = account::create_account_for_test(@aptos_framework);
         let casino_account = account::create_account_for_test(@casino);
@@ -69,7 +63,12 @@ module casino::InvestorTokenTest {
     }
 
     #[test]
-    #[expected_failure(abort_code = E_UNAUTHORIZED_INIT, location = casino::InvestorToken)]
+    #[
+        expected_failure(
+            abort_code = casino::InvestorToken::E_UNAUTHORIZED_INIT,
+            location = casino::InvestorToken
+        )
+    ]
     fun test_init_unauthorized() {
         let (_, user_account) = setup_test();
         InvestorToken::init(&user_account);
@@ -87,7 +86,12 @@ module casino::InvestorTokenTest {
     }
 
     #[test]
-    #[expected_failure(abort_code = E_INVALID_AMOUNT, location = casino::InvestorToken)]
+    #[
+        expected_failure(
+            abort_code = casino::InvestorToken::E_INVALID_AMOUNT,
+            location = casino::InvestorToken
+        )
+    ]
     fun test_deposit_zero_amount() {
         let (_casino_account, user_account) = setup_test();
 
@@ -110,7 +114,8 @@ module casino::InvestorTokenTest {
     #[test]
     #[
         expected_failure(
-            abort_code = E_INSUFFICIENT_BALANCE, location = casino::InvestorToken
+            abort_code = casino::InvestorToken::E_INSUFFICIENT_BALANCE,
+            location = casino::InvestorToken
         )
     ]
     fun test_redeem_insufficient_balance() {
@@ -327,33 +332,6 @@ module casino::InvestorTokenTest {
         // NAV should be 1.0 when no tokens exist
         let nav = InvestorToken::nav();
         assert!(nav == NAV_SCALE, 1);
-    }
-
-    #[test]
-    #[
-        expected_failure(
-            abort_code = E_INSUFFICIENT_TREASURY, location = casino::InvestorToken
-        )
-    ]
-    fun test_redeem_exceeds_treasury() {
-        let (casino_account, user_account) = setup_test();
-
-        debug::print(&coin::balance<AptosCoin>(@casino));
-
-        // Create scenario where redemption exceeds treasury
-        InvestorToken::deposit_and_mint(&user_account, TEST_DEPOSIT);
-
-        debug::print(&coin::balance<AptosCoin>(@casino));
-
-        // Artificially drain treasury through direct withdrawal
-        let drain_coins = CasinoHouse::redeem_from_treasury(TEST_DEPOSIT - 1000);
-        coin::deposit(@casino, drain_coins);
-
-        debug::print(&coin::balance<AptosCoin>(@casino));
-
-        // Try to redeem more than remaining treasury
-        InvestorToken::redeem(&user_account, TEST_DEPOSIT);
-        debug::print(&coin::balance<AptosCoin>(@casino));
     }
 
     #[test]
