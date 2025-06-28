@@ -47,7 +47,9 @@ module casino::CasinoHouseTest {
     }
 
     // Helper function to create a player with appropriate balance for testing
-    fun create_player_with_balance(aptos_framework: &signer, player_address: address, balance: u64): signer {
+    fun create_player_with_balance(
+        aptos_framework: &signer, player_address: address, balance: u64
+    ): signer {
         let player = account::create_account_for_test(player_address);
         coin::register<AptosCoin>(&player);
         aptos_coin::mint(aptos_framework, player_address, balance);
@@ -65,8 +67,7 @@ module casino::CasinoHouseTest {
         CasinoHouse::init_module_for_test(&casino_account);
 
         assert!(CasinoHouse::treasury_balance() == 0, 1);
-        assert!(CasinoHouse::get_params() == 150, 2);
-        assert!(vector::length(&CasinoHouse::get_registered_games()) == 0, 3);
+        assert!(vector::length(&CasinoHouse::get_registered_games()) == 0, 2);
     }
 
     #[test]
@@ -267,6 +268,10 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
+        // Fund treasury with sufficient balance for expected payout
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
+
         // Create player with appropriate balance for test
         let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
 
@@ -275,7 +280,10 @@ module casino::CasinoHouseTest {
         let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, MIN_BET * 2);
 
         assert!(bet_id == 1, 1);
-        assert!(CasinoHouse::treasury_balance() == MIN_BET, 2);
+        assert!(
+            CasinoHouse::treasury_balance() == MIN_BET * 3,
+            2
+        );
     }
 
     #[test]
@@ -354,6 +362,10 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
+        // Fund treasury with sufficient balance for expected payouts
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 6);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
+
         // Create players with appropriate balances for test
         let player1 = create_player_with_balance(&aptos_framework, @0x111, MIN_BET * 2);
         let player2 = create_player_with_balance(&aptos_framework, @0x222, MIN_BET * 4);
@@ -368,7 +380,7 @@ module casino::CasinoHouseTest {
         assert!(bet_id1 == 1, 1);
         assert!(bet_id2 == 2, 2);
         assert!(
-            CasinoHouse::treasury_balance() == MIN_BET * 3,
+            CasinoHouse::treasury_balance() == MIN_BET * 9,
             3
         );
     }
@@ -397,7 +409,11 @@ module casino::CasinoHouseTest {
     }
 
     #[test]
-    #[expected_failure(abort_code = E_INSUFFICIENT_TREASURY_FOR_PAYOUT, location = casino::CasinoHouse)]
+    #[
+        expected_failure(
+            abort_code = E_INSUFFICIENT_TREASURY_FOR_PAYOUT, location = casino::CasinoHouse
+        )
+    ]
     fun test_place_bet_insufficient_treasury_for_payout() {
         let (aptos_framework, casino_account, game_account) = setup_test();
 
@@ -414,13 +430,20 @@ module casino::CasinoHouseTest {
         // Create player with appropriate balance for test
         let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
 
-        // Try to place bet with expected payout larger than treasury (should fail)
+        // Try to place bet with expected payout larger than treasury + bet amount (should fail)
         let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
-        CasinoHouse::place_bet(&game_account, coins, @0x999, INITIAL_BALANCE + 1);
+        CasinoHouse::place_bet(
+            &game_account,
+            coins,
+            @0x999,
+            INITIAL_BALANCE + MIN_BET + 1
+        );
     }
 
     #[test]
-    #[expected_failure(abort_code = E_PAYOUT_EXCEEDS_EXPECTED, location = casino::CasinoHouse)]
+    #[expected_failure(
+        abort_code = E_PAYOUT_EXCEEDS_EXPECTED, location = casino::CasinoHouse
+    )]
     fun test_settle_bet_payout_exceeds_expected() {
         let (aptos_framework, casino_account, game_account) = setup_test();
 
@@ -433,6 +456,10 @@ module casino::CasinoHouseTest {
             MAX_BET,
             HOUSE_EDGE
         );
+
+        // Fund treasury with sufficient balance for expected payout
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
 
         // Create player with appropriate balance for test
         let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
@@ -459,6 +486,10 @@ module casino::CasinoHouseTest {
             MAX_BET,
             HOUSE_EDGE
         );
+
+        // Fund treasury with sufficient balance for expected payout
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
 
         // Create player with appropriate balance for test
         let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
@@ -492,6 +523,10 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
+        // Fund treasury with sufficient balance for expected payout
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
+
         // Create player with appropriate balance for test
         let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
 
@@ -500,12 +535,7 @@ module casino::CasinoHouseTest {
         let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, MIN_BET * 2);
 
         // Settle with payout
-        CasinoHouse::settle_bet(
-            &game_account,
-            bet_id,
-            @0x999,
-            MIN_BET
-        );
+        CasinoHouse::settle_bet(&game_account, bet_id, @0x999, MIN_BET);
 
         let expected_balance = MIN_BET * 2;
 
@@ -514,7 +544,7 @@ module casino::CasinoHouseTest {
             1
         );
         assert!(
-            CasinoHouse::treasury_balance() == 0,
+            CasinoHouse::treasury_balance() == MIN_BET * 2,
             2
         );
     }
@@ -533,6 +563,10 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
+        // Fund treasury with sufficient balance for expected payout
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
+
         // Create player with appropriate balance for test
         let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
 
@@ -543,7 +577,10 @@ module casino::CasinoHouseTest {
         // Settle with small payout (house keeps most)
         CasinoHouse::settle_bet(&game_account, bet_id, @0x999, MIN_BET / 4);
 
-        assert!(CasinoHouse::treasury_balance() == MIN_BET * 3 / 4, 1);
+        assert!(
+            CasinoHouse::treasury_balance() == MIN_BET * 2 + MIN_BET * 3 / 4,
+            1
+        );
     }
 
     #[test]
@@ -571,6 +608,10 @@ module casino::CasinoHouseTest {
             MAX_BET,
             HOUSE_EDGE
         );
+
+        // Fund treasury with sufficient balance for expected payout
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
 
         // Create player with appropriate balance for test
         let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
@@ -600,6 +641,10 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
+        // Fund treasury with sufficient balance for expected payout
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
+
         // Create player with appropriate balance for test
         let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
 
@@ -607,8 +652,8 @@ module casino::CasinoHouseTest {
         let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
         let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, MIN_BET * 2);
 
-        // Try to payout more than treasury has (treasury only has MIN_BET)
-        CasinoHouse::settle_bet(&game_account, bet_id, @0x999, MIN_BET + 1);
+        // Try to payout more than treasury has (treasury has MIN_BET * 3, try to pay MIN_BET + 1)
+        CasinoHouse::settle_bet(&game_account, bet_id, @0x999, MIN_BET * 3 + 1);
     }
 
     //
@@ -710,54 +755,6 @@ module casino::CasinoHouseTest {
     }
 
     //
-    // Admin Operations Tests
-    //
-
-    #[test]
-    fun test_set_house_edge_success() {
-        let (_, casino_account, _) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        assert!(CasinoHouse::get_params() == 150, 1);
-
-        CasinoHouse::set_house_edge(&casino_account, 200);
-        assert!(CasinoHouse::get_params() == 200, 2);
-    }
-
-    #[test]
-    #[expected_failure(abort_code = E_NOT_ADMIN, location = casino::CasinoHouse)]
-    fun test_set_house_edge_unauthorized() {
-        let (_, casino_account, game_account) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        CasinoHouse::set_house_edge(&game_account, 200);
-    }
-
-    #[test]
-    #[expected_failure(abort_code = E_INVALID_AMOUNT, location = casino::CasinoHouse)]
-    fun test_set_house_edge_too_high() {
-        let (_, casino_account, _) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        CasinoHouse::set_house_edge(&casino_account, 1001); // > 10%
-    }
-
-    #[test]
-    fun test_set_house_edge_boundary_values() {
-        let (_, casino_account, _) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-
-        // Test minimum edge (0%)
-        CasinoHouse::set_house_edge(&casino_account, 0);
-        assert!(CasinoHouse::get_params() == 0, 1);
-
-        // Test maximum edge (10%)
-        CasinoHouse::set_house_edge(&casino_account, 1000);
-        assert!(CasinoHouse::get_params() == 1000, 2);
-    }
-
-    //
     // Edge Cases and Complex Scenarios
     //
 
@@ -775,15 +772,24 @@ module casino::CasinoHouseTest {
             HOUSE_EDGE
         );
 
+        // Fund treasury with sufficient balance for expected payout
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, 1000000000 * 2);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
+
         // Create player with appropriate balance for test
-        let player = create_player_with_balance(&aptos_framework, @0x999, 1000000000 * 2);
+        let player = create_player_with_balance(&aptos_framework, @0x999, 1000000000
+            * 2);
 
         // Player funds bet through game
         let coins = coin::withdraw<AptosCoin>(&player, 1000000000);
-        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, 1000000000 * 2);
+        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, 1000000000
+            * 2);
 
         assert!(bet_id == 1, 1);
-        assert!(CasinoHouse::treasury_balance() == 1000000000, 2);
+        assert!(
+            CasinoHouse::treasury_balance() == 1000000000 * 3,
+            2
+        );
     }
 
     #[test]
@@ -802,18 +808,27 @@ module casino::CasinoHouseTest {
 
         let bet_amount = 1000003;
 
+        // Fund treasury with sufficient balance for expected payout
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, bet_amount * 2);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
+
         // Create player with appropriate balance for test
-        let player = create_player_with_balance(&aptos_framework, @0x999, bet_amount * 2);
+        let player = create_player_with_balance(&aptos_framework, @0x999, bet_amount
+            * 2);
 
         // Player funds bet through game
         let coins = coin::withdraw<AptosCoin>(&player, bet_amount);
-        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, bet_amount * 2);
+        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, bet_amount
+            * 2);
 
         // Settle with exact payout
         let payout = 500001;
         CasinoHouse::settle_bet(&game_account, bet_id, @0x999, payout);
 
-        assert!(CasinoHouse::treasury_balance() == bet_amount - payout, 1);
+        assert!(
+            CasinoHouse::treasury_balance() == bet_amount * 2 + bet_amount - payout,
+            1
+        );
     }
 
     #[test]
@@ -828,6 +843,10 @@ module casino::CasinoHouseTest {
         aptos_coin::mint(&aptos_framework, @0x222, INITIAL_BALANCE);
 
         CasinoHouse::init_module_for_test(&casino_account);
+
+        // Fund treasury with sufficient balance for expected payouts
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 6);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
 
         // Register multiple games
         CasinoHouse::register_game(
@@ -861,7 +880,7 @@ module casino::CasinoHouseTest {
         assert!(bet_id1 == 1, 1);
         assert!(bet_id2 == 2, 2);
         assert!(
-            CasinoHouse::treasury_balance() == MIN_BET * 3,
+            CasinoHouse::treasury_balance() == MIN_BET * 9,
             3
         );
     }

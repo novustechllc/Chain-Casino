@@ -65,11 +65,6 @@ module casino::CasinoHouse {
         bets: OrderedMap<u64, BetInfo>
     }
 
-    /// Casino operational parameters
-    struct Params has key {
-        house_edge_bps: u64
-    }
-
     /// Game metadata and configuration
     struct GameInfo has copy, drop, store {
         name: String,
@@ -104,7 +99,7 @@ module casino::CasinoHouse {
     struct BetSettledEvent has drop, store {
         bet_id: u64,
         winner: address,
-        payout: u64,
+        payout: u64
     }
 
     #[event]
@@ -246,8 +241,8 @@ module casino::CasinoHouse {
 
     /// Accept bet from authorized game
     public fun place_bet(
-        game: &signer, 
-        coins: Coin<AptosCoin>, 
+        game: &signer,
+        coins: Coin<AptosCoin>,
         player: address,
         expected_payout: u64
     ): u64 acquires Treasury, BetIndex, GameRegistry, BetRegistry {
@@ -269,14 +264,15 @@ module casino::CasinoHouse {
         // Validate expected payout
         assert!(expected_payout > 0, E_INVALID_AMOUNT);
 
-        // Check treasury has sufficient funds for expected payout
-        let treasury = borrow_global<Treasury>(@casino);
-        let treasury_balance = coin::value(&treasury.vault);
-        assert!(expected_payout <= treasury_balance, E_INSUFFICIENT_TREASURY_FOR_PAYOUT);
-
-        // Merge coins into treasury
+        // Merge coins into treasury first
         let treasury_mut = borrow_global_mut<Treasury>(@casino);
         coin::merge(&mut treasury_mut.vault, coins);
+
+        // Check if treasury has sufficient funds for expected payout after bet contribution
+        let new_treasury_balance = coin::value(&treasury_mut.vault);
+        assert!(
+            expected_payout <= new_treasury_balance, E_INSUFFICIENT_TREASURY_FOR_PAYOUT
+        );
 
         // Generate bet ID
         let bet_index = borrow_global_mut<BetIndex>(@casino);
@@ -285,14 +281,17 @@ module casino::CasinoHouse {
 
         // Store bet information
         let bet_registry = borrow_global_mut<BetRegistry>(@casino);
-        let bet_info = BetInfo {
-            expected_payout,
-            settled: false
-        };
+        let bet_info = BetInfo { expected_payout, settled: false };
         ordered_map::add(&mut bet_registry.bets, bet_id, bet_info);
 
         event::emit(
-            BetAcceptedEvent { bet_id, game_address: game_addr, player, amount, expected_payout }
+            BetAcceptedEvent {
+                bet_id,
+                game_address: game_addr,
+                player,
+                amount,
+                expected_payout
+            }
         );
 
         bet_id
@@ -303,7 +302,7 @@ module casino::CasinoHouse {
         game: &signer,
         bet_id: u64,
         winner: address,
-        payout: u64,
+        payout: u64
     ) acquires Treasury, GameRegistry, BetRegistry {
         // Verify game is registered
         let registry = borrow_global<GameRegistry>(@casino);
@@ -340,9 +339,7 @@ module casino::CasinoHouse {
 
         // Profit remains in treasury for InvestorToken holders
 
-        event::emit(
-            BetSettledEvent { bet_id, winner, payout }
-        );
+        event::emit(BetSettledEvent { bet_id, winner, payout });
     }
 
     /// Extract funds from treasury for InvestorToken redemptions
@@ -395,13 +392,6 @@ module casino::CasinoHouse {
     }
 
     #[view]
-    /// Get casino parameters
-    public fun get_params(): u64 acquires Params {
-        let params = borrow_global<Params>(@casino);
-        params.house_edge_bps
-    }
-
-    #[view]
     /// Get current treasury balance
     public fun treasury_balance(): u64 acquires Treasury {
         let treasury = borrow_global<Treasury>(@casino);
@@ -413,18 +403,5 @@ module casino::CasinoHouse {
     public fun is_game_registered(game_address: address): bool acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@casino);
         ordered_map::contains(&registry.registered_games, &game_address)
-    }
-
-    //
-    // Admin Interface
-    //
-
-    /// Update casino house edge
-    public entry fun set_house_edge(admin: &signer, new_edge_bps: u64) acquires Params {
-        assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
-        assert!(new_edge_bps <= 1000, E_INVALID_AMOUNT); // Max 10%
-
-        let params = borrow_global_mut<Params>(@casino);
-        params.house_edge_bps = new_edge_bps;
     }
 }
