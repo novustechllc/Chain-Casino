@@ -3,6 +3,7 @@
 #[test_only]
 module casino::InvestorTokenTest {
     use std::string;
+    use std::signer;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::coin;
@@ -26,33 +27,28 @@ module casino::InvestorTokenTest {
         let casino_account = account::create_account_for_test(@casino);
         let user_account = account::create_account_for_test(@0x123);
 
-        // Initialize AptosCoin for test environment
         aptos_coin::ensure_initialized_with_apt_fa_metadata_for_test();
-
-        // Set timestamp BEFORE any operations
         timestamp::set_time_has_started_for_testing(&aptos_framework);
-        timestamp::update_global_time_for_test(1000000); // Set to non-zero time
+        timestamp::update_global_time_for_test(1000000);
 
-        // Register coin stores for accounts before minting
         coin::register<AptosCoin>(&casino_account);
         coin::register<AptosCoin>(&user_account);
 
-        // Now mint coins to the accounts
         aptos_coin::mint(&aptos_framework, @casino, INITIAL_BALANCE);
         aptos_coin::mint(&aptos_framework, @0x123, INITIAL_BALANCE);
 
         // Initialize CasinoHouse first, then InvestorToken
-        CasinoHouse::init(&casino_account);
+        CasinoHouse::init_module_for_test(&casino_account);
         InvestorToken::init(&casino_account);
 
         // Register a test game for profit injection scenarios
         CasinoHouse::register_game(
             &casino_account,
-            &casino_account, // Use casino_account as game account
+            signer::address_of(&casino_account),
             string::utf8(b"TestGame"),
-            1000, // min_bet
-            1000000, // max_bet
-            150 // house_edge_bps
+            1000,
+            1000000,
+            150
         );
 
         (casino_account, user_account)
@@ -111,11 +107,7 @@ module casino::InvestorTokenTest {
     }
 
     #[test]
-    #[
-        expected_failure(
-            abort_code = E_INSUFFICIENT_BALANCE, location = casino::InvestorToken
-        )
-    ]
+    #[expected_failure(abort_code = E_INSUFFICIENT_BALANCE, location = casino::InvestorToken)]
     fun test_redeem_insufficient_balance() {
         let (_casino_account, user_account) = setup_test();
 
@@ -193,9 +185,8 @@ module casino::InvestorTokenTest {
 
         aptos_coin::ensure_initialized_with_apt_fa_metadata_for_test();
         timestamp::set_time_has_started_for_testing(&aptos_framework);
-        timestamp::update_global_time_for_test(1000000); // Set to non-zero time
+        timestamp::update_global_time_for_test(1000000);
 
-        // Register coin stores for all accounts
         coin::register<AptosCoin>(&casino_account);
         coin::register<AptosCoin>(&user1);
         coin::register<AptosCoin>(&user2);
@@ -205,17 +196,17 @@ module casino::InvestorTokenTest {
         aptos_coin::mint(&aptos_framework, @0x222, INITIAL_BALANCE);
 
         // Initialize CasinoHouse and InvestorToken
-        CasinoHouse::init(&casino_account);
+        CasinoHouse::init_module_for_test(&casino_account);
         InvestorToken::init(&casino_account);
 
-        // Register a test game for profit injection scenarios
+        // Register a test game
         CasinoHouse::register_game(
             &casino_account,
-            &casino_account, // Use casino_account as game account
+            signer::address_of(&casino_account),
             string::utf8(b"TestGame"),
-            1000, // min_bet
-            1000000, // max_bet
-            150 // house_edge_bps
+            1000,
+            1000000,
+            150
         );
 
         InvestorToken::deposit_and_mint(&user1, TEST_DEPOSIT);
@@ -229,26 +220,17 @@ module casino::InvestorTokenTest {
     }
 
     #[test]
-    fun test_nav_with_profit_injection() {
+    fun test_nav_with_direct_treasury_deposit() {
         let (casino_account, user_account) = setup_test();
 
         // Deposit initial tokens
         InvestorToken::deposit_and_mint(&user_account, TEST_DEPOSIT);
         let initial_nav = InvestorToken::nav();
 
-        // Simulate profit via bet flow using updated function names
+        // Simulate profit by direct treasury deposit (bypassing game flow)
         let profit_amount = 500000; // 0.005 APT
-        let bet_coins = coin::withdraw<AptosCoin>(&casino_account, profit_amount);
-        let bet_id = CasinoHouse::place_bet(@casino, bet_coins, @0x123);
-
-        // Settle with house profit (no payout to winner)
-        CasinoHouse::test_settle_bet(
-            @casino,
-            bet_id,
-            @0x0, // winner (no payout)
-            0, // payout
-            profit_amount // profit to house
-        );
+        let profit_coins = coin::withdraw<AptosCoin>(&casino_account, profit_amount);
+        CasinoHouse::deposit_to_treasury(profit_coins);
 
         let nav_after_profit = InvestorToken::nav();
         assert!(nav_after_profit > initial_nav, 1);
@@ -331,5 +313,43 @@ module casino::InvestorTokenTest {
         // User balance should match their share of total supply
         let user_balance = InvestorToken::user_balance(@0x123);
         assert!(user_balance == final_supply, 4);
+    }
+
+    #[test]
+    fun test_nav_with_zero_supply() {
+        let (_casino_account, _) = setup_test();
+
+        // NAV should be 1.0 when no tokens exist
+        let nav = InvestorToken::nav();
+        assert!(nav == NAV_SCALE, 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = E_INSUFFICIENT_TREASURY, location = casino::InvestorToken)]
+    fun test_redeem_exceeds_treasury() {
+        let (casino_account, user_account) = setup_test();
+
+        // Create scenario where redemption exceeds treasury
+        InvestorToken::deposit_and_mint(&user_account, TEST_DEPOSIT);
+        
+        // Artificially drain treasury through direct withdrawal
+        let drain_coins = CasinoHouse::redeem_from_treasury(TEST_DEPOSIT - 1000);
+        coin::deposit(@casino, drain_coins);
+
+        // Try to redeem more than remaining treasury
+        InvestorToken::redeem(&user_account, TEST_DEPOSIT);
+    }
+
+    #[test]
+    fun test_nav_precision_with_large_numbers() {
+        let (_casino_account, user_account) = setup_test();
+
+        // Test with large deposit amounts
+        let large_amount = 900000000; // 9 APT
+        InvestorToken::deposit_and_mint(&user_account, large_amount);
+
+        let nav = InvestorToken::nav();
+        assert!(nav >= NAV_SCALE, 1); // Should be at least 1.0
+        assert!(nav < NAV_SCALE * 2, 2); // Should be reasonable
     }
 }
