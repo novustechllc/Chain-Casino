@@ -4,16 +4,14 @@
 //! 6x payout odds with ~16.67% house edge.
 
 module dice_game::DiceGame {
+    use aptos_framework::randomness;
+    use aptos_framework::event;
     use std::signer;
     use std::string;
     use aptos_framework::coin;
     use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::randomness;
-    use aptos_framework::event;
-    use aptos_framework::create_signer;
     use casino::CasinoHouse;
-
-    friend aptos_framework::create_signer;
+    use casino::CasinoHouse::GameCapability;
 
     //
     // Error Codes
@@ -38,6 +36,15 @@ module dice_game::DiceGame {
     const HOUSE_EDGE_BPS: u64 = 1667;
 
     //
+    // Resources
+    //
+
+    /// Stores the game's authorization capability
+    struct GameAuth has key {
+        capability: GameCapability
+    }
+
+    //
     // Event Specifications
     //
 
@@ -57,16 +64,20 @@ module dice_game::DiceGame {
     // Initialization Interface
     //
 
-    /// Register the dice game with CasinoHouse
-    public entry fun register_with_casino(casino_admin: &signer) {
-        CasinoHouse::register_game(
-            casino_admin,
-            @dice_game,
-            string::utf8(b"Dice Game"),
-            MIN_BET,
-            MAX_BET,
-            HOUSE_EDGE_BPS
-        );
+    /// Initialize game and get capability from casino
+    public entry fun initialize_game(casino_admin: &signer) {
+        let capability =
+            CasinoHouse::register_game(
+                casino_admin,
+                @dice_game,
+                string::utf8(b"Dice Game"),
+                MIN_BET,
+                MAX_BET,
+                HOUSE_EDGE_BPS
+            );
+
+        let game_auth = GameAuth { capability };
+        move_to(casino_admin, game_auth); // Store at casino admin address
     }
 
     //
@@ -77,7 +88,7 @@ module dice_game::DiceGame {
     /// Play dice game - player signs transaction, module calls casino
     public entry fun play_dice(
         player: &signer, guess: u8, bet_amount: u64
-    ) {
+    ) acquires GameAuth {
         // Validate inputs
         assert!(guess >= 1 && guess <= 6, E_INVALID_GUESS);
         assert!(bet_amount >= MIN_BET, E_INVALID_AMOUNT);
@@ -91,13 +102,14 @@ module dice_game::DiceGame {
         // Player provides bet coins
         let bet_coins = coin::withdraw<AptosCoin>(player, bet_amount);
 
-        // Create a signer for the game module
-        let game_signer = create_signer::create_signer(@dice_game);
+        // Get stored capability
+        let game_auth = borrow_global<GameAuth>(@casino);
+        let capability = &game_auth.capability;
 
-        // Module calls casino with its own signer authority
+        // Module calls casino with capability authorization
         let bet_id =
             CasinoHouse::place_bet(
-                &game_signer,
+                capability,
                 bet_coins,
                 player_addr,
                 expected_payout
@@ -113,12 +125,7 @@ module dice_game::DiceGame {
         } else { 0 };
 
         // Settle bet through CasinoHouse
-        CasinoHouse::settle_bet(
-            &game_signer,
-            bet_id,
-            player_addr,
-            actual_payout
-        );
+        CasinoHouse::settle_bet(capability, bet_id, player_addr, actual_payout);
 
         // Emit game event
         event::emit(
