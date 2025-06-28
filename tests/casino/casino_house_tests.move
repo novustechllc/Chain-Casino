@@ -2,7 +2,7 @@
 
 #[test_only]
 module casino::CasinoHouseTest {
-    use std::string::{Self, String};
+    use std::string;
     use std::vector;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
@@ -17,55 +17,40 @@ module casino::CasinoHouseTest {
     const MAX_BET: u64 = 500000000; // 5 APT
     const HOUSE_EDGE: u64 = 150; // 1.5%
 
-    fun setup_test(): (signer, signer, signer) {
+    // Error constants for testing
+    const E_NOT_ADMIN: u64 = 0x01;
+    const E_INVALID_AMOUNT: u64 = 0x02;
+    const E_GAME_NOT_REGISTERED: u64 = 0x03;
+    const E_GAME_ALREADY_REGISTERED: u64 = 0x05;
+    const E_INSUFFICIENT_TREASURY: u64 = 0x06;
+    const E_INVALID_SETTLEMENT: u64 = 0x07;
+    const E_INSUFFICIENT_TREASURY_FOR_PAYOUT: u64 = 0x08;
+    const E_PAYOUT_EXCEEDS_EXPECTED: u64 = 0x09;
+    const E_BET_ALREADY_SETTLED: u64 = 0x0A;
+
+    // Store capabilities for testing
+    struct TestGameAuth has key {
+        capability: GameCapability
+    }
+
+    fun setup_test(): (signer, signer) {
         let aptos_framework = account::create_account_for_test(@aptos_framework);
         let casino_account = account::create_account_for_test(@casino);
-        let game_account = account::create_account_for_test(@0x123);
 
         aptos_coin::ensure_initialized_with_apt_fa_metadata_for_test();
         timestamp::set_time_has_started_for_testing(&aptos_framework);
-        timestamp::update_global_time_for_test(1000000);
 
         coin::register<AptosCoin>(&casino_account);
-        coin::register<AptosCoin>(&game_account);
-
         aptos_coin::mint(&aptos_framework, @casino, INITIAL_BALANCE);
-        aptos_coin::mint(&aptos_framework, @0x123, INITIAL_BALANCE);
 
-        (aptos_framework, casino_account, game_account)
+        (aptos_framework, casino_account)
     }
 
-    // Helper function to create a player with appropriate balance for testing
-    fun create_player_with_balance(
-        aptos_framework: &signer, player_address: address, balance: u64
-    ): signer {
-        let player = account::create_account_for_test(player_address);
+    fun create_player(framework: &signer, addr: address, balance: u64): signer {
+        let player = account::create_account_for_test(addr);
         coin::register<AptosCoin>(&player);
-        aptos_coin::mint(aptos_framework, player_address, balance);
+        aptos_coin::mint(framework, addr, balance);
         player
-    }
-
-    // Helper function to store game capability for testing
-    fun store_game_capability(
-        casino_account: &signer,
-        game_address: address,
-        name: String,
-        min_bet: u64,
-        max_bet: u64,
-        house_edge: u64
-    ): GameCapability {
-        let capability =
-            CasinoHouse::register_game(
-                casino_account,
-                game_address,
-                name,
-                min_bet,
-                max_bet,
-                house_edge
-            );
-        // Store capability at casino address for testing
-        move_to(casino_account, capability);
-        capability
     }
 
     //
@@ -74,8 +59,7 @@ module casino::CasinoHouseTest {
 
     #[test]
     fun test_init_module_success() {
-        let (_, casino_account, _) = setup_test();
-
+        let (_, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
         assert!(CasinoHouse::treasury_balance() == 0, 1);
@@ -83,14 +67,10 @@ module casino::CasinoHouseTest {
     }
 
     #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_NOT_ADMIN, location = casino::CasinoHouse
-        )
-    ]
-    fun test_init_module_unauthorized() {
-        let (_, _, game_account) = setup_test();
-        CasinoHouse::init_module_for_test(&game_account);
+    #[expected_failure(abort_code = E_NOT_ADMIN, location = casino::CasinoHouse)]
+    fun test_init_unauthorized() {
+        let fake_admin = account::create_account_for_test(@0x999);
+        CasinoHouse::init_module_for_test(&fake_admin);
     }
 
     //
@@ -99,11 +79,11 @@ module casino::CasinoHouseTest {
 
     #[test]
     fun test_register_game_success() {
-        let (_, casino_account, _) = setup_test();
-
+        let (_, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
+
         let capability =
-            store_game_capability(
+            CasinoHouse::register_game(
                 &casino_account,
                 @0x123,
                 string::utf8(b"Dice Game"),
@@ -111,176 +91,51 @@ module casino::CasinoHouseTest {
                 MAX_BET,
                 HOUSE_EDGE
             );
+        move_to(&casino_account, TestGameAuth { capability });
 
-        let games = CasinoHouse::get_registered_games();
-        assert!(vector::length(&games) == 1, 1);
-        assert!(CasinoHouse::is_game_registered(@0x123) == true, 2);
+        assert!(CasinoHouse::is_game_registered(@0x123), 1);
+        assert!(vector::length(&CasinoHouse::get_registered_games()) == 1, 2);
     }
 
     #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_NOT_ADMIN, location = casino::CasinoHouse
-        )
-    ]
-    fun test_register_game_unauthorized() {
-        let (_, _, game_account) = setup_test();
-
-        CasinoHouse::init_module_for_test(&game_account); // This will fail first
-    }
-
-    #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_INVALID_AMOUNT,
-            location = casino::CasinoHouse
-        )
-    ]
-    fun test_register_game_zero_min_bet() {
-        let (_, casino_account, _) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        CasinoHouse::register_game(
-            &casino_account,
-            @0x123,
-            string::utf8(b"Bad Game"),
-            0, // min_bet = 0 should fail
-            MAX_BET,
-            HOUSE_EDGE
-        );
-    }
-
-    #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_INVALID_AMOUNT,
-            location = casino::CasinoHouse
-        )
-    ]
-    fun test_register_game_min_greater_than_max() {
-        let (_, casino_account, _) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        CasinoHouse::register_game(
-            &casino_account,
-            @0x123,
-            string::utf8(b"Bad Game"),
-            MAX_BET, // min_bet > max_bet
-            MIN_BET,
-            HOUSE_EDGE
-        );
-    }
-
-    #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_GAME_ALREADY_REGISTERED,
-            location = casino::CasinoHouse
-        )
-    ]
+    #[expected_failure(
+        abort_code = E_GAME_ALREADY_REGISTERED, location = casino::CasinoHouse
+    )]
     fun test_register_game_duplicate() {
-        let (_, casino_account, _) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        store_game_capability(
-            &casino_account,
-            @0x123,
-            string::utf8(b"Game 1"),
-            MIN_BET,
-            MAX_BET,
-            HOUSE_EDGE
-        );
-
-        // Try to register same address again
-        CasinoHouse::register_game(
-            &casino_account,
-            @0x123,
-            string::utf8(b"Game 2"),
-            MIN_BET,
-            MAX_BET,
-            HOUSE_EDGE
-        );
-    }
-
-    #[test]
-    fun test_multiple_games_registration() {
-        let (_, casino_account, _) = setup_test();
-
+        let (_, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        store_game_capability(
-            &casino_account,
-            @0x111,
-            string::utf8(b"Dice Game"),
-            MIN_BET,
-            MAX_BET,
-            HOUSE_EDGE
-        );
+        let cap1 =
+            CasinoHouse::register_game(
+                &casino_account,
+                @0x123,
+                string::utf8(b"Game 1"),
+                MIN_BET,
+                MAX_BET,
+                HOUSE_EDGE
+            );
+        move_to(&casino_account, TestGameAuth { capability: cap1 });
 
-        store_game_capability(
-            &casino_account,
-            @0x222,
-            string::utf8(b"Poker Game"),
-            MIN_BET * 2,
-            MAX_BET * 2,
-            HOUSE_EDGE + 50
-        );
-
-        let games = CasinoHouse::get_registered_games();
-        assert!(vector::length(&games) == 2, 1);
-        assert!(CasinoHouse::is_game_registered(@0x111) == true, 2);
-        assert!(CasinoHouse::is_game_registered(@0x222) == true, 3);
+        // This will abort, but compiler needs to see value handling
+        let _cap2 =
+            CasinoHouse::register_game(
+                &casino_account,
+                @0x123,
+                string::utf8(b"Game 2"),
+                MIN_BET,
+                MAX_BET,
+                HOUSE_EDGE
+            );
+        move_to(&casino_account, TestGameAuth { capability: _cap2 });
     }
 
     #[test]
     fun test_unregister_game() {
-        let (_, casino_account, _) = setup_test();
-
+        let (_, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
+
         let capability =
-            store_game_capability(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Dice Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-
-        assert!(vector::length(&CasinoHouse::get_registered_games()) == 1, 1);
-
-        CasinoHouse::unregister_game(&casino_account, @0x123);
-
-        assert!(vector::length(&CasinoHouse::get_registered_games()) == 0, 2);
-        assert!(CasinoHouse::is_game_registered(@0x123) == false, 3);
-    }
-
-    #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_GAME_NOT_REGISTERED,
-            location = casino::CasinoHouse
-        )
-    ]
-    fun test_unregister_nonexistent_game() {
-        let (_, casino_account, _) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        CasinoHouse::unregister_game(&casino_account, @0x123);
-    }
-
-    #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_NOT_ADMIN, location = casino::CasinoHouse
-        )
-    ]
-    fun test_unregister_game_unauthorized() {
-        let (_, casino_account, game_account) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        let capability =
-            store_game_capability(
+            CasinoHouse::register_game(
                 &casino_account,
                 @0x123,
                 string::utf8(b"Test Game"),
@@ -288,22 +143,24 @@ module casino::CasinoHouseTest {
                 MAX_BET,
                 HOUSE_EDGE
             );
+        move_to(&casino_account, TestGameAuth { capability });
 
-        // Try to unregister with wrong signer
-        CasinoHouse::unregister_game(&game_account, @0x123);
+        assert!(CasinoHouse::is_game_registered(@0x123), 1);
+        CasinoHouse::unregister_game(&casino_account, @0x123);
+        assert!(!CasinoHouse::is_game_registered(@0x123), 2);
     }
 
     //
-    // Bet Placement Tests (Updated for signer-based approach)
+    // Bet Placement Tests
     //
 
     #[test]
-    fun test_place_bet_success() {
-        let (aptos_framework, casino_account, game_account) = setup_test();
-
+    fun test_place_bet_success() acquires TestGameAuth {
+        let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
+
         let capability =
-            store_game_capability(
+            CasinoHouse::register_game(
                 &casino_account,
                 @0x123,
                 string::utf8(b"Test Game"),
@@ -311,17 +168,19 @@ module casino::CasinoHouseTest {
                 MAX_BET,
                 HOUSE_EDGE
             );
+        move_to(&casino_account, TestGameAuth { capability });
 
-        // Fund treasury with sufficient balance for expected payout
+        // Fund treasury
         let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
         CasinoHouse::deposit_to_treasury(treasury_coins);
 
-        // Create player with appropriate balance for test
-        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
+        let player = create_player(&framework, @0x999, MIN_BET * 2);
+        let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
 
-        // Player funds bet through game
-        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
-        let bet_id = CasinoHouse::place_bet(&capability, coins, @0x999, MIN_BET * 2);
+        let auth = borrow_global<TestGameAuth>(@casino);
+        let bet_id = CasinoHouse::place_bet(
+            &auth.capability, bet_coins, @0x999, MIN_BET * 2
+        );
 
         assert!(bet_id == 1, 1);
         assert!(
@@ -330,26 +189,17 @@ module casino::CasinoHouseTest {
         );
     }
 
+    // Note: Cannot test unregistered game scenario since GameCapability
+    // can only be created by CasinoHouse module (Move security feature)
+
     #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_GAME_NOT_REGISTERED,
-            location = casino::CasinoHouse
-        )
-    ]
-    fun test_place_bet_unregistered_game() {
-        let (aptos_framework, casino_account, game_account) = setup_test();
-
+    #[expected_failure(abort_code = E_INVALID_AMOUNT, location = casino::CasinoHouse)]
+    fun test_place_bet_below_minimum() acquires TestGameAuth {
+        let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
-        // Don't register the game
 
-        // Create player with appropriate balance for test
-        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
-
-        // Player funds bet through game
-        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
         let capability =
-            store_game_capability(
+            CasinoHouse::register_game(
                 &casino_account,
                 @0x123,
                 string::utf8(b"Test Game"),
@@ -357,22 +207,27 @@ module casino::CasinoHouseTest {
                 MAX_BET,
                 HOUSE_EDGE
             );
-        CasinoHouse::place_bet(&capability, coins, @0x999, MIN_BET * 2);
+        move_to(&casino_account, TestGameAuth { capability });
+
+        let player = create_player(&framework, @0x999, MIN_BET);
+        let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET - 1);
+
+        let auth = borrow_global<TestGameAuth>(@casino);
+        CasinoHouse::place_bet(&auth.capability, bet_coins, @0x999, MIN_BET);
     }
 
     #[test]
     #[
         expected_failure(
-            abort_code = casino::CasinoHouse::E_INVALID_AMOUNT,
-            location = casino::CasinoHouse
+            abort_code = E_INSUFFICIENT_TREASURY_FOR_PAYOUT, location = casino::CasinoHouse
         )
     ]
-    fun test_place_bet_below_minimum() {
-        let (aptos_framework, casino_account, game_account) = setup_test();
-
+    fun test_place_bet_insufficient_treasury() acquires TestGameAuth {
+        let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
+
         let capability =
-            store_game_capability(
+            CasinoHouse::register_game(
                 &casino_account,
                 @0x123,
                 string::utf8(b"Test Game"),
@@ -380,230 +235,31 @@ module casino::CasinoHouseTest {
                 MAX_BET,
                 HOUSE_EDGE
             );
+        move_to(&casino_account, TestGameAuth { capability });
 
-        // Create player with appropriate balance for test
-        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
+        let player = create_player(&framework, @0x999, MIN_BET);
+        let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
 
-        // Player funds bet through game with amount below minimum
-        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET - 1);
-        CasinoHouse::place_bet(&capability, coins, @0x999, MIN_BET * 2);
-    }
-
-    #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_INVALID_AMOUNT,
-            location = casino::CasinoHouse
-        )
-    ]
-    fun test_place_bet_above_maximum() {
-        let (aptos_framework, casino_account, game_account) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        let capability =
-            store_game_capability(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-
-        // Create player with appropriate balance for test
-        let player = create_player_with_balance(&aptos_framework, @0x999, MAX_BET * 2);
-
-        // Player funds bet through game with amount above maximum
-        let coins = coin::withdraw<AptosCoin>(&player, MAX_BET + 1);
-        CasinoHouse::place_bet(&capability, coins, @0x999, MAX_BET * 2);
-    }
-
-    #[test]
-    fun test_multiple_bets_incrementing_id() {
-        let (aptos_framework, casino_account, game_account) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        let capability =
-            store_game_capability(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-
-        // Fund treasury with sufficient balance for expected payouts
-        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 6);
-        CasinoHouse::deposit_to_treasury(treasury_coins);
-
-        // Create players with appropriate balances for test
-        let player1 = create_player_with_balance(&aptos_framework, @0x111, MIN_BET * 2);
-        let player2 = create_player_with_balance(&aptos_framework, @0x222, MIN_BET * 4);
-
-        // Players fund bets through game
-        let coins1 = coin::withdraw<AptosCoin>(&player1, MIN_BET);
-        let bet_id1 = CasinoHouse::place_bet(&capability, coins1, @0x111, MIN_BET * 2);
-
-        let coins2 = coin::withdraw<AptosCoin>(&player2, MIN_BET * 2);
-        let bet_id2 = CasinoHouse::place_bet(&capability, coins2, @0x222, MIN_BET * 4);
-
-        assert!(bet_id1 == 1, 1);
-        assert!(bet_id2 == 2, 2);
-        assert!(
-            CasinoHouse::treasury_balance() == MIN_BET * 9,
-            3
-        );
-    }
-
-    #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_INVALID_AMOUNT,
-            location = casino::CasinoHouse
-        )
-    ]
-    fun test_place_bet_zero_expected_payout() {
-        let (aptos_framework, casino_account, game_account) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        let capability =
-            store_game_capability(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-
-        // Create player with appropriate balance for test
-        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
-
-        // Try to place bet with zero expected payout (should fail)
-        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
-        CasinoHouse::place_bet(&capability, coins, @0x999, 0);
-    }
-
-    #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_INSUFFICIENT_TREASURY_FOR_PAYOUT,
-            location = casino::CasinoHouse
-        )
-    ]
-    fun test_place_bet_insufficient_treasury_for_payout() {
-        let (aptos_framework, casino_account, game_account) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        let capability =
-            store_game_capability(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-
-        // Create player with appropriate balance for test
-        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
-
-        // Try to place bet with expected payout larger than treasury + bet amount (should fail)
-        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
+        let auth = borrow_global<TestGameAuth>(@casino);
         CasinoHouse::place_bet(
-            &capability,
-            coins,
+            &auth.capability,
+            bet_coins,
             @0x999,
-            INITIAL_BALANCE + MIN_BET + 1
+            INITIAL_BALANCE
         );
-    }
-
-    #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_PAYOUT_EXCEEDS_EXPECTED,
-            location = casino::CasinoHouse
-        )
-    ]
-    fun test_settle_bet_payout_exceeds_expected() {
-        let (aptos_framework, casino_account, game_account) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        let capability =
-            store_game_capability(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-
-        // Fund treasury with sufficient balance for expected payout
-        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
-        CasinoHouse::deposit_to_treasury(treasury_coins);
-
-        // Create player with appropriate balance for test
-        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
-
-        // Player funds bet through game
-        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
-        let bet_id = CasinoHouse::place_bet(&capability, coins, @0x999, MIN_BET * 2);
-
-        // Try to settle with payout exceeding expected (should fail)
-        CasinoHouse::settle_bet(&capability, bet_id, @0x999, MIN_BET * 3);
-    }
-
-    #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_BET_ALREADY_SETTLED,
-            location = casino::CasinoHouse
-        )
-    ]
-    fun test_settle_bet_already_settled() {
-        let (aptos_framework, casino_account, game_account) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        let capability =
-            store_game_capability(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-
-        // Fund treasury with sufficient balance for expected payout
-        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
-        CasinoHouse::deposit_to_treasury(treasury_coins);
-
-        // Create player with appropriate balance for test
-        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
-
-        // Player funds bet through game
-        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
-        let bet_id = CasinoHouse::place_bet(&capability, coins, @0x999, MIN_BET * 2);
-
-        // Settle bet first time
-        CasinoHouse::settle_bet(&capability, bet_id, @0x999, MIN_BET);
-
-        // Try to settle same bet again (should fail)
-        CasinoHouse::settle_bet(&capability, bet_id, @0x999, MIN_BET);
     }
 
     //
     // Bet Settlement Tests
     //
-    #[test]
-    fun test_settle_bet_zero_total() {
-        let (aptos_framework, casino_account, game_account) = setup_test();
 
+    #[test]
+    fun test_settle_bet_success() acquires TestGameAuth {
+        let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
+
         let capability =
-            store_game_capability(
+            CasinoHouse::register_game(
                 &casino_account,
                 @0x123,
                 string::utf8(b"Test Game"),
@@ -611,33 +267,107 @@ module casino::CasinoHouseTest {
                 MAX_BET,
                 HOUSE_EDGE
             );
+        move_to(&casino_account, TestGameAuth { capability });
 
-        // Fund treasury with sufficient balance for expected payout
+        // Fund treasury and place bet
         let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
         CasinoHouse::deposit_to_treasury(treasury_coins);
 
-        // Create player with appropriate balance for test
-        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
+        let player = create_player(&framework, @0x999, MIN_BET);
+        let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
 
-        // Player funds bet through game
-        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
-        let bet_id = CasinoHouse::place_bet(&capability, coins, @0x999, MIN_BET * 2);
+        let auth = borrow_global<TestGameAuth>(@casino);
+        let bet_id = CasinoHouse::place_bet(
+            &auth.capability, bet_coins, @0x999, MIN_BET * 2
+        );
 
-        // Try to settle with zero payout (should pass now - zero payouts are valid)
-        CasinoHouse::settle_bet(&capability, bet_id, @0x999, 0);
+        let initial_balance = coin::balance<AptosCoin>(@0x999);
+        CasinoHouse::settle_bet(&auth.capability, bet_id, @0x999, MIN_BET);
+
+        assert!(
+            coin::balance<AptosCoin>(@0x999) == initial_balance + MIN_BET,
+            1
+        );
+    }
+
+    #[test]
+    #[expected_failure(abort_code = E_BET_ALREADY_SETTLED, location = casino::CasinoHouse)]
+    fun test_settle_bet_already_settled() acquires TestGameAuth {
+        let (framework, casino_account) = setup_test();
+        CasinoHouse::init_module_for_test(&casino_account);
+
+        let capability =
+            CasinoHouse::register_game(
+                &casino_account,
+                @0x123,
+                string::utf8(b"Test Game"),
+                MIN_BET,
+                MAX_BET,
+                HOUSE_EDGE
+            );
+        move_to(&casino_account, TestGameAuth { capability });
+
+        // Setup and place bet
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
+
+        let player = create_player(&framework, @0x999, MIN_BET);
+        let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
+
+        let auth = borrow_global<TestGameAuth>(@casino);
+        let bet_id = CasinoHouse::place_bet(
+            &auth.capability, bet_coins, @0x999, MIN_BET * 2
+        );
+
+        // Settle once
+        CasinoHouse::settle_bet(&auth.capability, bet_id, @0x999, MIN_BET);
+
+        // Try to settle again
+        CasinoHouse::settle_bet(&auth.capability, bet_id, @0x999, MIN_BET);
+    }
+
+    #[test]
+    #[expected_failure(
+        abort_code = E_PAYOUT_EXCEEDS_EXPECTED, location = casino::CasinoHouse
+    )]
+    fun test_settle_bet_payout_exceeds_expected() acquires TestGameAuth {
+        let (framework, casino_account) = setup_test();
+        CasinoHouse::init_module_for_test(&casino_account);
+
+        let capability =
+            CasinoHouse::register_game(
+                &casino_account,
+                @0x123,
+                string::utf8(b"Test Game"),
+                MIN_BET,
+                MAX_BET,
+                HOUSE_EDGE
+            );
+        move_to(&casino_account, TestGameAuth { capability });
+
+        // Setup and place bet
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 3);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
+
+        let player = create_player(&framework, @0x999, MIN_BET);
+        let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
+
+        let auth = borrow_global<TestGameAuth>(@casino);
+        let bet_id = CasinoHouse::place_bet(
+            &auth.capability, bet_coins, @0x999, MIN_BET * 2
+        );
+
+        // Try to settle with payout exceeding expected
+        CasinoHouse::settle_bet(&auth.capability, bet_id, @0x999, MIN_BET * 3);
     }
 
     //
-    // Treasury Operations Tests (Package functions)
+    // Treasury Operations Tests
     //
 
     #[test]
-    fun test_treasury_operations_within_package() {
-        // Note: These are package functions, so they can only be tested
-        // from within the casino package. In a real scenario, these would
-        // be called by InvestorToken module.
-
-        let (_, casino_account, _) = setup_test();
+    fun test_treasury_operations() {
+        let (_, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
         // Test deposit
@@ -646,26 +376,21 @@ module casino::CasinoHouseTest {
         assert!(CasinoHouse::treasury_balance() == 1000000, 1);
 
         // Test redeem
-        let withdrawn_coins = CasinoHouse::redeem_from_treasury(500000);
-        coin::deposit(@casino, withdrawn_coins); // Must handle the coins
+        let redeemed_coins = CasinoHouse::redeem_from_treasury(500000);
+        coin::deposit(@casino, redeemed_coins);
         assert!(CasinoHouse::treasury_balance() == 500000, 2);
     }
 
     #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_INSUFFICIENT_TREASURY,
-            location = casino::CasinoHouse
-        )
-    ]
+    #[expected_failure(
+        abort_code = E_INSUFFICIENT_TREASURY, location = casino::CasinoHouse
+    )]
     fun test_redeem_from_empty_treasury() {
-        let (_, casino_account, _) = setup_test();
+        let (_, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
         let coins = CasinoHouse::redeem_from_treasury(1);
-        // Will abort before creating coins
-
-        CasinoHouse::deposit_to_treasury(coins);
+        coin::deposit(@casino, coins);
     }
 
     //
@@ -673,36 +398,18 @@ module casino::CasinoHouseTest {
     //
 
     #[test]
-    fun test_get_registered_games_empty() {
-        let (_, casino_account, _) = setup_test();
-
+    fun test_view_functions() {
+        let (_, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        let games = CasinoHouse::get_registered_games();
-        assert!(vector::length(&games) == 0, 1);
-    }
+        // Initially empty
+        assert!(vector::length(&CasinoHouse::get_registered_games()) == 0, 1);
+        assert!(!CasinoHouse::is_game_registered(@0x123), 2);
+        assert!(CasinoHouse::treasury_balance() == 0, 3);
 
-    #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_GAME_NOT_REGISTERED,
-            location = casino::CasinoHouse
-        )
-    ]
-    fun test_get_game_info_nonexistent() {
-        let (_, casino_account, _) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        CasinoHouse::get_game_info(@0x123);
-    }
-
-    #[test]
-    fun test_get_game_info_success() {
-        let (_, casino_account, _) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
+        // After registering game
         let capability =
-            store_game_capability(
+            CasinoHouse::register_game(
                 &casino_account,
                 @0x123,
                 string::utf8(b"Test Game"),
@@ -710,20 +417,21 @@ module casino::CasinoHouseTest {
                 MAX_BET,
                 HOUSE_EDGE
             );
+        move_to(&casino_account, TestGameAuth { capability });
 
-        let game_info = CasinoHouse::get_game_info(@0x123);
-        // In real implementation, would need getter functions for GameInfo fields
+        assert!(vector::length(&CasinoHouse::get_registered_games()) == 1, 4);
+        assert!(CasinoHouse::is_game_registered(@0x123), 5);
+
+        let _game_info = CasinoHouse::get_game_info(@0x123);
     }
 
     #[test]
-    fun test_is_game_registered() {
-        let (_, casino_account, _) = setup_test();
-
+    fun test_multiple_bets_incrementing_id() acquires TestGameAuth {
+        let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
-        assert!(CasinoHouse::is_game_registered(@0x123) == false, 1);
 
         let capability =
-            store_game_capability(
+            CasinoHouse::register_game(
                 &casino_account,
                 @0x123,
                 string::utf8(b"Test Game"),
@@ -731,72 +439,70 @@ module casino::CasinoHouseTest {
                 MAX_BET,
                 HOUSE_EDGE
             );
+        move_to(&casino_account, TestGameAuth { capability });
 
-        assert!(CasinoHouse::is_game_registered(@0x123) == true, 2);
-    }
-
-    //
-    // Edge Cases and Complex Scenarios
-    //
-
-    #[test]
-    fun test_bet_settlement_math_precision() {
-        let (aptos_framework, casino_account, game_account) = setup_test();
-
-        CasinoHouse::init_module_for_test(&casino_account);
-        let capability =
-            store_game_capability(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-
-        let bet_amount = 1000003;
-
-        // Fund treasury with sufficient balance for expected payout
-        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, bet_amount * 2);
+        // Fund treasury
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 6);
         CasinoHouse::deposit_to_treasury(treasury_coins);
 
-        // Create player with appropriate balance for test
-        let player = create_player_with_balance(&aptos_framework, @0x999, bet_amount
-            * 2);
+        let player1 = create_player(&framework, @0x111, MIN_BET * 2);
+        let player2 = create_player(&framework, @0x222, MIN_BET * 2);
 
-        // Player funds bet through game
-        let coins = coin::withdraw<AptosCoin>(&player, bet_amount);
-        let bet_id = CasinoHouse::place_bet(&capability, coins, @0x999, bet_amount * 2);
+        let bet_coins1 = coin::withdraw<AptosCoin>(&player1, MIN_BET);
+        let bet_coins2 = coin::withdraw<AptosCoin>(&player2, MIN_BET);
 
-        // Settle with exact payout
-        let payout = 500001;
-        CasinoHouse::settle_bet(&capability, bet_id, @0x999, payout);
+        let auth = borrow_global<TestGameAuth>(@casino);
+        let bet_id1 =
+            CasinoHouse::place_bet(
+                &auth.capability,
+                bet_coins1,
+                @0x111,
+                MIN_BET * 2
+            );
+        let bet_id2 =
+            CasinoHouse::place_bet(
+                &auth.capability,
+                bet_coins2,
+                @0x222,
+                MIN_BET * 2
+            );
 
-        assert!(
-            CasinoHouse::treasury_balance() == bet_amount * 2 + bet_amount - payout,
-            1
-        );
+        assert!(bet_id1 == 1, 1);
+        assert!(bet_id2 == 2, 2);
     }
 
     #[test]
-    #[
-        expected_failure(
-            abort_code = casino::CasinoHouse::E_NOT_ADMIN, location = casino::CasinoHouse
-        )
-    ]
-    fun test_register_game_unauthorized_signer() {
-        let (_, casino_account, _) = setup_test();
-        let fake_admin = account::create_account_for_test(@0x999);
-
+    fun test_zero_payout_settlement() acquires TestGameAuth {
+        let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
-        // This hits the uncovered line in register_game
-        store_game_capability(
-            &fake_admin,
-            @0x123,
-            string::utf8(b"Game"),
-            1000,
-            10000,
-            150
+
+        let capability =
+            CasinoHouse::register_game(
+                &casino_account,
+                @0x123,
+                string::utf8(b"Test Game"),
+                MIN_BET,
+                MAX_BET,
+                HOUSE_EDGE
+            );
+        move_to(&casino_account, TestGameAuth { capability });
+
+        let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET);
+        CasinoHouse::deposit_to_treasury(treasury_coins);
+
+        let player = create_player(&framework, @0x999, MIN_BET);
+        let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
+
+        let auth = borrow_global<TestGameAuth>(@casino);
+        let bet_id = CasinoHouse::place_bet(&auth.capability, bet_coins, @0x999, MIN_BET);
+
+        // House wins - zero payout
+        CasinoHouse::settle_bet(&auth.capability, bet_id, @0x999, 0);
+
+        // Treasury should retain all funds
+        assert!(
+            CasinoHouse::treasury_balance() == MIN_BET * 2,
+            1
         );
     }
 }

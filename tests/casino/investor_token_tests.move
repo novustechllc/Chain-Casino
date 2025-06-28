@@ -11,6 +11,13 @@ module casino::InvestorTokenTest {
     use aptos_framework::object;
     use casino::InvestorToken;
     use casino::CasinoHouse;
+    use casino::CasinoHouse::GameCapability;
+
+    // Test game wrapper to handle GameCapability
+    #[test_only]
+    struct TestGameAuth has key {
+        capability: GameCapability
+    }
 
     const INITIAL_BALANCE: u64 = 1000000000; // 10 APT in octas
     const TEST_DEPOSIT: u64 = 100000000; // 1 APT in octas
@@ -36,14 +43,18 @@ module casino::InvestorTokenTest {
         InvestorToken::init(&casino_account);
 
         // Register a test game for profit injection scenarios
-        CasinoHouse::register_game(
-            &casino_account,
-            signer::address_of(&casino_account),
-            string::utf8(b"TestGame"),
-            1000,
-            1000000,
-            150
-        );
+        let capability =
+            CasinoHouse::register_game(
+                &casino_account,
+                signer::address_of(&casino_account),
+                string::utf8(b"TestGame"),
+                1000,
+                1000000,
+                150
+            );
+
+        // Store capability to avoid compilation error
+        move_to(&casino_account, TestGameAuth { capability });
 
         (casino_account, user_account)
     }
@@ -209,14 +220,18 @@ module casino::InvestorTokenTest {
         InvestorToken::init(&casino_account);
 
         // Register a test game
-        CasinoHouse::register_game(
-            &casino_account,
-            signer::address_of(&casino_account),
-            string::utf8(b"TestGame"),
-            1000,
-            1000000,
-            150
-        );
+        let capability =
+            CasinoHouse::register_game(
+                &casino_account,
+                signer::address_of(&casino_account),
+                string::utf8(b"TestGame"),
+                1000,
+                1000000,
+                150
+            );
+
+        // Store capability to avoid compilation error
+        move_to(&casino_account, TestGameAuth { capability });
 
         InvestorToken::deposit_and_mint(&user1, TEST_DEPOSIT);
         InvestorToken::deposit_and_mint(&user2, TEST_DEPOSIT * 2);

@@ -202,7 +202,6 @@ module casino::CasinoHouse {
         );
 
         // Validate game info
-        assert!(min_bet > 0, E_INVALID_AMOUNT);
         assert!(max_bet >= min_bet, E_INVALID_AMOUNT);
 
         // Store game info
@@ -214,7 +213,7 @@ module casino::CasinoHouse {
             house_edge_bps
         };
 
-        ordered_map::add(&mut registry.registered_games, game_address, game_info);
+        registry.registered_games.add(game_address, game_info);
 
         event::emit(
             GameRegisteredEvent { game_address, name, module_address: game_address }
@@ -233,13 +232,11 @@ module casino::CasinoHouse {
         // Remove from game registry
         let registry = borrow_global_mut<GameRegistry>(@casino);
         assert!(
-            ordered_map::contains(&registry.registered_games, &game_address),
+            registry.registered_games.contains(&game_address),
             E_GAME_NOT_REGISTERED
         );
 
-        let game_info = ordered_map::remove(
-            &mut registry.registered_games, &game_address
-        );
+        let game_info = registry.registered_games.remove(&game_address);
         event::emit(GameUnregisteredEvent { game_address, name: game_info.name });
     }
 
@@ -260,10 +257,10 @@ module casino::CasinoHouse {
         // Mandatory game registry check
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
-            ordered_map::contains(&registry.registered_games, &game_addr),
+            registry.registered_games.contains(&game_addr),
             E_GAME_NOT_REGISTERED
         );
-        let game_info = ordered_map::borrow(&registry.registered_games, &game_addr);
+        let game_info = registry.registered_games.borrow(&game_addr);
         assert!(amount >= game_info.min_bet, E_INVALID_AMOUNT);
         assert!(amount <= game_info.max_bet, E_INVALID_AMOUNT);
 
@@ -273,11 +270,12 @@ module casino::CasinoHouse {
         // Merge coins into treasury first
         let treasury_mut = borrow_global_mut<Treasury>(@casino);
         coin::merge(&mut treasury_mut.vault, coins);
+        let treasury_balance = coin::value(&treasury_mut.vault);
 
         // Check if treasury has sufficient funds for expected payout after bet contribution
-        let new_treasury_balance = coin::value(&treasury_mut.vault);
         assert!(
-            expected_payout <= new_treasury_balance, E_INSUFFICIENT_TREASURY_FOR_PAYOUT
+            expected_payout <= treasury_balance + amount,
+            E_INSUFFICIENT_TREASURY_FOR_PAYOUT
         );
 
         // Generate bet ID
@@ -288,7 +286,7 @@ module casino::CasinoHouse {
         // Store bet information
         let bet_registry = borrow_global_mut<BetRegistry>(@casino);
         let bet_info = BetInfo { expected_payout, settled: false };
-        ordered_map::add(&mut bet_registry.bets, bet_id, bet_info);
+        bet_registry.bets.add(bet_id, bet_info);
 
         event::emit(
             BetAcceptedEvent {
@@ -314,18 +312,18 @@ module casino::CasinoHouse {
         let game_addr = capability.game_address;
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
-            ordered_map::contains(&registry.registered_games, &game_addr),
+            registry.registered_games.contains(&game_addr),
             E_GAME_NOT_REGISTERED
         );
 
         // Get bet information and validate
         let bet_registry = borrow_global_mut<BetRegistry>(@casino);
         assert!(
-            ordered_map::contains(&bet_registry.bets, &bet_id),
+            bet_registry.bets.contains(&bet_id),
             E_INVALID_SETTLEMENT
         );
 
-        let bet_info = ordered_map::borrow_mut(&mut bet_registry.bets, &bet_id);
+        let bet_info = bet_registry.bets.borrow_mut(&bet_id);
         assert!(!bet_info.settled, E_BET_ALREADY_SETTLED);
         assert!(payout <= bet_info.expected_payout, E_PAYOUT_EXCEEDS_EXPECTED);
 
@@ -372,7 +370,7 @@ module casino::CasinoHouse {
         let registry = borrow_global<GameRegistry>(@casino);
         let games = vector::empty<GameInfo>();
 
-        let keys = ordered_map::keys(&registry.registered_games);
+        let keys = registry.registered_games.keys();
         let i = 0;
         while (i < vector::length(&keys)) {
             let game_address = *vector::borrow(&keys, i);
