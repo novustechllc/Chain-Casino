@@ -21,6 +21,8 @@ module dice_game::DiceGame {
     const E_INVALID_GUESS: u64 = 0x01;
     /// Invalid bet amount
     const E_INVALID_AMOUNT: u64 = 0x02;
+    /// Unauthorized initialization
+    const E_UNAUTHORIZED: u64 = 0x03;
 
     //
     // Constants
@@ -39,7 +41,7 @@ module dice_game::DiceGame {
     // Resources
     //
 
-    /// Stores the game's authorization capability
+    /// Stores the game's authorization capability at @dice_game
     struct GameAuth has key {
         capability: GameCapability
     }
@@ -64,8 +66,15 @@ module dice_game::DiceGame {
     // Initialization Interface
     //
 
-    /// Initialize game and get capability from casino
-    public entry fun initialize_game(casino_admin: &signer) {
+    /// Initialize game - casino admin registers, dice game stores capability
+    public entry fun initialize_game( // TODO: fix this
+        casino_admin: &signer, 
+        dice_admin: &signer
+    ) {
+        assert!(signer::address_of(casino_admin) == @casino, E_UNAUTHORIZED);
+        assert!(signer::address_of(dice_admin) == @dice_game, E_UNAUTHORIZED);
+
+        // Casino admin registers the dice game
         let capability =
             CasinoHouse::register_game(
                 casino_admin,
@@ -76,8 +85,9 @@ module dice_game::DiceGame {
                 HOUSE_EDGE_BPS
             );
 
+        // Store capability at dice game's own address
         let game_auth = GameAuth { capability };
-        move_to(casino_admin, game_auth); // Store at casino admin address
+        move_to(dice_admin, game_auth);
     }
 
     //
@@ -102,8 +112,8 @@ module dice_game::DiceGame {
         // Player provides bet coins
         let bet_coins = coin::withdraw<AptosCoin>(player, bet_amount);
 
-        // Get stored capability
-        let game_auth = borrow_global<GameAuth>(@casino);
+        // Get stored capability from dice game address
+        let game_auth = borrow_global<GameAuth>(@dice_game);
         let capability = &game_auth.capability;
 
         // Module calls casino with capability authorization
