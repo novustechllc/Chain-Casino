@@ -4,6 +4,7 @@
 module casino::InvestorTokenTest {
     use std::string;
     use std::signer;
+    use std::debug;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::coin;
@@ -337,15 +338,22 @@ module casino::InvestorTokenTest {
     fun test_redeem_exceeds_treasury() {
         let (casino_account, user_account) = setup_test();
 
+        debug::print(&coin::balance<AptosCoin>(@casino));
+
         // Create scenario where redemption exceeds treasury
         InvestorToken::deposit_and_mint(&user_account, TEST_DEPOSIT);
+
+        debug::print(&coin::balance<AptosCoin>(@casino));
 
         // Artificially drain treasury through direct withdrawal
         let drain_coins = CasinoHouse::redeem_from_treasury(TEST_DEPOSIT - 1000);
         coin::deposit(@casino, drain_coins);
 
+        debug::print(&coin::balance<AptosCoin>(@casino));
+
         // Try to redeem more than remaining treasury
         InvestorToken::redeem(&user_account, TEST_DEPOSIT);
+        debug::print(&coin::balance<AptosCoin>(@casino));
     }
 
     #[test]

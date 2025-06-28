@@ -90,7 +90,6 @@ module casino::CasinoHouse {
         bet_id: u64,
         winner: address,
         payout: u64,
-        profit: u64
     }
 
     #[event]
@@ -261,7 +260,6 @@ module casino::CasinoHouse {
         bet_id: u64,
         winner: address,
         payout: u64,
-        profit: u64
     ) acquires Treasury, GameRegistry {
         // Verify game is registered
         let registry = borrow_global<GameRegistry>(@casino);
@@ -272,8 +270,6 @@ module casino::CasinoHouse {
             E_GAME_NOT_REGISTERED
         );
 
-        // Validate settlement math (payout + profit should equal bet amount)
-        let bet_amount = payout + profit;
         assert!(bet_amount > 0, E_INVALID_SETTLEMENT);
 
         let treasury = borrow_global_mut<Treasury>(@casino);
@@ -289,7 +285,7 @@ module casino::CasinoHouse {
         // Profit remains in treasury for InvestorToken holders
 
         event::emit(
-            BetSettledEvent { bet_id, winner, payout, profit }
+            BetSettledEvent { bet_id, winner, payout }
         );
     }
 
