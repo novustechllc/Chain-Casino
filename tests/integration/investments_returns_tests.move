@@ -15,8 +15,8 @@ module casino::RealInvestmentTest {
 
     // Test constants
     const TEN_APT: u64 = 1000000000; // 10 APT in octas
-    const BET_MIN: u64 = 20000000;   // 0.2 APT
-    const BET_MAX: u64 = 50000000;   // 0.5 APT
+    const BET_MIN: u64 = 20000000; // 0.2 APT
+    const BET_MAX: u64 = 50000000; // 0.5 APT
     const PLAYER_FUNDING: u64 = 100000000; // 1 APT per player
 
     fun setup_real_test(): (signer, signer) {
@@ -69,20 +69,17 @@ module casino::RealInvestmentTest {
 
         // 2. Create players and make real bets through DiceGame
         let player_addresses = vector[
-            @0x2001, @0x2002, @0x2003, @0x2004, @0x2005,
-            @0x2006, @0x2007, @0x2008, @0x2009, @0x200A,
-            @0x200B, @0x200C, @0x200D, @0x200E, @0x200F,
-            @0x2010, @0x2011, @0x2012, @0x2013, @0x2014
+            @0x2001, @0x2002, @0x2003, @0x2004, @0x2005, @0x2006, @0x2007, @0x2008, @0x2009, @0x200A, @0x200B, @0x200C, @0x200D, @0x200E, @0x200F, @0x2010, @0x2011, @0x2012, @0x2013, @0x2014
         ];
 
         let bet_amounts = vector[
-            20000000,  // 0.2 APT
-            25000000,  // 0.25 APT 
-            30000000,  // 0.3 APT
-            35000000,  // 0.35 APT
-            40000000,  // 0.4 APT
-            45000000,  // 0.45 APT
-            50000000   // 0.5 APT
+            20000000, // 0.2 APT
+            25000000, // 0.25 APT
+            30000000, // 0.3 APT
+            35000000, // 0.35 APT
+            40000000, // 0.4 APT
+            45000000, // 0.45 APT
+            50000000 // 0.5 APT
         ];
 
         let i = 0;
@@ -92,13 +89,15 @@ module casino::RealInvestmentTest {
         while (i < vector::length(&player_addresses)) {
             let player_addr = *vector::borrow(&player_addresses, i);
             let player = create_funded_player(&framework, player_addr);
-            
-            let bet_amount = *vector::borrow(&bet_amounts, i % vector::length(&bet_amounts));
+
+            let bet_amount = *vector::borrow(
+                &bet_amounts, i % vector::length(&bet_amounts)
+            );
             let guess = (i % 6) + 1; // Guess 1-6
 
             // Make real bet through DiceGame
             DiceGame::play_dice(&player, (guess as u8), bet_amount);
-            
+
             total_bets_placed = total_bets_placed + 1;
             total_bet_volume = total_bet_volume + bet_amount;
             i = i + 1;
@@ -107,24 +106,27 @@ module casino::RealInvestmentTest {
         // 3. Analyze results after real games
         let treasury_after_games = CasinoHouse::treasury_balance();
         let final_nav = InvestorToken::nav();
-        
-        let house_profit = if (treasury_after_games > treasury_after_investment) {
-            treasury_after_games - treasury_after_investment
-        } else { 0 };
 
-        let nav_increase = if (final_nav > initial_nav) {
-            final_nav - initial_nav
-        } else { 0 };
+        let house_profit =
+            if (treasury_after_games > treasury_after_investment) {
+                treasury_after_games - treasury_after_investment
+            } else { 0 };
+
+        let nav_increase =
+            if (final_nav > initial_nav) {
+                final_nav - initial_nav
+            } else { 0 };
 
         // 4. Investor redeems tokens to see actual return
         let investor_apt_before_redeem = coin::balance<AptosCoin>(@0x1111);
         InvestorToken::redeem(&investor, investor_tokens);
         let investor_apt_after_redeem = coin::balance<AptosCoin>(@0x1111);
-        
+
         let total_received = investor_apt_after_redeem - initial_investor_apt + TEN_APT; // Account for initial investment
-        let actual_profit = if (total_received > TEN_APT) {
-            total_received - TEN_APT
-        } else { 0 };
+        let actual_profit =
+            if (total_received > TEN_APT) {
+                total_received - TEN_APT
+            } else { 0 };
 
         // 5. Print real results
         std::debug::print(&string::utf8(b"=== REAL INVESTMENT TEST RESULTS ==="));
@@ -140,11 +142,12 @@ module casino::RealInvestmentTest {
         std::debug::print(&string::utf8(b"Final NAV:"));
         std::debug::print(&actual_profit);
         std::debug::print(&string::utf8(b"Investor Profit (octas):"));
-        
+
         // Calculate percentage return
-        let profit_percentage = if (actual_profit > 0) {
-            (actual_profit * 10000) / TEN_APT // Basis points
-        } else { 0 };
+        let profit_percentage =
+            if (actual_profit > 0) {
+                (actual_profit * 10000) / TEN_APT // Basis points
+            } else { 0 };
         std::debug::print(&profit_percentage);
         std::debug::print(&string::utf8(b"Profit Percentage (basis points):"));
 
@@ -152,12 +155,12 @@ module casino::RealInvestmentTest {
         assert!(total_bets_placed == 20, 1);
         assert!(treasury_after_games > 0, 2);
         assert!(final_nav > 0, 3);
-        
+
         // The house should statistically profit with 16.67% edge over 20 games
         // But individual test runs may vary due to randomness
     }
 
-    #[test] 
+    #[test]
     fun test_real_multiple_investment_rounds() {
         let (framework, _casino_account) = setup_real_test();
 

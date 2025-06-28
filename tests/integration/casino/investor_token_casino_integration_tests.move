@@ -68,14 +68,15 @@ module casino::InvestorTokenCasinoIntegrationTest {
         assert!(InvestorToken::user_balance(@0x123) == INVESTOR_DEPOSIT, 8);
 
         // 3. Register a test game and simulate profit
-        let capability = CasinoHouse::register_game(
-            &casino_account,
-            @0xD1CE,
-            string::utf8(b"Test Game"),
-            1000000, // min bet
-            100000000, // max bet  
-            150 // house edge
-        );
+        let capability =
+            CasinoHouse::register_game(
+                &casino_account,
+                @0xD1CE,
+                string::utf8(b"Test Game"),
+                1000000, // min bet
+                100000000, // max bet
+                150 // house edge
+            );
         move_to(&casino_account, TestGameAuth { capability });
 
         // Simulate game profit by direct treasury injection
@@ -95,7 +96,7 @@ module casino::InvestorTokenCasinoIntegrationTest {
         // 5. Investor redeems half their tokens at profit
         let redeem_tokens = INVESTOR_DEPOSIT / 2;
         let investor_apt_before = coin::balance<AptosCoin>(@0x123);
-        
+
         InvestorToken::redeem(&investor, redeem_tokens);
 
         let investor_apt_after = coin::balance<AptosCoin>(@0x123);
@@ -111,10 +112,13 @@ module casino::InvestorTokenCasinoIntegrationTest {
         let final_treasury = CasinoHouse::treasury_balance();
         let final_nav = InvestorToken::nav();
 
-        assert!(final_token_supply == INVESTOR_DEPOSIT - redeem_tokens, 14);
+        assert!(
+            final_token_supply == INVESTOR_DEPOSIT - redeem_tokens,
+            14
+        );
         assert!(final_treasury > 0, 15);
         assert!(final_nav > 0, 16);
-        
+
         // User should still have remaining tokens
         let remaining_tokens = InvestorToken::user_balance(@0x123);
         assert!(remaining_tokens == final_token_supply, 17);
@@ -146,7 +150,7 @@ module casino::InvestorTokenCasinoIntegrationTest {
         // Both investors deposit
         let deposit1 = 60000000; // 0.6 APT
         let deposit2 = 40000000; // 0.4 APT
-        
+
         InvestorToken::deposit_and_mint(&investor1, deposit1);
         InvestorToken::deposit_and_mint(&investor2, deposit2);
 
@@ -164,13 +168,16 @@ module casino::InvestorTokenCasinoIntegrationTest {
 
         let balance1 = InvestorToken::user_balance(@0x111);
         let balance2 = InvestorToken::user_balance(@0x222);
-        
+
         // Proportional ownership should be maintained
         assert!(balance1 > balance2, 3); // investor1 deposited more
-        assert!(balance1 + balance2 == InvestorToken::total_supply(), 4);
+        assert!(
+            balance1 + balance2 == InvestorToken::total_supply(),
+            4
+        );
     }
 
-    #[test] 
+    #[test]
     fun test_treasury_synchronization() {
         let (_, casino_account, investor) = setup_integration_test();
 
@@ -198,15 +205,16 @@ module casino::InvestorTokenCasinoIntegrationTest {
 
         // Deposit initial amount
         InvestorToken::deposit_and_mint(&investor, INVESTOR_DEPOSIT);
-        
+
         // Add small profit increment
         let small_profit = 1000; // 0.000001 APT
         let profit_coins = coin::withdraw<AptosCoin>(&casino_account, small_profit);
         CasinoHouse::deposit_to_treasury(profit_coins);
 
         let nav_after_profit = InvestorToken::nav();
-        let expected_nav = ((INVESTOR_DEPOSIT + small_profit) * NAV_SCALE) / INVESTOR_DEPOSIT;
-        
+        let expected_nav = ((INVESTOR_DEPOSIT + small_profit) * NAV_SCALE)
+            / INVESTOR_DEPOSIT;
+
         assert!(nav_after_profit == expected_nav, 1);
         assert!(nav_after_profit > NAV_SCALE, 2);
     }

@@ -98,9 +98,11 @@ module casino::CasinoHouseTest {
     }
 
     #[test]
-    #[expected_failure(
-        abort_code = E_GAME_ALREADY_REGISTERED, location = casino::CasinoHouse
-    )]
+    #[
+        expected_failure(
+            abort_code = E_GAME_ALREADY_REGISTERED, location = casino::CasinoHouse
+        )
+    ]
     fun test_register_game_duplicate() {
         let (_, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
@@ -327,9 +329,11 @@ module casino::CasinoHouseTest {
     }
 
     #[test]
-    #[expected_failure(
-        abort_code = E_PAYOUT_EXCEEDS_EXPECTED, location = casino::CasinoHouse
-    )]
+    #[
+        expected_failure(
+            abort_code = E_PAYOUT_EXCEEDS_EXPECTED, location = casino::CasinoHouse
+        )
+    ]
     fun test_settle_bet_payout_exceeds_expected() acquires TestGameAuth {
         let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);

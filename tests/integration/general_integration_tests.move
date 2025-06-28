@@ -36,7 +36,7 @@ module casino::FullIntegrationTest {
         aptos_coin::ensure_initialized_with_apt_fa_metadata_for_test();
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         timestamp::update_global_time_for_test(1000000);
-        
+
         // Initialize randomness for testing
         randomness::initialize_for_testing(&aptos_framework);
 
@@ -62,7 +62,8 @@ module casino::FullIntegrationTest {
 
     #[test]
     fun test_full_casino_ecosystem() {
-        let (_, casino_account, _dice_account, investor, player) = setup_full_integration();
+        let (_, casino_account, _dice_account, investor, player) =
+            setup_full_integration();
 
         // 1. Verify all modules initialized correctly
         assert!(CasinoHouse::treasury_balance() == 0, 1);
@@ -71,7 +72,7 @@ module casino::FullIntegrationTest {
 
         // 2. Investor deposits and mints tokens
         InvestorToken::deposit_and_mint(&investor, INVESTOR_DEPOSIT);
-        
+
         let initial_nav = InvestorToken::nav();
         assert!(initial_nav == NAV_SCALE, 4); // NAV = 1.0
         assert!(CasinoHouse::treasury_balance() == INVESTOR_DEPOSIT, 5);
@@ -82,11 +83,14 @@ module casino::FullIntegrationTest {
         CasinoHouse::deposit_to_treasury(reserve_coins);
 
         let treasury_after_reserve = CasinoHouse::treasury_balance();
-        assert!(treasury_after_reserve == INVESTOR_DEPOSIT + payout_reserve, 6);
+        assert!(
+            treasury_after_reserve == INVESTOR_DEPOSIT + payout_reserve,
+            6
+        );
 
-        // 4. Player makes a dice bet 
+        // 4. Player makes a dice bet
         DiceGame::play_dice(&player, 1, DICE_BET);
-        
+
         // Treasury should have received the bet regardless of outcome
         let treasury_after_bet = CasinoHouse::treasury_balance();
         assert!(treasury_after_bet >= treasury_after_reserve, 7);
@@ -101,28 +105,31 @@ module casino::FullIntegrationTest {
         let nav_with_profit = InvestorToken::nav();
         let expected_treasury = treasury_after_bet + house_profit;
         let expected_nav = (expected_treasury * NAV_SCALE) / INVESTOR_DEPOSIT;
-        
+
         assert!(nav_with_profit > initial_nav, 8);
         assert!(CasinoHouse::treasury_balance() == expected_treasury, 9);
 
         // 7. Investor redeems tokens at profit
         let redeem_tokens = INVESTOR_DEPOSIT / 2;
         let investor_apt_before = coin::balance<AptosCoin>(@0x123);
-        
+
         InvestorToken::redeem(&investor, redeem_tokens);
-        
+
         let investor_apt_after = coin::balance<AptosCoin>(@0x123);
         let received_apt = investor_apt_after - investor_apt_before;
-        
+
         // Should receive more than face value due to profits
         assert!(received_apt > 0, 10);
-        
+
         // Verify final ecosystem state
         let final_supply = InvestorToken::total_supply();
         let final_treasury = CasinoHouse::treasury_balance();
         let final_nav = InvestorToken::nav();
-        
-        assert!(final_supply == INVESTOR_DEPOSIT - redeem_tokens, 11);
+
+        assert!(
+            final_supply == INVESTOR_DEPOSIT - redeem_tokens,
+            11
+        );
         assert!(final_treasury > 0, 12);
         assert!(final_nav > 0, 13);
     }
@@ -133,7 +140,7 @@ module casino::FullIntegrationTest {
 
         // Setup investor position
         InvestorToken::deposit_and_mint(&investor, INVESTOR_DEPOSIT);
-        
+
         // Fund treasury for payouts
         let payout_fund = 200000000; // 2 APT
         let fund_coins = coin::withdraw<AptosCoin>(&casino_account, payout_fund);
@@ -179,7 +186,10 @@ module casino::FullIntegrationTest {
         InvestorToken::redeem(&investor, redeem_amount);
 
         let remaining_balance = InvestorToken::user_balance(@0x123);
-        assert!(remaining_balance == INVESTOR_DEPOSIT - redeem_amount, 3);
+        assert!(
+            remaining_balance == INVESTOR_DEPOSIT - redeem_amount,
+            3
+        );
     }
 
     #[test]
@@ -188,7 +198,7 @@ module casino::FullIntegrationTest {
 
         // Verify DiceGame registered with correct parameters
         assert!(DiceGame::is_registered(), 1);
-        
+
         let (min_bet, max_bet, payout_mult, house_edge) = DiceGame::get_game_config();
         assert!(min_bet == 1000000, 2); // 0.01 APT
         assert!(max_bet == 50000000, 3); // 0.5 APT
@@ -218,7 +228,8 @@ module casino::FullIntegrationTest {
         // Simulate house edge profit directly (since we can't control randomness)
         // In real scenario, house edge would accumulate over many games
         let simulated_house_profit = 50000000; // 0.5 APT
-        let house_coins = coin::withdraw<AptosCoin>(&casino_account, simulated_house_profit);
+        let house_coins =
+            coin::withdraw<AptosCoin>(&casino_account, simulated_house_profit);
         CasinoHouse::deposit_to_treasury(house_coins);
 
         // Verify profit flows to investor via NAV increase
@@ -226,7 +237,10 @@ module casino::FullIntegrationTest {
         let treasury_after_profit = CasinoHouse::treasury_balance();
 
         assert!(nav_after_profit > initial_nav, 1);
-        assert!(treasury_after_profit == initial_treasury + simulated_house_profit, 2);
+        assert!(
+            treasury_after_profit == initial_treasury + simulated_house_profit,
+            2
+        );
 
         // Calculate expected NAV increase
         let expected_nav = (treasury_after_profit * NAV_SCALE) / large_deposit;
@@ -235,12 +249,12 @@ module casino::FullIntegrationTest {
         // Investor redemption should capture the profit
         let investor_apt_before = coin::balance<AptosCoin>(@0x123);
         let redeem_tokens = large_deposit / 10; // Redeem 10%
-        
+
         InvestorToken::redeem(&investor, redeem_tokens);
-        
+
         let investor_apt_after = coin::balance<AptosCoin>(@0x123);
         let received = investor_apt_after - investor_apt_before;
-        
+
         // Should receive more than face value (minus fees)
         let face_value = redeem_tokens;
         assert!(received > 0, 4);
@@ -249,34 +263,35 @@ module casino::FullIntegrationTest {
 
     #[test]
     fun test_ecosystem_state_consistency() {
-        let (_, casino_account, _dice_account, investor, player) = setup_full_integration();
+        let (_, casino_account, _dice_account, investor, player) =
+            setup_full_integration();
 
         // Multi-step ecosystem test
         InvestorToken::deposit_and_mint(&investor, INVESTOR_DEPOSIT);
-        
+
         // Fund and play
         let fund_coins = coin::withdraw<AptosCoin>(&casino_account, 100000000);
         CasinoHouse::deposit_to_treasury(fund_coins);
-        
+
         DiceGame::play_dice(&player, 2, DICE_BET);
-        
+
         // Add profit simulation
         let profit_coins = coin::withdraw<AptosCoin>(&casino_account, 25000000);
         CasinoHouse::deposit_to_treasury(profit_coins);
-        
+
         // Verify consistency across all modules
         let casino_treasury = CasinoHouse::treasury_balance();
         let token_treasury = InvestorToken::treasury_balance();
         assert!(casino_treasury == token_treasury, 1);
-        
+
         let nav = InvestorToken::nav();
         let supply = InvestorToken::total_supply();
         let expected_nav = (casino_treasury * NAV_SCALE) / supply;
         assert!(nav == expected_nav, 2);
-        
+
         // Final redemption test
         InvestorToken::redeem(&investor, supply / 3);
-        
+
         // State should remain consistent
         let final_casino_treasury = CasinoHouse::treasury_balance();
         let final_token_treasury = InvestorToken::treasury_balance();

@@ -67,9 +67,8 @@ module dice_game::DiceGame {
     //
 
     /// Initialize game - casino admin registers, dice game stores capability
-    public entry fun initialize_game( // TODO: fix this
-        casino_admin: &signer, 
-        dice_admin: &signer
+    public entry fun initialize_game(// TODO: fix this
+        casino_admin: &signer, dice_admin: &signer
     ) {
         assert!(signer::address_of(casino_admin) == @casino, E_UNAUTHORIZED);
         assert!(signer::address_of(dice_admin) == @dice_game, E_UNAUTHORIZED);
