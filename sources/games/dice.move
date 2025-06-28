@@ -10,7 +10,10 @@ module dice_game::DiceGame {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::randomness;
     use aptos_framework::event;
+    use aptos_framework::create_signer;
     use casino::CasinoHouse;
+
+    friend aptos_framework::create_signer;
 
     //
     // Error Codes
@@ -20,8 +23,6 @@ module dice_game::DiceGame {
     const E_INVALID_GUESS: u64 = 0x01;
     /// Invalid bet amount
     const E_INVALID_AMOUNT: u64 = 0x02;
-    /// Unauthorized game operator
-    const E_UNAUTHORIZED: u64 = 0x03;
 
     //
     // Constants
@@ -73,17 +74,10 @@ module dice_game::DiceGame {
     //
 
     #[lint::allow_unsafe_randomness]
-    /// Play dice game
-    /// Both game operator and player must sign transaction
+    /// Play dice game - player signs transaction, module calls casino
     public entry fun play_dice(
-        game_operator: &signer,
-        player: &signer,
-        guess: u8,
-        bet_amount: u64
+        player: &signer, guess: u8, bet_amount: u64
     ) {
-        // Validate game operator
-        assert!(signer::address_of(game_operator) == @dice_game, E_UNAUTHORIZED);
-
         // Validate inputs
         assert!(guess >= 1 && guess <= 6, E_INVALID_GUESS);
         assert!(bet_amount >= MIN_BET, E_INVALID_AMOUNT);
@@ -97,10 +91,13 @@ module dice_game::DiceGame {
         // Player provides bet coins
         let bet_coins = coin::withdraw<AptosCoin>(player, bet_amount);
 
-        // Place bet with CasinoHouse
+        // Create a signer for the game module
+        let game_signer = create_signer::create_signer(@dice_game);
+
+        // Module calls casino with its own signer authority
         let bet_id =
             CasinoHouse::place_bet(
-                game_operator,
+                &game_signer,
                 bet_coins,
                 player_addr,
                 expected_payout
@@ -117,7 +114,7 @@ module dice_game::DiceGame {
 
         // Settle bet through CasinoHouse
         CasinoHouse::settle_bet(
-            game_operator,
+            &game_signer,
             bet_id,
             player_addr,
             actual_payout
