@@ -24,6 +24,9 @@ module casino::CasinoHouseTest {
     const E_GAME_ALREADY_REGISTERED: u64 = 0x05;
     const E_INSUFFICIENT_TREASURY: u64 = 0x06;
     const E_INVALID_SETTLEMENT: u64 = 0x07;
+    const E_INSUFFICIENT_TREASURY_FOR_PAYOUT: u64 = 0x08;
+    const E_PAYOUT_EXCEEDS_EXPECTED: u64 = 0x09;
+    const E_BET_ALREADY_SETTLED: u64 = 0x0A;
 
     fun setup_test(): (signer, signer, signer) {
         let aptos_framework = account::create_account_for_test(@aptos_framework);
@@ -269,7 +272,7 @@ module casino::CasinoHouseTest {
 
         // Player funds bet through game
         let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
-        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
+        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, MIN_BET * 2);
 
         assert!(bet_id == 1, 1);
         assert!(CasinoHouse::treasury_balance() == MIN_BET, 2);
@@ -288,7 +291,7 @@ module casino::CasinoHouseTest {
 
         // Player funds bet through game
         let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
-        CasinoHouse::place_bet(&game_account, coins, @0x999);
+        CasinoHouse::place_bet(&game_account, coins, @0x999, MIN_BET * 2);
     }
 
     #[test]
@@ -311,7 +314,7 @@ module casino::CasinoHouseTest {
 
         // Player funds bet through game with amount below minimum
         let coins = coin::withdraw<AptosCoin>(&player, MIN_BET - 1);
-        CasinoHouse::place_bet(&game_account, coins, @0x999);
+        CasinoHouse::place_bet(&game_account, coins, @0x999, MIN_BET * 2);
     }
 
     #[test]
@@ -334,7 +337,7 @@ module casino::CasinoHouseTest {
 
         // Player funds bet through game with amount above maximum
         let coins = coin::withdraw<AptosCoin>(&player, MAX_BET + 1);
-        CasinoHouse::place_bet(&game_account, coins, @0x999);
+        CasinoHouse::place_bet(&game_account, coins, @0x999, MAX_BET * 2);
     }
 
     #[test]
@@ -357,10 +360,10 @@ module casino::CasinoHouseTest {
 
         // Players fund bets through game
         let coins1 = coin::withdraw<AptosCoin>(&player1, MIN_BET);
-        let bet_id1 = CasinoHouse::place_bet(&game_account, coins1, @0x111);
+        let bet_id1 = CasinoHouse::place_bet(&game_account, coins1, @0x111, MIN_BET * 2);
 
         let coins2 = coin::withdraw<AptosCoin>(&player2, MIN_BET * 2);
-        let bet_id2 = CasinoHouse::place_bet(&game_account, coins2, @0x222);
+        let bet_id2 = CasinoHouse::place_bet(&game_account, coins2, @0x222, MIN_BET * 4);
 
         assert!(bet_id1 == 1, 1);
         assert!(bet_id2 == 2, 2);
@@ -368,6 +371,107 @@ module casino::CasinoHouseTest {
             CasinoHouse::treasury_balance() == MIN_BET * 3,
             3
         );
+    }
+
+    #[test]
+    #[expected_failure(abort_code = E_INVALID_AMOUNT, location = casino::CasinoHouse)]
+    fun test_place_bet_zero_expected_payout() {
+        let (aptos_framework, casino_account, game_account) = setup_test();
+
+        CasinoHouse::init_module_for_test(&casino_account);
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+
+        // Create player with appropriate balance for test
+        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
+
+        // Try to place bet with zero expected payout (should fail)
+        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
+        CasinoHouse::place_bet(&game_account, coins, @0x999, 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = E_INSUFFICIENT_TREASURY_FOR_PAYOUT, location = casino::CasinoHouse)]
+    fun test_place_bet_insufficient_treasury_for_payout() {
+        let (aptos_framework, casino_account, game_account) = setup_test();
+
+        CasinoHouse::init_module_for_test(&casino_account);
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+
+        // Create player with appropriate balance for test
+        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
+
+        // Try to place bet with expected payout larger than treasury (should fail)
+        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
+        CasinoHouse::place_bet(&game_account, coins, @0x999, INITIAL_BALANCE + 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = E_PAYOUT_EXCEEDS_EXPECTED, location = casino::CasinoHouse)]
+    fun test_settle_bet_payout_exceeds_expected() {
+        let (aptos_framework, casino_account, game_account) = setup_test();
+
+        CasinoHouse::init_module_for_test(&casino_account);
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+
+        // Create player with appropriate balance for test
+        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
+
+        // Player funds bet through game with expected payout
+        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
+        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, MIN_BET * 2);
+
+        // Try to settle with payout exceeding expected (should fail)
+        CasinoHouse::settle_bet(&game_account, bet_id, @0x999, MIN_BET * 3);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = E_BET_ALREADY_SETTLED, location = casino::CasinoHouse)]
+    fun test_settle_bet_already_settled() {
+        let (aptos_framework, casino_account, game_account) = setup_test();
+
+        CasinoHouse::init_module_for_test(&casino_account);
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+
+        // Create player with appropriate balance for test
+        let player = create_player_with_balance(&aptos_framework, @0x999, MIN_BET * 2);
+
+        // Player funds bet through game
+        let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
+        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, MIN_BET * 2);
+
+        // Settle bet first time
+        CasinoHouse::settle_bet(&game_account, bet_id, @0x999, MIN_BET);
+
+        // Try to settle same bet again (should fail)
+        CasinoHouse::settle_bet(&game_account, bet_id, @0x999, MIN_BET);
     }
 
     //
@@ -393,7 +497,7 @@ module casino::CasinoHouseTest {
 
         // Player funds bet through game
         let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
-        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
+        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, MIN_BET * 2);
 
         // Settle with payout
         CasinoHouse::settle_bet(
@@ -434,7 +538,7 @@ module casino::CasinoHouseTest {
 
         // Player funds bet through game
         let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
-        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
+        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, MIN_BET * 2);
 
         // Settle with small payout (house keeps most)
         CasinoHouse::settle_bet(&game_account, bet_id, @0x999, MIN_BET / 4);
@@ -473,7 +577,7 @@ module casino::CasinoHouseTest {
 
         // Player funds bet through game
         let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
-        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
+        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, MIN_BET * 2);
 
         // Try to settle with zero payout (should fail)
         CasinoHouse::settle_bet(&game_account, bet_id, @0x999, 0);
@@ -501,7 +605,7 @@ module casino::CasinoHouseTest {
 
         // Player funds bet through game
         let coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
-        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
+        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, MIN_BET * 2);
 
         // Try to payout more than treasury has (treasury only has MIN_BET)
         CasinoHouse::settle_bet(&game_account, bet_id, @0x999, MIN_BET + 1);
@@ -676,7 +780,7 @@ module casino::CasinoHouseTest {
 
         // Player funds bet through game
         let coins = coin::withdraw<AptosCoin>(&player, 1000000000);
-        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
+        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, 1000000000 * 2);
 
         assert!(bet_id == 1, 1);
         assert!(CasinoHouse::treasury_balance() == 1000000000, 2);
@@ -703,7 +807,7 @@ module casino::CasinoHouseTest {
 
         // Player funds bet through game
         let coins = coin::withdraw<AptosCoin>(&player, bet_amount);
-        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999);
+        let bet_id = CasinoHouse::place_bet(&game_account, coins, @0x999, bet_amount * 2);
 
         // Settle with exact payout
         let payout = 500001;
@@ -751,8 +855,8 @@ module casino::CasinoHouseTest {
         let coins1 = coin::withdraw<AptosCoin>(&player1, MIN_BET);
         let coins2 = coin::withdraw<AptosCoin>(&player2, MIN_BET * 2);
 
-        let bet_id1 = CasinoHouse::place_bet(&game1, coins1, @0x333);
-        let bet_id2 = CasinoHouse::place_bet(&game2, coins2, @0x444);
+        let bet_id1 = CasinoHouse::place_bet(&game1, coins1, @0x333, MIN_BET * 2);
+        let bet_id2 = CasinoHouse::place_bet(&game2, coins2, @0x444, MIN_BET * 4);
 
         assert!(bet_id1 == 1, 1);
         assert!(bet_id2 == 2, 2);

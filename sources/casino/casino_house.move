@@ -30,13 +30,16 @@ module casino::CasinoHouse {
     const E_INSUFFICIENT_TREASURY: u64 = 0x06;
     /// Invalid bet settlement parameters
     const E_INVALID_SETTLEMENT: u64 = 0x07;
+    /// Insufficient treasury balance for expected payout
+    const E_INSUFFICIENT_TREASURY_FOR_PAYOUT: u64 = 0x08;
+    /// Payout exceeds expected payout for bet
+    const E_PAYOUT_EXCEEDS_EXPECTED: u64 = 0x09;
+    /// Bet already settled
+    const E_BET_ALREADY_SETTLED: u64 = 0x0A;
 
     //
     // Constants
     //
-
-    /// Default house edge (1.5%)
-    const DEFAULT_HOUSE_EDGE_BPS: u64 = 150;
 
     //
     // Resource Specifications
@@ -57,6 +60,11 @@ module casino::CasinoHouse {
         next: u64
     }
 
+    /// Registry of bet information for payout validation
+    struct BetRegistry has key {
+        bets: OrderedMap<u64, BetInfo>
+    }
+
     /// Casino operational parameters
     struct Params has key {
         house_edge_bps: u64
@@ -71,6 +79,12 @@ module casino::CasinoHouse {
         house_edge_bps: u64
     }
 
+    /// Bet information for payout validation
+    struct BetInfo has copy, drop, store {
+        expected_payout: u64,
+        settled: bool
+    }
+
     //
     // Event Specifications
     //
@@ -81,7 +95,8 @@ module casino::CasinoHouse {
         bet_id: u64,
         game_address: address,
         player: address,
-        amount: u64
+        amount: u64,
+        expected_payout: u64
     }
 
     #[event]
@@ -127,9 +142,14 @@ module casino::CasinoHouse {
             }
         );
 
-        move_to(admin, BetIndex { next: 1 });
+        move_to(
+            admin,
+            BetRegistry {
+                bets: ordered_map::new<u64, BetInfo>()
+            }
+        );
 
-        move_to(admin, Params { house_edge_bps: DEFAULT_HOUSE_EDGE_BPS });
+        move_to(admin, BetIndex { next: 1 });
     }
 
     #[test_only]
@@ -148,9 +168,14 @@ module casino::CasinoHouse {
             }
         );
 
-        move_to(admin, BetIndex { next: 1 });
+        move_to(
+            admin,
+            BetRegistry {
+                bets: ordered_map::new<u64, BetInfo>()
+            }
+        );
 
-        move_to(admin, Params { house_edge_bps: DEFAULT_HOUSE_EDGE_BPS });
+        move_to(admin, BetIndex { next: 1 });
     }
 
     //
@@ -221,8 +246,11 @@ module casino::CasinoHouse {
 
     /// Accept bet from authorized game
     public fun place_bet(
-        game: &signer, coins: Coin<AptosCoin>, player: address
-    ): u64 acquires Treasury, BetIndex, GameRegistry {
+        game: &signer, 
+        coins: Coin<AptosCoin>, 
+        player: address,
+        expected_payout: u64
+    ): u64 acquires Treasury, BetIndex, GameRegistry, BetRegistry {
         // Verify game is registered
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
@@ -238,17 +266,33 @@ module casino::CasinoHouse {
         assert!(amount >= game_info.min_bet, E_INVALID_AMOUNT);
         assert!(amount <= game_info.max_bet, E_INVALID_AMOUNT);
 
+        // Validate expected payout
+        assert!(expected_payout > 0, E_INVALID_AMOUNT);
+
+        // Check treasury has sufficient funds for expected payout
+        let treasury = borrow_global<Treasury>(@casino);
+        let treasury_balance = coin::value(&treasury.vault);
+        assert!(expected_payout <= treasury_balance, E_INSUFFICIENT_TREASURY_FOR_PAYOUT);
+
         // Merge coins into treasury
-        let treasury = borrow_global_mut<Treasury>(@casino);
-        coin::merge(&mut treasury.vault, coins);
+        let treasury_mut = borrow_global_mut<Treasury>(@casino);
+        coin::merge(&mut treasury_mut.vault, coins);
 
         // Generate bet ID
         let bet_index = borrow_global_mut<BetIndex>(@casino);
         let bet_id = bet_index.next;
         bet_index.next = bet_id + 1;
 
+        // Store bet information
+        let bet_registry = borrow_global_mut<BetRegistry>(@casino);
+        let bet_info = BetInfo {
+            expected_payout,
+            settled: false
+        };
+        ordered_map::add(&mut bet_registry.bets, bet_id, bet_info);
+
         event::emit(
-            BetAcceptedEvent { bet_id, game_address: game_addr, player, amount }
+            BetAcceptedEvent { bet_id, game_address: game_addr, player, amount, expected_payout }
         );
 
         bet_id
@@ -260,7 +304,7 @@ module casino::CasinoHouse {
         bet_id: u64,
         winner: address,
         payout: u64,
-    ) acquires Treasury, GameRegistry {
+    ) acquires Treasury, GameRegistry, BetRegistry {
         // Verify game is registered
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
@@ -270,7 +314,19 @@ module casino::CasinoHouse {
             E_GAME_NOT_REGISTERED
         );
 
-        assert!(bet_amount > 0, E_INVALID_SETTLEMENT);
+        // Get bet information and validate
+        let bet_registry = borrow_global_mut<BetRegistry>(@casino);
+        assert!(
+            ordered_map::contains(&bet_registry.bets, &bet_id),
+            E_INVALID_SETTLEMENT
+        );
+
+        let bet_info = ordered_map::borrow_mut(&mut bet_registry.bets, &bet_id);
+        assert!(!bet_info.settled, E_BET_ALREADY_SETTLED);
+        assert!(payout <= bet_info.expected_payout, E_PAYOUT_EXCEEDS_EXPECTED);
+
+        // Mark bet as settled
+        bet_info.settled = true;
 
         let treasury = borrow_global_mut<Treasury>(@casino);
         let treasury_balance = coin::value(&treasury.vault);

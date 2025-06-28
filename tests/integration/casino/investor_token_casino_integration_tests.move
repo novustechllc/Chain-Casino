@@ -70,7 +70,7 @@ module casino::IntegrationTest {
         // Big payout 1
         let small_bet1 = 1000000; // 0.01 APT bet
         let coins1 = coin::withdraw<AptosCoin>(&player1, small_bet1);
-        let bet_id1 = CasinoHouse::place_bet(&game_account, coins1, @0x222);
+        let bet_id1 = CasinoHouse::place_bet(&game_account, coins1, @0x222, 200000000); // 2 APT expected payout
         CasinoHouse::settle_bet(
             &game_account, 
             bet_id1, 
@@ -81,7 +81,7 @@ module casino::IntegrationTest {
         // Big payout 2  
         let small_bet2 = 1000000; // 0.01 APT bet
         let coins2 = coin::withdraw<AptosCoin>(&player2, small_bet2);
-        let bet_id2 = CasinoHouse::place_bet(&game_account, coins2, @0x333);
+        let bet_id2 = CasinoHouse::place_bet(&game_account, coins2, @0x333, 200000000); // 2 APT expected payout
         CasinoHouse::settle_bet(
             &game_account,
             bet_id2,
@@ -92,7 +92,7 @@ module casino::IntegrationTest {
         // Big payout 3
         let small_bet3 = 1000000; // 0.01 APT bet
         let coins3 = coin::withdraw<AptosCoin>(&player1, small_bet3);
-        let bet_id3 = CasinoHouse::place_bet(&game_account, coins3, @0x222);
+        let bet_id3 = CasinoHouse::place_bet(&game_account, coins3, @0x222, 100000000); // 1 APT expected payout
         CasinoHouse::settle_bet(
             &game_account,
             bet_id3,
