@@ -224,23 +224,23 @@ module casino::CasinoHouse {
         GameCapability { game_address }
     }
 
-    /// Permanently remove game from registry and revoke capability
+    /// Remove game from registry (game owns its capability)
     public entry fun unregister_game(
         admin: &signer, game_address: address
-    ) acquires GameCapability, GameRegistry {
+    ) acquires GameRegistry {
         assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
-        assert!(exists<GameCapability>(game_address), E_GAME_NOT_REGISTERED);
-
-        // Remove capability resource
-        move_from<GameCapability>(game_address);
 
         // Remove from game registry
         let registry = borrow_global_mut<GameRegistry>(@casino);
-        if (ordered_map::contains(&registry.registered_games, &game_address)) {
-            let game_info =
-                ordered_map::remove(&mut registry.registered_games, &game_address);
-            event::emit(GameUnregisteredEvent { game_address, name: game_info.name });
-        };
+        assert!(
+            ordered_map::contains(&registry.registered_games, &game_address),
+            E_GAME_NOT_REGISTERED
+        );
+
+        let game_info = ordered_map::remove(
+            &mut registry.registered_games, &game_address
+        );
+        event::emit(GameUnregisteredEvent { game_address, name: game_info.name });
     }
 
     //
@@ -257,13 +257,15 @@ module casino::CasinoHouse {
         let game_addr = capability.game_address;
         let amount = coin::value(&coins);
 
-        // Get game info if available for bet limits validation
+        // Mandatory game registry check
         let registry = borrow_global<GameRegistry>(@casino);
-        if (ordered_map::contains(&registry.registered_games, &game_addr)) {
-            let game_info = ordered_map::borrow(&registry.registered_games, &game_addr);
-            assert!(amount >= game_info.min_bet, E_INVALID_AMOUNT);
-            assert!(amount <= game_info.max_bet, E_INVALID_AMOUNT);
-        };
+        assert!(
+            ordered_map::contains(&registry.registered_games, &game_addr),
+            E_GAME_NOT_REGISTERED
+        );
+        let game_info = ordered_map::borrow(&registry.registered_games, &game_addr);
+        assert!(amount >= game_info.min_bet, E_INVALID_AMOUNT);
+        assert!(amount <= game_info.max_bet, E_INVALID_AMOUNT);
 
         // Validate expected payout
         assert!(expected_payout > 0, E_INVALID_AMOUNT);
@@ -307,8 +309,14 @@ module casino::CasinoHouse {
         bet_id: u64,
         winner: address,
         payout: u64
-    ) acquires Treasury, BetRegistry {
-        // Capability itself provides authorization - no registry check needed
+    ) acquires Treasury, BetRegistry, GameRegistry {
+        // Mandatory game registry check
+        let game_addr = capability.game_address;
+        let registry = borrow_global<GameRegistry>(@casino);
+        assert!(
+            ordered_map::contains(&registry.registered_games, &game_addr),
+            E_GAME_NOT_REGISTERED
+        );
 
         // Get bet information and validate
         let bet_registry = borrow_global_mut<BetRegistry>(@casino);
