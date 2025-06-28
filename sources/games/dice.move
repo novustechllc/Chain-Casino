@@ -73,6 +73,7 @@ module dice_game::DiceGame {
     //
 
     #[lint::allow_unsafe_randomness]
+    #[randomness]
     /// Play dice game
     /// Both game operator and player must sign transaction
     public entry fun play_dice(
