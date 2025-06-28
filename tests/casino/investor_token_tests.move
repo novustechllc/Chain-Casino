@@ -107,7 +107,9 @@ module casino::InvestorTokenTest {
     }
 
     #[test]
-    #[expected_failure(abort_code = E_INSUFFICIENT_BALANCE, location = casino::InvestorToken)]
+    #[expected_failure(
+        abort_code = E_INSUFFICIENT_BALANCE, location = casino::InvestorToken
+    )]
     fun test_redeem_insufficient_balance() {
         let (_casino_account, user_account) = setup_test();
 
@@ -325,13 +327,15 @@ module casino::InvestorTokenTest {
     }
 
     #[test]
-    #[expected_failure(abort_code = E_INSUFFICIENT_TREASURY, location = casino::InvestorToken)]
+    #[expected_failure(
+        abort_code = E_INSUFFICIENT_TREASURY, location = casino::InvestorToken
+    )]
     fun test_redeem_exceeds_treasury() {
         let (casino_account, user_account) = setup_test();
 
         // Create scenario where redemption exceeds treasury
         InvestorToken::deposit_and_mint(&user_account, TEST_DEPOSIT);
-        
+
         // Artificially drain treasury through direct withdrawal
         let drain_coins = CasinoHouse::redeem_from_treasury(TEST_DEPOSIT - 1000);
         coin::deposit(@casino, drain_coins);

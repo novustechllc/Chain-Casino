@@ -128,9 +128,11 @@ module casino::CasinoHouseTest {
     }
 
     #[test]
-    #[expected_failure(
-        abort_code = E_GAME_ALREADY_REGISTERED, location = casino::CasinoHouse
-    )]
+    #[
+        expected_failure(
+            abort_code = E_GAME_ALREADY_REGISTERED, location = casino::CasinoHouse
+        )
+    ]
     fun test_register_game_duplicate() {
         let (_, casino_account, _) = setup_test();
 

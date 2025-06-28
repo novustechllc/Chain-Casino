@@ -3,5 +3,4 @@
 //! Tests cross-module interactions, treasury synchronization, and profit flow.
 
 #[test_only]
-module casino::IntegrationTest {
-}
+module casino::IntegrationTest {}

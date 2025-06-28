@@ -1,5 +1,5 @@
 //! LICENSE: GPL-3.0
-//! 
+//!
 //! Casino treasury and game registry management
 //!
 //! Central hub for game authorization, bet settlement, and treasury operations.
@@ -227,7 +227,9 @@ module casino::CasinoHouse {
         // Verify game is registered
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
-            ordered_map::contains(&registry.registered_games, &signer::address_of(game)),
+            ordered_map::contains(
+                &registry.registered_games, &signer::address_of(game)
+            ),
             E_GAME_NOT_REGISTERED
         );
 
@@ -264,7 +266,9 @@ module casino::CasinoHouse {
         // Verify game is registered
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
-            ordered_map::contains(&registry.registered_games, &signer::address_of(game)),
+            ordered_map::contains(
+                &registry.registered_games, &signer::address_of(game)
+            ),
             E_GAME_NOT_REGISTERED
         );
 
