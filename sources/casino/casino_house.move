@@ -1,16 +1,21 @@
 //! MIT License
 //!
-//! Casino treasury and game registry management
+//! Casino treasury and game registry management (Refactored for Fungible Assets)
 //!
 //! Central hub for game authorization, bet settlement, and treasury operations.
-//! Integrates with InvestorToken for profit distribution to token holders.
+//! Uses modern Fungible Asset standard instead of deprecated Coin operations.
 
 module casino::CasinoHouse {
     use std::string::{String};
     use std::vector;
     use std::signer;
-    use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::aptos_coin::AptosCoin;
+    use std::option;
+    use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata};
+    use aptos_framework::primary_fungible_store;
+    use aptos_framework::object::{Self, Object};
+    use aptos_framework::aptos_coin;
+    use aptos_framework::coin;
+    use aptos_framework::account::{Self, SignerCapability};
     use aptos_framework::event;
     use aptos_std::ordered_map::{Self, OrderedMap};
 
@@ -40,16 +45,18 @@ module casino::CasinoHouse {
     const E_CAPABILITY_ALREADY_CLAIMED: u64 = 0x0B;
 
     //
-    // Constants
-    //
-
-    //
     // Resource Specifications
     //
 
-    /// Central treasury holding all casino funds
+    /// Central treasury holding all casino funds as Fungible Assets
     struct Treasury has key {
-        vault: Coin<AptosCoin>
+        /// Primary store for AptosCoin FA
+        store: Object<aptos_framework::fungible_asset::FungibleStore>
+    }
+
+    /// Casino signer capability for treasury operations
+    struct CasinoSignerCapability has key {
+        signer_cap: account::SignerCapability
     }
 
     /// Registry of authorized casino games
@@ -89,11 +96,10 @@ module casino::CasinoHouse {
     }
 
     //
-    // Event Specifications
+    // Event Specifications (unchanged)
     //
 
     #[event]
-    /// Emitted when bet is accepted by casino
     struct BetAcceptedEvent has drop, store {
         bet_id: u64,
         game_address: address,
@@ -103,7 +109,6 @@ module casino::CasinoHouse {
     }
 
     #[event]
-    /// Emitted when bet is settled with payout
     struct BetSettledEvent has drop, store {
         bet_id: u64,
         winner: address,
@@ -111,7 +116,6 @@ module casino::CasinoHouse {
     }
 
     #[event]
-    /// Emitted when new game is registered
     struct GameRegisteredEvent has drop, store {
         game_address: address,
         name: String,
@@ -119,14 +123,12 @@ module casino::CasinoHouse {
     }
 
     #[event]
-    /// Emitted when game is unregistered
     struct GameUnregisteredEvent has drop, store {
         game_address: address,
         name: String
     }
 
     #[event]
-    /// Emitted when game claims its capability
     struct GameCapabilityClaimedEvent has drop, store {
         game_address: address,
         name: String
@@ -140,10 +142,25 @@ module casino::CasinoHouse {
     fun init_module(admin: &signer) {
         assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
 
-        move_to(
-            admin,
-            Treasury { vault: coin::zero<AptosCoin>() }
-        );
+        // Create resource account for treasury operations
+        let (resource_signer, signer_cap) =
+            account::create_resource_account(admin, b"casino_treasury");
+
+        // Create primary store for AptosCoin FA on resource account
+        let aptos_metadata_option =
+            coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
+        let aptos_metadata = option::extract(&mut aptos_metadata_option);
+        let treasury_store =
+            primary_fungible_store::ensure_primary_store_exists(
+                signer::address_of(&resource_signer),
+                aptos_metadata
+            );
+
+        // Store signer capability at casino address
+        move_to(admin, CasinoSignerCapability { signer_cap });
+
+        // Store treasury reference at casino address
+        move_to(admin, Treasury { store: treasury_store });
 
         move_to(
             admin,
@@ -168,7 +185,7 @@ module casino::CasinoHouse {
     }
 
     //
-    // Game Management Interface
+    // Game Management Interface (unchanged)
     //
 
     /// Register new game by address (casino admin only)
@@ -184,16 +201,13 @@ module casino::CasinoHouse {
 
         let registry = borrow_global_mut<GameRegistry>(@casino);
 
-        // Check if game already registered
         assert!(
             !ordered_map::contains(&registry.registered_games, &game_address),
             E_GAME_ALREADY_REGISTERED
         );
 
-        // Validate game info
         assert!(max_bet >= min_bet, E_INVALID_AMOUNT);
 
-        // Store game info with capability_claimed = false
         let game_info = GameInfo {
             name,
             module_address: game_address,
@@ -216,7 +230,6 @@ module casino::CasinoHouse {
 
         let registry = borrow_global_mut<GameRegistry>(@casino);
 
-        // Check if game is registered
         assert!(
             registry.registered_games.contains(&game_address),
             E_GAME_NOT_REGISTERED
@@ -224,16 +237,12 @@ module casino::CasinoHouse {
 
         let game_info = registry.registered_games.borrow_mut(&game_address);
 
-        // Check if capability already claimed
         assert!(!game_info.capability_claimed, E_CAPABILITY_ALREADY_CLAIMED);
 
-        // Mark capability as claimed
         game_info.capability_claimed = true;
 
-        // Emit capability claimed event
         event::emit(GameCapabilityClaimedEvent { game_address, name: game_info.name });
 
-        // Return capability for game authorization
         GameCapability { game_address }
     }
 
@@ -243,7 +252,6 @@ module casino::CasinoHouse {
     ) acquires GameRegistry {
         assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
 
-        // Remove from game registry
         let registry = borrow_global_mut<GameRegistry>(@casino);
         assert!(
             registry.registered_games.contains(&game_address),
@@ -255,18 +263,18 @@ module casino::CasinoHouse {
     }
 
     //
-    // Bet Flow Interface (Public Functions)
+    // Bet Flow Interface (REFACTORED)
     //
 
-    /// Accept bet from authorized game
+    /// Accept bet from authorized game - now uses FungibleAsset
     public fun place_bet(
         capability: &GameCapability,
-        coins: Coin<AptosCoin>,
+        bet_fa: FungibleAsset,
         player: address,
         expected_payout: u64
     ): u64 acquires Treasury, BetIndex, GameRegistry, BetRegistry {
         let game_addr = capability.game_address;
-        let amount = coin::value(&coins);
+        let amount = fungible_asset::amount(&bet_fa);
 
         // Mandatory game registry check
         let registry = borrow_global<GameRegistry>(@casino);
@@ -278,17 +286,22 @@ module casino::CasinoHouse {
         assert!(amount >= game_info.min_bet, E_INVALID_AMOUNT);
         assert!(amount <= game_info.max_bet, E_INVALID_AMOUNT);
 
-        // Validate expected payout
         assert!(expected_payout > 0, E_INVALID_AMOUNT);
 
-        // Merge coins into treasury first
-        let treasury_mut = borrow_global_mut<Treasury>(@casino);
-        coin::merge(&mut treasury_mut.vault, coins);
-        let treasury_balance = coin::value(&treasury_mut.vault);
+        // Deposit bet to treasury store
+        let treasury = borrow_global<Treasury>(@casino);
+        fungible_asset::deposit(treasury.store, bet_fa);
+
+        let treasury_addr = get_treasury_address();
+        let aptos_metadata_option =
+            coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
+        let aptos_metadata = option::extract(&mut aptos_metadata_option);
+        let treasury_balance =
+            primary_fungible_store::balance(treasury_addr, aptos_metadata);
 
         // Check if treasury has sufficient funds for expected payout after bet contribution
         assert!(
-            expected_payout <= treasury_balance + amount,
+            expected_payout <= treasury_balance,
             E_INSUFFICIENT_TREASURY_FOR_PAYOUT
         );
 
@@ -315,13 +328,13 @@ module casino::CasinoHouse {
         bet_id
     }
 
-    /// Settle bet with payout from treasury
+    /// Settle bet with payout from treasury - now uses FungibleAsset
     public fun settle_bet(
         capability: &GameCapability,
         bet_id: u64,
         winner: address,
         payout: u64
-    ) acquires Treasury, BetRegistry, GameRegistry {
+    ) acquires BetRegistry, GameRegistry, CasinoSignerCapability {
         // Mandatory game registry check
         let game_addr = capability.game_address;
         let registry = borrow_global<GameRegistry>(@casino);
@@ -341,45 +354,69 @@ module casino::CasinoHouse {
         assert!(!bet_info.settled, E_BET_ALREADY_SETTLED);
         assert!(payout <= bet_info.expected_payout, E_PAYOUT_EXCEEDS_EXPECTED);
 
-        // Mark bet as settled
         bet_info.settled = true;
 
-        let treasury = borrow_global_mut<Treasury>(@casino);
-        let treasury_balance = coin::value(&treasury.vault);
+        let treasury_addr = get_treasury_address();
+        let aptos_metadata_option =
+            coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
+        let aptos_metadata = option::extract(&mut aptos_metadata_option);
+        let treasury_balance =
+            primary_fungible_store::balance(treasury_addr, aptos_metadata);
         assert!(payout <= treasury_balance, E_INSUFFICIENT_TREASURY);
 
         // Pay winner if payout > 0
         if (payout > 0) {
-            let payout_coins = coin::extract(&mut treasury.vault, payout);
-            coin::deposit(winner, payout_coins);
+            let treasury_signer = get_treasury_signer();
+            let aptos_metadata_option =
+                coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
+            let aptos_metadata = option::extract(&mut aptos_metadata_option);
+            primary_fungible_store::transfer(
+                &treasury_signer,
+                aptos_metadata,
+                winner,
+                payout
+            );
         };
-
-        // Profit remains in treasury for InvestorToken holders
 
         event::emit(BetSettledEvent { bet_id, winner, payout });
     }
 
-    /// Extract funds from treasury for InvestorToken redemptions
-    package fun redeem_from_treasury(amount: u64): Coin<AptosCoin> acquires Treasury {
-        let treasury = borrow_global_mut<Treasury>(@casino);
-        let treasury_balance = coin::value(&treasury.vault);
-        assert!(amount <= treasury_balance, E_INSUFFICIENT_TREASURY);
-
-        coin::extract(&mut treasury.vault, amount)
+    /// Internal function to get treasury signer from capability
+    fun get_treasury_signer(): signer acquires CasinoSignerCapability {
+        let signer_cap = &borrow_global<CasinoSignerCapability>(@casino).signer_cap;
+        account::create_signer_with_capability(signer_cap)
     }
 
-    /// Deposit coins to treasury (for InvestorToken deposits)
-    package fun deposit_to_treasury(coins: Coin<AptosCoin>) acquires Treasury {
-        let treasury = borrow_global_mut<Treasury>(@casino);
-        coin::merge(&mut treasury.vault, coins);
+    /// Get the treasury resource account address
+    fun get_treasury_address(): address {
+        account::create_resource_address(&@casino, b"casino_treasury")
+    }
+
+    /// Extract funds from treasury for InvestorToken redemptions - REFACTORED
+    package fun redeem_from_treasury(amount: u64): FungibleAsset acquires CasinoSignerCapability {
+        let aptos_metadata_option =
+            coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
+        let aptos_metadata = option::extract(&mut aptos_metadata_option);
+        let treasury_addr = get_treasury_address();
+        let treasury_balance =
+            primary_fungible_store::balance(treasury_addr, aptos_metadata);
+        assert!(amount <= treasury_balance, E_INSUFFICIENT_TREASURY);
+
+        let treasury_signer = get_treasury_signer();
+        primary_fungible_store::withdraw(&treasury_signer, aptos_metadata, amount)
+    }
+
+    /// Deposit fungible asset to treasury - REFACTORED
+    package fun deposit_to_treasury(fa: FungibleAsset) acquires Treasury {
+        let treasury = borrow_global<Treasury>(@casino);
+        fungible_asset::deposit(treasury.store, fa);
     }
 
     //
-    // View Interface
+    // View Interface - UPDATED
     //
 
     #[view]
-    /// Get all registered games
     public fun get_registered_games(): vector<GameInfo> acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@casino);
         let games = vector::empty<GameInfo>();
@@ -398,7 +435,6 @@ module casino::CasinoHouse {
     }
 
     #[view]
-    /// Get specific game information
     public fun get_game_info(game_address: address): GameInfo acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
@@ -409,21 +445,22 @@ module casino::CasinoHouse {
     }
 
     #[view]
-    /// Get current treasury balance
-    public fun treasury_balance(): u64 acquires Treasury {
-        let treasury = borrow_global<Treasury>(@casino);
-        coin::value(&treasury.vault)
+    /// Get current treasury balance using primary store
+    public fun treasury_balance(): u64 {
+        let aptos_metadata_option =
+            coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
+        let aptos_metadata = option::extract(&mut aptos_metadata_option);
+        let treasury_addr = get_treasury_address();
+        primary_fungible_store::balance(treasury_addr, aptos_metadata)
     }
 
     #[view]
-    /// Check if game is registered
     public fun is_game_registered(game_address: address): bool acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@casino);
         ordered_map::contains(&registry.registered_games, &game_address)
     }
 
     #[view]
-    /// Check if game has claimed its capability
     public fun is_game_capability_claimed(game_address: address): bool acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@casino);
         if (!ordered_map::contains(&registry.registered_games, &game_address)) { false }

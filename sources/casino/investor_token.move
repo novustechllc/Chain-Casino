@@ -1,20 +1,28 @@
 //! MIT License
 //!
-//! InvestorToken Fungible Asset Implementation
+//! InvestorToken Fungible Asset Implementation (Refactored)
 //!
 //! NAV-based investor tokens for the ChainCasino platform.
+//! Now uses modern Fungible Asset standard throughout.
 
 module casino::InvestorToken {
     use std::string;
     use std::signer;
     use std::option;
     use aptos_framework::object::{Self, Object, ExtendRef};
-    use aptos_framework::fungible_asset::{Self, Metadata, MintRef, BurnRef, TransferRef};
+    use aptos_framework::fungible_asset::{
+        Self,
+        Metadata,
+        MintRef,
+        BurnRef,
+        TransferRef,
+        FungibleAsset
+    };
     use aptos_framework::primary_fungible_store;
     use aptos_framework::event;
     use aptos_framework::timestamp;
+    use aptos_framework::aptos_coin;
     use aptos_framework::coin;
-    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_std::math64;
     use casino::CasinoHouse;
 
@@ -118,7 +126,7 @@ module casino::InvestorToken {
     }
 
     //
-    // Core Economic Interface
+    // Core Economic Interface - REFACTORED
     //
 
     #[view]
@@ -130,7 +138,6 @@ module casino::InvestorToken {
         if (total_supply == 0) {
             NAV_SCALE
         } else {
-            // Use u128 arithmetic to prevent overflow
             let treasury_u128 = (treasury_balance as u128);
             let nav_scale_u128 = (NAV_SCALE as u128);
             let supply_u128 = (total_supply as u128);
@@ -140,7 +147,7 @@ module casino::InvestorToken {
         }
     }
 
-    /// Deposit APT and mint proportional InvestorTokens
+    /// Deposit APT and mint proportional InvestorTokens - REFACTORED
     public entry fun deposit_and_mint(
         user: &signer, amount: u64
     ) acquires InvestorTokenRefs, DividendMetadata {
@@ -153,7 +160,6 @@ module casino::InvestorToken {
         let tokens_to_mint =
             if (total_supply == 0) { amount }
             else {
-                // Use u128 to prevent overflow
                 let amount_u128 = (amount as u128);
                 let supply_u128 = (total_supply as u128);
                 let treasury_u128 = (treasury_balance as u128);
@@ -162,9 +168,14 @@ module casino::InvestorToken {
                 (result_u128 as u64)
             };
 
+        // Withdraw APT from user as FungibleAsset
+        let aptos_metadata_option =
+            coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
+        let aptos_metadata = option::extract(&mut aptos_metadata_option);
+        let deposit_fa = primary_fungible_store::withdraw(user, aptos_metadata, amount);
+
         // Transfer APT to casino treasury
-        let coins = coin::withdraw<AptosCoin>(user, amount);
-        deposit_to_treasury(coins);
+        deposit_to_treasury(deposit_fa);
 
         // Mint tokens to user
         let refs = borrow_global<InvestorTokenRefs>(object::object_address(&metadata));
@@ -179,7 +190,7 @@ module casino::InvestorToken {
         update_nav_tracking();
     }
 
-    /// Burn InvestorTokens and redeem APT at current NAV
+    /// Burn InvestorTokens and redeem APT at current NAV - REFACTORED
     public entry fun redeem(user: &signer, tokens: u64) acquires InvestorTokenRefs, DividendMetadata {
         assert!(tokens > 0, E_INVALID_AMOUNT);
 
@@ -191,7 +202,7 @@ module casino::InvestorToken {
 
         let current_nav = nav();
 
-        // Use u128 for gross amount calculation
+        // Calculate gross amount using u128
         let tokens_u128 = (tokens as u128);
         let nav_u128 = (current_nav as u128);
         let scale_u128 = (NAV_SCALE as u128);
@@ -212,8 +223,15 @@ module casino::InvestorToken {
 
         // Withdraw from treasury and pay user (only if net_amount > 0)
         if (net_amount > 0) {
-            let payout = redeem_from_treasury(net_amount);
-            coin::deposit(user_addr, payout);
+            let payout_fa = redeem_from_treasury(net_amount);
+            let aptos_metadata_option =
+                coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
+            let aptos_metadata = option::extract(&mut aptos_metadata_option);
+            let user_aptos_store =
+                primary_fungible_store::ensure_primary_store_exists(
+                    user_addr, aptos_metadata
+                );
+            fungible_asset::deposit(user_aptos_store, payout_fa);
         };
 
         // Calculate profit for dividend event
@@ -271,7 +289,6 @@ module casino::InvestorToken {
         let metadata = get_metadata();
         let supply_option = fungible_asset::supply(metadata);
         if (option::is_some(&supply_option)) {
-            // Convert u128 to u64 safely
             let supply_u128 = option::extract(&mut supply_option);
             (supply_u128 as u64)
         } else { 0 }
@@ -283,14 +300,14 @@ module casino::InvestorToken {
     }
 
     //
-    // Treasury Integration Functions
+    // Treasury Integration Functions - REFACTORED
     //
 
-    fun deposit_to_treasury(coins: coin::Coin<AptosCoin>) {
-        CasinoHouse::deposit_to_treasury(coins);
+    fun deposit_to_treasury(fa: FungibleAsset) {
+        CasinoHouse::deposit_to_treasury(fa);
     }
 
-    fun redeem_from_treasury(amount: u64): coin::Coin<AptosCoin> {
+    fun redeem_from_treasury(amount: u64): FungibleAsset {
         CasinoHouse::redeem_from_treasury(amount)
     }
 

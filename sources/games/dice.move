@@ -1,6 +1,6 @@
 //! MIT License
 //!
-//! Simple Dice Game for ChainCasino Platform
+//! Simple Dice Game for ChainCasino Platform (Refactored for FA)
 //!
 //! Single die guessing game where players bet on the exact outcome (1-6).
 //! 6x payout odds with ~16.67% house edge.
@@ -9,8 +9,11 @@ module dice_game::DiceGame {
     use aptos_framework::randomness;
     use aptos_framework::event;
     use std::signer;
+    use std::option;
+    use aptos_framework::fungible_asset::FungibleAsset;
+    use aptos_framework::primary_fungible_store;
+    use aptos_framework::aptos_coin;
     use aptos_framework::coin;
-    use aptos_framework::aptos_coin::AptosCoin;
     use casino::CasinoHouse;
     use casino::CasinoHouse::GameCapability;
 
@@ -82,24 +85,14 @@ module dice_game::DiceGame {
     //
 
     /// Initialize dice game - claims capability from casino
-    /// Prerequisites: Casino admin must have called CasinoHouse::register_game first
     public entry fun initialize_game(dice_admin: &signer) {
         assert!(signer::address_of(dice_admin) == @dice_game, E_UNAUTHORIZED);
-
-        // Check if already initialized
         assert!(!exists<GameAuth>(@dice_game), E_ALREADY_INITIALIZED);
-
-        // Verify game is registered by casino
         assert!(CasinoHouse::is_game_registered(@dice_game), E_GAME_NOT_REGISTERED);
 
-        // Claim capability from casino (proves dice_game identity)
         let capability = CasinoHouse::get_game_capability(dice_admin);
+        move_to(dice_admin, GameAuth { capability });
 
-        // Store capability at dice game's own address
-        let game_auth = GameAuth { capability };
-        move_to(dice_admin, game_auth);
-
-        // Emit initialization event
         event::emit(
             GameInitialized {
                 game_address: @dice_game,
@@ -112,51 +105,48 @@ module dice_game::DiceGame {
     }
 
     //
-    // Core Game Interface
+    // Core Game Interface - REFACTORED
     //
 
     #[randomness]
-    /// Play dice game - player signs transaction, module calls casino
+    /// Play dice game - now uses FungibleAsset operations
     entry fun play_dice(player: &signer, guess: u8, bet_amount: u64) acquires GameAuth {
-        // Validate inputs
         assert!(guess >= 1 && guess <= 6, E_INVALID_GUESS);
         assert!(bet_amount >= MIN_BET, E_INVALID_AMOUNT);
         assert!(bet_amount <= MAX_BET, E_INVALID_AMOUNT);
 
         let player_addr = signer::address_of(player);
-
-        // Calculate expected payout if player wins
         let expected_payout = bet_amount * PAYOUT_MULTIPLIER;
 
-        // Player provides bet coins
-        let bet_coins = coin::withdraw<AptosCoin>(player, bet_amount);
+        // Withdraw bet as FungibleAsset from player
+        let aptos_metadata_option =
+            coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
+        let aptos_metadata = option::extract(&mut aptos_metadata_option);
+        let bet_fa = primary_fungible_store::withdraw(player, aptos_metadata, bet_amount);
 
-        // Get stored capability from dice game address
+        // Get stored capability
         let game_auth = borrow_global<GameAuth>(@dice_game);
         let capability = &game_auth.capability;
 
-        // Module calls casino with capability authorization
+        // Place bet with casino (FA gets deposited to treasury)
         let bet_id =
             CasinoHouse::place_bet(
                 capability,
-                bet_coins,
+                bet_fa,
                 player_addr,
                 expected_payout
             );
 
-        // Roll the dice (1-6)
+        // Roll dice and determine outcome
         let dice_result = randomness::u8_range(1, 7);
-
-        // Determine outcome
         let player_won = dice_result == guess;
         let actual_payout = if (player_won) {
             expected_payout
         } else { 0 };
 
-        // Settle bet through CasinoHouse
+        // Settle bet (casino handles FA transfer to winner if any)
         CasinoHouse::settle_bet(capability, bet_id, player_addr, actual_payout);
 
-        // Emit game event
         event::emit(
             DiceRolled {
                 bet_id,
@@ -170,10 +160,9 @@ module dice_game::DiceGame {
         );
     }
 
-    // Test only
     #[test_only]
     #[lint::allow_unsafe_randomness]
-    /// Play dice game - player signs transaction, module calls casino
+    /// Test version allowing unsafe randomness
     public entry fun test_only_play_dice(
         player: &signer, guess: u8, bet_amount: u64
     ) acquires GameAuth {
@@ -185,31 +174,26 @@ module dice_game::DiceGame {
     //
 
     #[view]
-    /// Get game configuration
     public fun get_game_config(): (u64, u64, u64, u64) {
         (MIN_BET, MAX_BET, PAYOUT_MULTIPLIER, HOUSE_EDGE_BPS)
     }
 
     #[view]
-    /// Calculate expected payout for a bet amount
     public fun calculate_payout(bet_amount: u64): u64 {
         bet_amount * PAYOUT_MULTIPLIER
     }
 
     #[view]
-    /// Check if game is registered with CasinoHouse
     public fun is_registered(): bool {
         CasinoHouse::is_game_registered(@dice_game)
     }
 
     #[view]
-    /// Check if game is fully initialized (has capability)
     public fun is_initialized(): bool {
         exists<GameAuth>(@dice_game)
     }
 
     #[view]
-    /// Check if game is ready to accept bets (registered + initialized)
     public fun is_ready(): bool {
         is_registered() && is_initialized()
     }
