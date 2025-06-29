@@ -13,6 +13,8 @@ ChainCasino is a decentralized protocol on **Aptos** that merges casino gaming w
 
 ChainCasino turns **"The House Always Wins"** into **"The Investor Always Earns."**
 
+![ChainCasino Banner](./.github/assets/Banner_Final.jpg)
+
 ---
 
 ## 📐 Architecture Overview
@@ -114,6 +116,8 @@ flowchart LR
 ## TODO
 
 - Add Previous Branch Tests Refactor Made Obsolete
+- Optimize for Transaction Parallelization on Aptos Blockchain
+- Gas Waste Removal
 
 ---
 
