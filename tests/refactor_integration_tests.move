@@ -164,11 +164,12 @@ module casino::ComprehensiveIntegrationTest {
         // Massive treasury reserve for slot machine max payout (500x)
         // Slot max payout = 50000000 * 500 = 25000000000 (250 APT)
         let massive_reserve = 30000000000; // 300 APT reserve
-        let reserve_fa = primary_fungible_store::withdraw(
-            &casino_signer,
-            option::extract(&mut coin::paired_metadata<AptosCoin>()),
-            massive_reserve
-        );
+        let reserve_fa =
+            primary_fungible_store::withdraw(
+                &casino_signer,
+                option::extract(&mut coin::paired_metadata<AptosCoin>()),
+                massive_reserve
+            );
         CasinoHouse::deposit_to_treasury(reserve_fa);
 
         InvestorToken::deposit_and_mint(&investor2, INVESTOR_DEPOSIT / 2); // 5 APT
@@ -301,11 +302,12 @@ module casino::ComprehensiveIntegrationTest {
         // Massive treasury reserve for slot machine max payout (500x)
         // Slot max payout = 50000000 * 500 = 25000000000 (250 APT)
         let massive_reserve = 30000000000; // 300 APT reserve
-        let reserve_fa = primary_fungible_store::withdraw(
-            &casino_signer,
-            option::extract(&mut coin::paired_metadata<AptosCoin>()),
-            massive_reserve
-        );
+        let reserve_fa =
+            primary_fungible_store::withdraw(
+                &casino_signer,
+                option::extract(&mut coin::paired_metadata<AptosCoin>()),
+                massive_reserve
+            );
         CasinoHouse::deposit_to_treasury(reserve_fa);
 
         // Create whale player
