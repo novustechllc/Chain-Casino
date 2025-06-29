@@ -10,12 +10,11 @@ module casino::CasinoHouse {
     use std::vector;
     use std::signer;
     use std::option;
-    use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata};
+    use aptos_framework::fungible_asset::{Self, FungibleAsset};
     use aptos_framework::primary_fungible_store;
-    use aptos_framework::object::{Self, Object, ObjectCore, ExtendRef};
-    use aptos_framework::aptos_coin;
+    use aptos_framework::object::{Self, Object, ExtendRef};
     use aptos_framework::coin;
-    use aptos_framework::account::{Self, SignerCapability};
+    use aptos_framework::account;
     use aptos_framework::event;
     use aptos_framework::timestamp;
     use aptos_std::ordered_map::{Self, OrderedMap};
@@ -62,8 +61,8 @@ module casino::CasinoHouse {
         signer_cap: account::SignerCapability
     }
 
-    /// Game metadata stored in named object
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// Game metadata stored in named object
     struct GameMetadata has key {
         name: String,
         version: String,

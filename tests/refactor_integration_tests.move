@@ -195,7 +195,7 @@ module casino::ComprehensiveIntegrationTest {
 
         // === PHASE 3: GAMING ACTIVITY ===
 
-        let initial_treasury = CasinoHouse::treasury_balance();
+        let _initial_treasury = CasinoHouse::treasury_balance();
 
         // Dice game activity
         DiceGame::test_only_play_dice(&player1, 1, DICE_BET);
@@ -331,8 +331,8 @@ module casino::ComprehensiveIntegrationTest {
                 string::utf8(b"v1")
             );
 
-        let dice_actual = DiceGame::get_game_object_address();
-        let slot_actual = SlotMachine::get_game_object_address();
+        let _dice_actual = DiceGame::get_game_object_address();
+        let _slot_actual = SlotMachine::get_game_object_address();
 
         // Verify casino game objects are accessible
         let dice_casino_object = DiceGame::get_casino_game_object();
@@ -413,7 +413,7 @@ module casino::ComprehensiveIntegrationTest {
 
         // High-volume whale activity
         let (_, dice_max_bet, _, _) = DiceGame::get_game_config();
-        let (_, slot_max_bet, _) = SlotMachine::get_game_config();
+        let (_, _slot_max_bet, _) = SlotMachine::get_game_config();
         let large_bet = dice_max_bet;
 
         // Multiple large bets

@@ -13,9 +13,7 @@ module dice_game::DiceGame {
     use std::option;
     use std::string::{Self, String};
     use std::vector;
-    use aptos_framework::fungible_asset::FungibleAsset;
     use aptos_framework::primary_fungible_store;
-    use aptos_framework::aptos_coin;
     use aptos_framework::coin;
     use casino::CasinoHouse;
     use casino::CasinoHouse::GameCapability;

@@ -21,7 +21,6 @@ module casino::InvestorToken {
     use aptos_framework::primary_fungible_store;
     use aptos_framework::event;
     use aptos_framework::timestamp;
-    use aptos_framework::aptos_coin;
     use aptos_framework::coin;
     use aptos_std::math64;
     use casino::CasinoHouse;
