@@ -67,7 +67,9 @@ module casino::CriticalIntegrationTest {
         (aptos_framework, casino_account, dice_account)
     }
 
-    fun create_funded_player(framework: &signer, addr: address, balance: u64): signer {
+    fun create_funded_player(
+        framework: &signer, addr: address, balance: u64
+    ): signer {
         let player = account::create_account_for_test(addr);
         coin::register<AptosCoin>(&player);
         aptos_coin::mint(framework, addr, balance);
@@ -93,7 +95,7 @@ module casino::CriticalIntegrationTest {
         DiceGame::test_only_play_dice(&whale, 2, MASSIVE_BET); // Another 10 APT if wins
 
         let treasury_after_bets = CasinoHouse::treasury_balance();
-        
+
         // Treasury should have more funds (from bets) regardless of outcomes
         assert!(treasury_after_bets >= treasury_after_investment, 2);
 
@@ -144,12 +146,13 @@ module casino::CriticalIntegrationTest {
         // Simulate blackjack bet via CasinoHouse directly
         let bj_bet_coins = coin::withdraw<AptosCoin>(&bj_player, MASSIVE_BET);
         let bj_auth = borrow_global<TestGameAuth>(BLACKJACK_ADDR);
-        let bet_id = CasinoHouse::place_bet(
-            &bj_auth.capability,
-            bj_bet_coins,
-            PLAYER_BASE,
-            MASSIVE_BET * 2
-        );
+        let bet_id =
+            CasinoHouse::place_bet(
+                &bj_auth.capability,
+                bj_bet_coins,
+                PLAYER_BASE,
+                MASSIVE_BET * 2
+            );
         // Simulate blackjack loss (house wins)
         CasinoHouse::settle_bet(&bj_auth.capability, bet_id, PLAYER_BASE, 0);
 
@@ -195,7 +198,7 @@ module casino::CriticalIntegrationTest {
 
         // Concurrent redemptions
         let redeem_amount = LARGE_DEPOSIT / 3;
-        
+
         let inv1_apt_before = coin::balance<AptosCoin>(@0x1001);
         let inv2_apt_before = coin::balance<AptosCoin>(@0x1002);
 
@@ -217,7 +220,7 @@ module casino::CriticalIntegrationTest {
         assert!(final_treasury > 0, 3);
         assert!(final_supply > 0, 4);
         assert!(final_nav > 0, 5);
-        
+
         // NAV should reflect profit accumulation
         assert!(final_nav >= nav_after_1, 6);
     }
@@ -246,13 +249,10 @@ module casino::CriticalIntegrationTest {
 
         let player = create_funded_player(&framework, @0x9999, SMALL_RESERVE);
         let bet_coins = coin::withdraw<AptosCoin>(&player, 10000000);
-        
+
         let auth = borrow_global<TestGameAuth>(TEMP_GAME_ADDR);
         let bet_id = CasinoHouse::place_bet(
-            &auth.capability,
-            bet_coins,
-            @0x9999,
-            20000000
+            &auth.capability, bet_coins, @0x9999, 20000000
         );
 
         // Unregister the game
@@ -277,7 +277,7 @@ module casino::CriticalIntegrationTest {
         InvestorToken::redeem(&micro_investor, user_tokens);
 
         let balance_after = coin::balance<AptosCoin>(MICRO_INVESTOR_ADDR);
-        
+
         // Should handle minimum fees correctly
         // Note: might receive 0 due to fees exceeding redemption value
         assert!(balance_after >= balance_before, 1);
@@ -298,20 +298,21 @@ module casino::CriticalIntegrationTest {
 
         // NAV should reflect massive profit
         let nav = InvestorToken::nav();
-        let expected_nav = ((LARGE_DEPOSIT / 10 + massive_profit) * 1000000) / (LARGE_DEPOSIT / 10);
-        
+        let expected_nav = ((LARGE_DEPOSIT / 10 + massive_profit) * 1000000)
+            / (LARGE_DEPOSIT / 10);
+
         assert!(nav == expected_nav, 1);
         assert!(nav > 50000000, 2); // NAV > 50 (massive profit)
 
         // Investor should be able to redeem at high NAV
         let tokens_to_redeem = (LARGE_DEPOSIT / 10) / 2;
         let apt_before = coin::balance<AptosCoin>(INVESTOR_ADDR);
-        
+
         InvestorToken::redeem(&investor, tokens_to_redeem);
-        
+
         let apt_after = coin::balance<AptosCoin>(INVESTOR_ADDR);
         let received = apt_after - apt_before;
-        
+
         // Should receive much more than face value
         assert!(received > tokens_to_redeem, 3);
     }
@@ -343,14 +344,15 @@ module casino::CriticalIntegrationTest {
         // Place active bet
         let player = create_funded_player(&framework, WHALE_ADDR, MASSIVE_BET);
         let bet_coins = coin::withdraw<AptosCoin>(&player, 50000000);
-        
+
         let auth = borrow_global<TestGameAuth>(TEST_GAME_ADDR);
-        let bet_id = CasinoHouse::place_bet(
-            &auth.capability,
-            bet_coins,
-            WHALE_ADDR,
-            100000000
-        );
+        let bet_id =
+            CasinoHouse::place_bet(
+                &auth.capability,
+                bet_coins,
+                WHALE_ADDR,
+                100000000
+            );
 
         // Verify bet is placed
         assert!(CasinoHouse::treasury_balance() > LARGE_DEPOSIT, 1);
