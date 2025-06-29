@@ -153,20 +153,22 @@ module slot_game::SlotMachine {
         let capability = &game_auth.capability;
 
         // Module calls casino with capability authorization (BEFORE spinning reels)
-        let bet_id = CasinoHouse::place_bet(
-            capability,
-            bet_coins,
-            player_addr,
-            expected_payout  // Maximum possible payout
-        );
+        let bet_id =
+            CasinoHouse::place_bet(
+                capability,
+                bet_coins,
+                player_addr,
+                expected_payout // Maximum possible payout
+            );
 
         // NOW spin the three reels to determine actual result
         let reel1 = spin_reel_internal();
-        let reel2 = spin_reel_internal(); 
+        let reel2 = spin_reel_internal();
         let reel3 = spin_reel_internal();
 
         // Calculate actual payout based on result
-        let (payout_multiplier, symbol_name) = calculate_payout_internal(reel1, reel2, reel3);
+        let (payout_multiplier, symbol_name) =
+            calculate_payout_internal(reel1, reel2, reel3);
         let actual_payout = bet_amount * payout_multiplier;
 
         // Determine if player won
@@ -190,7 +192,7 @@ module slot_game::SlotMachine {
             }
         );
     }
-    
+
     // Test only
     #[test_only]
     #[lint::allow_unsafe_randomness]
