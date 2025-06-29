@@ -4,7 +4,6 @@
 
 #[test_only]
 module dice_game::DiceGameTest {
-    use std::string;
     use std::vector;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
@@ -131,7 +130,7 @@ module dice_game::DiceGameTest {
     #[test]
     #[expected_failure(abort_code = E_INVALID_GUESS, location = dice_game::DiceGame)]
     fun test_play_dice_guess_too_low() {
-        let (framework, _, dice_account) = setup_basic_test();
+        let (framework, _, _) = setup_basic_test();
 
         // Setup a minimal test scenario
         let player = account::create_account_for_test(@0x123);
@@ -145,7 +144,7 @@ module dice_game::DiceGameTest {
     #[test]
     #[expected_failure(abort_code = E_INVALID_GUESS, location = dice_game::DiceGame)]
     fun test_play_dice_guess_too_high() {
-        let (framework, _, dice_account) = setup_basic_test();
+        let (framework, _, _) = setup_basic_test();
 
         let player = account::create_account_for_test(@0x123);
         coin::register<AptosCoin>(&player);
@@ -158,7 +157,7 @@ module dice_game::DiceGameTest {
     #[test]
     #[expected_failure(abort_code = E_INVALID_AMOUNT, location = dice_game::DiceGame)]
     fun test_play_dice_bet_too_low() {
-        let (framework, _, dice_account) = setup_basic_test();
+        let (framework, _, _) = setup_basic_test();
 
         let player = account::create_account_for_test(@0x123);
         coin::register<AptosCoin>(&player);
@@ -171,7 +170,7 @@ module dice_game::DiceGameTest {
     #[test]
     #[expected_failure(abort_code = E_INVALID_AMOUNT, location = dice_game::DiceGame)]
     fun test_play_dice_bet_too_high() {
-        let (framework, _, dice_account) = setup_basic_test();
+        let (framework, _, _) = setup_basic_test();
 
         let player = account::create_account_for_test(@0x123);
         coin::register<AptosCoin>(&player);

@@ -5,7 +5,6 @@
 #[test_only]
 module casino::CriticalIntegrationTest {
     use std::string;
-    use std::vector;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::coin;
@@ -189,14 +188,14 @@ module casino::CriticalIntegrationTest {
         CasinoHouse::deposit_to_treasury(profit_coins);
 
         InvestorToken::deposit_and_mint(&investor2, LARGE_DEPOSIT);
-        let nav_after_2 = InvestorToken::nav();
+        let _ = InvestorToken::nav();
 
         // More profit
         let profit_coins2 = coin::withdraw<AptosCoin>(&casino_account, SMALL_RESERVE);
         CasinoHouse::deposit_to_treasury(profit_coins2);
 
         InvestorToken::deposit_and_mint(&investor3, LARGE_DEPOSIT);
-        let nav_after_3 = InvestorToken::nav();
+        let _ = InvestorToken::nav();
 
         // Concurrent redemptions
         let redeem_amount = LARGE_DEPOSIT / 3;
