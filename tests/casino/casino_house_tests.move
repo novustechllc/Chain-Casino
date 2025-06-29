@@ -27,6 +27,7 @@ module casino::CasinoHouseTest {
     const E_INSUFFICIENT_TREASURY_FOR_PAYOUT: u64 = 0x08;
     const E_PAYOUT_EXCEEDS_EXPECTED: u64 = 0x09;
     const E_BET_ALREADY_SETTLED: u64 = 0x0A;
+    const E_CAPABILITY_ALREADY_CLAIMED: u64 = 0x0B;
 
     // Store capabilities for testing
     struct TestGameAuth has key {
@@ -82,16 +83,17 @@ module casino::CasinoHouseTest {
         let (_, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Dice Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Dice Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account = account::create_account_for_test(@0x123);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         assert!(CasinoHouse::is_game_registered(@0x123), 1);
         assert!(vector::length(&CasinoHouse::get_registered_games()) == 1, 2);
@@ -107,28 +109,30 @@ module casino::CasinoHouseTest {
         let (_, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        let cap1 =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Game 1"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability: cap1 });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Game 1"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account = account::create_account_for_test(@0x123);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         // This will abort, but compiler needs to see value handling
-        let _cap2 =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Game 2"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability: _cap2 });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Game 2"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account2 = account::create_account_for_test(@0x123);
+        let capability2 = CasinoHouse::get_game_capability(&game_account2);
+        move_to(&game_account2, TestGameAuth { capability: capability2 });
     }
 
     #[test]
@@ -136,16 +140,17 @@ module casino::CasinoHouseTest {
         let (_, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account = account::create_account_for_test(@0x123);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         assert!(CasinoHouse::is_game_registered(@0x123), 1);
         CasinoHouse::unregister_game(&casino_account, @0x123);
@@ -161,16 +166,17 @@ module casino::CasinoHouseTest {
         let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account = account::create_account_for_test(@0x123);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         // Fund treasury
         let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
@@ -179,7 +185,7 @@ module casino::CasinoHouseTest {
         let player = create_player(&framework, @0x999, MIN_BET * 2);
         let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
 
-        let auth = borrow_global<TestGameAuth>(@casino);
+        let auth = borrow_global<TestGameAuth>(@0x123);
         let bet_id = CasinoHouse::place_bet(
             &auth.capability, bet_coins, @0x999, MIN_BET * 2
         );
@@ -200,21 +206,22 @@ module casino::CasinoHouseTest {
         let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account = account::create_account_for_test(@0x123);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         let player = create_player(&framework, @0x999, MIN_BET);
         let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET - 1);
 
-        let auth = borrow_global<TestGameAuth>(@casino);
+        let auth = borrow_global<TestGameAuth>(@0x123);
         CasinoHouse::place_bet(&auth.capability, bet_coins, @0x999, MIN_BET);
     }
 
@@ -228,21 +235,22 @@ module casino::CasinoHouseTest {
         let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account = account::create_account_for_test(@0x123);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         let player = create_player(&framework, @0x999, MIN_BET);
         let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
 
-        let auth = borrow_global<TestGameAuth>(@casino);
+        let auth = borrow_global<TestGameAuth>(@0x123);
         CasinoHouse::place_bet(
             &auth.capability,
             bet_coins,
@@ -260,16 +268,17 @@ module casino::CasinoHouseTest {
         let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account = account::create_account_for_test(@0x123);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         // Fund treasury and place bet
         let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
@@ -278,7 +287,7 @@ module casino::CasinoHouseTest {
         let player = create_player(&framework, @0x999, MIN_BET);
         let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
 
-        let auth = borrow_global<TestGameAuth>(@casino);
+        let auth = borrow_global<TestGameAuth>(@0x123);
         let bet_id = CasinoHouse::place_bet(
             &auth.capability, bet_coins, @0x999, MIN_BET * 2
         );
@@ -298,16 +307,17 @@ module casino::CasinoHouseTest {
         let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account = account::create_account_for_test(@0x123);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         // Setup and place bet
         let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 2);
@@ -316,7 +326,7 @@ module casino::CasinoHouseTest {
         let player = create_player(&framework, @0x999, MIN_BET);
         let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
 
-        let auth = borrow_global<TestGameAuth>(@casino);
+        let auth = borrow_global<TestGameAuth>(@0x123);
         let bet_id = CasinoHouse::place_bet(
             &auth.capability, bet_coins, @0x999, MIN_BET * 2
         );
@@ -338,16 +348,17 @@ module casino::CasinoHouseTest {
         let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account = account::create_account_for_test(@0x123);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         // Setup and place bet
         let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 3);
@@ -356,7 +367,7 @@ module casino::CasinoHouseTest {
         let player = create_player(&framework, @0x999, MIN_BET);
         let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
 
-        let auth = borrow_global<TestGameAuth>(@casino);
+        let auth = borrow_global<TestGameAuth>(@0x123);
         let bet_id = CasinoHouse::place_bet(
             &auth.capability, bet_coins, @0x999, MIN_BET * 2
         );
@@ -412,16 +423,17 @@ module casino::CasinoHouseTest {
         assert!(CasinoHouse::treasury_balance() == 0, 3);
 
         // After registering game
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account = account::create_account_for_test(@0x123);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         assert!(vector::length(&CasinoHouse::get_registered_games()) == 1, 4);
         assert!(CasinoHouse::is_game_registered(@0x123), 5);
@@ -434,16 +446,17 @@ module casino::CasinoHouseTest {
         let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account = account::create_account_for_test(@0x123);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         // Fund treasury
         let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET * 6);
@@ -455,7 +468,7 @@ module casino::CasinoHouseTest {
         let bet_coins1 = coin::withdraw<AptosCoin>(&player1, MIN_BET);
         let bet_coins2 = coin::withdraw<AptosCoin>(&player2, MIN_BET);
 
-        let auth = borrow_global<TestGameAuth>(@casino);
+        let auth = borrow_global<TestGameAuth>(@0x123);
         let bet_id1 =
             CasinoHouse::place_bet(
                 &auth.capability,
@@ -480,16 +493,17 @@ module casino::CasinoHouseTest {
         let (framework, casino_account) = setup_test();
         CasinoHouse::init_module_for_test(&casino_account);
 
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0x123,
-                string::utf8(b"Test Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE
-            );
-        move_to(&casino_account, TestGameAuth { capability });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0x123,
+            string::utf8(b"Test Game"),
+            MIN_BET,
+            MAX_BET,
+            HOUSE_EDGE
+        );
+        let game_account = account::create_account_for_test(@0x123);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         let treasury_coins = coin::withdraw<AptosCoin>(&casino_account, MIN_BET);
         CasinoHouse::deposit_to_treasury(treasury_coins);
@@ -497,7 +511,7 @@ module casino::CasinoHouseTest {
         let player = create_player(&framework, @0x999, MIN_BET);
         let bet_coins = coin::withdraw<AptosCoin>(&player, MIN_BET);
 
-        let auth = borrow_global<TestGameAuth>(@casino);
+        let auth = borrow_global<TestGameAuth>(@0x123);
         let bet_id = CasinoHouse::place_bet(&auth.capability, bet_coins, @0x999, MIN_BET);
 
         // House wins - zero payout

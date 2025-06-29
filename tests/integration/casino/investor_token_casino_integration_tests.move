@@ -3,7 +3,6 @@
 #[test_only]
 module casino::InvestorTokenCasinoIntegrationTest {
     use std::string;
-    use std::signer;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::coin;
@@ -68,16 +67,17 @@ module casino::InvestorTokenCasinoIntegrationTest {
         assert!(InvestorToken::user_balance(@0x123) == INVESTOR_DEPOSIT, 8);
 
         // 3. Register a test game and simulate profit
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                @0xD1CE,
-                string::utf8(b"Test Game"),
-                1000000, // min bet
-                100000000, // max bet
-                150 // house edge
-            );
-        move_to(&casino_account, TestGameAuth { capability });
+        CasinoHouse::register_game(
+            &casino_account,
+            @0xD1CE,
+            string::utf8(b"Test Game"),
+            1000000, // min bet
+            100000000, // max bet
+            150 // house edge
+        );
+        let game_account = account::create_account_for_test(@0xD1CE);
+        let capability = CasinoHouse::get_game_capability(&game_account);
+        move_to(&game_account, TestGameAuth { capability });
 
         // Simulate game profit by direct treasury injection
         let profit_coins = coin::withdraw<AptosCoin>(&casino_account, GAME_PROFIT);

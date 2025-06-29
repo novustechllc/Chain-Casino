@@ -36,6 +36,8 @@ module casino::CasinoHouse {
     const E_PAYOUT_EXCEEDS_EXPECTED: u64 = 0x09;
     /// Bet already settled
     const E_BET_ALREADY_SETTLED: u64 = 0x0A;
+    /// Game capability already claimed
+    const E_CAPABILITY_ALREADY_CLAIMED: u64 = 0x0B;
 
     //
     // Constants
@@ -71,7 +73,8 @@ module casino::CasinoHouse {
         module_address: address,
         min_bet: u64,
         max_bet: u64,
-        house_edge_bps: u64
+        house_edge_bps: u64,
+        capability_claimed: bool
     }
 
     /// Bet information for payout validation
@@ -118,6 +121,13 @@ module casino::CasinoHouse {
     #[event]
     /// Emitted when game is unregistered
     struct GameUnregisteredEvent has drop, store {
+        game_address: address,
+        name: String
+    }
+
+    #[event]
+    /// Emitted when game claims its capability
+    struct GameCapabilityClaimedEvent has drop, store {
         game_address: address,
         name: String
     }
@@ -182,15 +192,15 @@ module casino::CasinoHouse {
     // Game Management Interface
     //
 
-    /// Register new game by address
-    public fun register_game(
+    /// Register new game by address (casino admin only)
+    public entry fun register_game(
         admin: &signer,
         game_address: address,
         name: String,
         min_bet: u64,
         max_bet: u64,
         house_edge_bps: u64
-    ): GameCapability acquires GameRegistry {
+    ) acquires GameRegistry {
         assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
 
         let registry = borrow_global_mut<GameRegistry>(@casino);
@@ -204,13 +214,14 @@ module casino::CasinoHouse {
         // Validate game info
         assert!(max_bet >= min_bet, E_INVALID_AMOUNT);
 
-        // Store game info
+        // Store game info with capability_claimed = false
         let game_info = GameInfo {
             name,
             module_address: game_address,
             min_bet,
             max_bet,
-            house_edge_bps
+            house_edge_bps,
+            capability_claimed: false
         };
 
         registry.registered_games.add(game_address, game_info);
@@ -218,12 +229,38 @@ module casino::CasinoHouse {
         event::emit(
             GameRegisteredEvent { game_address, name, module_address: game_address }
         );
+    }
+
+    /// Game claims its capability (only if registered and not already claimed)
+    public fun get_game_capability(game_signer: &signer): GameCapability acquires GameRegistry {
+        let game_address = signer::address_of(game_signer);
+
+        let registry = borrow_global_mut<GameRegistry>(@casino);
+
+        // Check if game is registered
+        assert!(
+            registry.registered_games.contains(&game_address),
+            E_GAME_NOT_REGISTERED
+        );
+
+        let game_info = registry.registered_games.borrow_mut(&game_address);
+
+        // Check if capability already claimed
+        assert!(!game_info.capability_claimed, E_CAPABILITY_ALREADY_CLAIMED);
+
+        // Mark capability as claimed
+        game_info.capability_claimed = true;
+
+        // Emit capability claimed event
+        event::emit(
+            GameCapabilityClaimedEvent { game_address, name: game_info.name }
+        );
 
         // Return capability for game authorization
         GameCapability { game_address }
     }
 
-    /// Remove game from registry (game owns its capability)
+    /// Remove game from registry (casino admin only)
     public entry fun unregister_game(
         admin: &signer, game_address: address
     ) acquires GameRegistry {
@@ -406,5 +443,18 @@ module casino::CasinoHouse {
     public fun is_game_registered(game_address: address): bool acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@casino);
         ordered_map::contains(&registry.registered_games, &game_address)
+    }
+
+    #[view]
+    /// Check if game has claimed its capability
+    public fun is_game_capability_claimed(game_address: address): bool acquires GameRegistry {
+        let registry = borrow_global<GameRegistry>(@casino);
+        if (!ordered_map::contains(&registry.registered_games, &game_address)) { false }
+        else {
+            let game_info = ordered_map::borrow(
+                &registry.registered_games, &game_address
+            );
+            game_info.capability_claimed
+        }
     }
 }

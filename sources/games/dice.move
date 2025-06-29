@@ -7,7 +7,6 @@ module dice_game::DiceGame {
     use aptos_framework::randomness;
     use aptos_framework::event;
     use std::signer;
-    use std::string;
     use aptos_framework::coin;
     use aptos_framework::aptos_coin::AptosCoin;
     use casino::CasinoHouse;
@@ -23,6 +22,10 @@ module dice_game::DiceGame {
     const E_INVALID_AMOUNT: u64 = 0x02;
     /// Unauthorized initialization
     const E_UNAUTHORIZED: u64 = 0x03;
+    /// Game not registered by casino yet
+    const E_GAME_NOT_REGISTERED: u64 = 0x04;
+    /// Game already initialized
+    const E_ALREADY_INITIALIZED: u64 = 0x05;
 
     //
     // Constants
@@ -62,31 +65,48 @@ module dice_game::DiceGame {
         payout: u64
     }
 
+    #[event]
+    /// Emitted when game successfully initializes
+    struct GameInitialized has drop, store {
+        game_address: address,
+        min_bet: u64,
+        max_bet: u64,
+        payout_multiplier: u64,
+        house_edge_bps: u64
+    }
+
     //
     // Initialization Interface
     //
 
-    /// Initialize game - casino admin registers, dice game stores capability
-    public entry fun initialize_game(// TODO: fix this
-        casino_admin: &signer, dice_admin: &signer
-    ) {
-        assert!(signer::address_of(casino_admin) == @casino, E_UNAUTHORIZED);
+    /// Initialize dice game - claims capability from casino
+    /// Prerequisites: Casino admin must have called CasinoHouse::register_game first
+    public entry fun initialize_game(dice_admin: &signer) {
         assert!(signer::address_of(dice_admin) == @dice_game, E_UNAUTHORIZED);
 
-        // Casino admin registers the dice game
-        let capability =
-            CasinoHouse::register_game(
-                casino_admin,
-                @dice_game,
-                string::utf8(b"Dice Game"),
-                MIN_BET,
-                MAX_BET,
-                HOUSE_EDGE_BPS
-            );
+        // Check if already initialized
+        assert!(!exists<GameAuth>(@dice_game), E_ALREADY_INITIALIZED);
+
+        // Verify game is registered by casino
+        assert!(CasinoHouse::is_game_registered(@dice_game), E_GAME_NOT_REGISTERED);
+
+        // Claim capability from casino (proves dice_game identity)
+        let capability = CasinoHouse::get_game_capability(dice_admin);
 
         // Store capability at dice game's own address
         let game_auth = GameAuth { capability };
         move_to(dice_admin, game_auth);
+
+        // Emit initialization event
+        event::emit(
+            GameInitialized {
+                game_address: @dice_game,
+                min_bet: MIN_BET,
+                max_bet: MAX_BET,
+                payout_multiplier: PAYOUT_MULTIPLIER,
+                house_edge_bps: HOUSE_EDGE_BPS
+            }
+        );
     }
 
     //
@@ -175,5 +195,17 @@ module dice_game::DiceGame {
     /// Check if game is registered with CasinoHouse
     public fun is_registered(): bool {
         CasinoHouse::is_game_registered(@dice_game)
+    }
+
+    #[view]
+    /// Check if game is fully initialized (has capability)
+    public fun is_initialized(): bool {
+        exists<GameAuth>(@dice_game)
+    }
+
+    #[view]
+    /// Check if game is ready to accept bets (registered + initialized)
+    public fun is_ready(): bool {
+        is_registered() && is_initialized()
     }
 }

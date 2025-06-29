@@ -43,18 +43,19 @@ module casino::InvestorTokenTest {
         InvestorToken::init(&casino_account);
 
         // Register a test game for profit injection scenarios
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                signer::address_of(&casino_account),
-                string::utf8(b"TestGame"),
-                1000,
-                1000000,
-                150
-            );
+        CasinoHouse::register_game(
+            &casino_account,
+            signer::address_of(&casino_account),
+            string::utf8(b"TestGame"),
+            1000,
+            1000000,
+            150
+        );
+        let game_account = account::create_account_for_test(signer::address_of(&casino_account));
+        let capability = CasinoHouse::get_game_capability(&game_account);
 
         // Store capability to avoid compilation error
-        move_to(&casino_account, TestGameAuth { capability });
+        move_to(&game_account, TestGameAuth { capability });
 
         (casino_account, user_account)
     }
@@ -220,18 +221,19 @@ module casino::InvestorTokenTest {
         InvestorToken::init(&casino_account);
 
         // Register a test game
-        let capability =
-            CasinoHouse::register_game(
-                &casino_account,
-                signer::address_of(&casino_account),
-                string::utf8(b"TestGame"),
-                1000,
-                1000000,
-                150
-            );
+        CasinoHouse::register_game(
+            &casino_account,
+            signer::address_of(&casino_account),
+            string::utf8(b"TestGame"),
+            1000,
+            1000000,
+            150
+        );
+        let game_account = account::create_account_for_test(signer::address_of(&casino_account));
+        let capability = CasinoHouse::get_game_capability(&game_account);
 
         // Store capability to avoid compilation error
-        move_to(&casino_account, TestGameAuth { capability });
+        move_to(&game_account, TestGameAuth { capability });
 
         InvestorToken::deposit_and_mint(&user1, TEST_DEPOSIT);
         InvestorToken::deposit_and_mint(&user2, TEST_DEPOSIT * 2);

@@ -55,7 +55,20 @@ module casino::FullIntegrationTest {
         // Initialize all modules
         CasinoHouse::init_module_for_test(&casino_account);
         InvestorToken::init(&casino_account);
-        DiceGame::initialize_game(&casino_account, &dice_account);
+
+        // NEW TWO-STEP INITIALIZATION:
+        // Step 1: Casino admin registers the dice game
+        CasinoHouse::register_game(
+            &casino_account,
+            @dice_game,
+            string::utf8(b"Dice Game"),
+            1000000,     // 0.01 APT min bet
+            50000000,    // 0.5 APT max bet
+            1667         // 16.67% house edge
+        );
+
+        // Step 2: Dice game claims its capability
+        DiceGame::initialize_game(&dice_account);
 
         (aptos_framework, casino_account, dice_account, investor, player)
     }
@@ -104,7 +117,7 @@ module casino::FullIntegrationTest {
         // 6. Verify NAV increased due to house profits
         let nav_with_profit = InvestorToken::nav();
         let expected_treasury = treasury_after_bet + house_profit;
-        let expected_nav = (expected_treasury * NAV_SCALE) / INVESTOR_DEPOSIT;
+        let _ = (expected_treasury * NAV_SCALE) / INVESTOR_DEPOSIT;
 
         assert!(nav_with_profit > initial_nav, 8);
         assert!(CasinoHouse::treasury_balance() == expected_treasury, 9);
@@ -256,7 +269,7 @@ module casino::FullIntegrationTest {
         let received = investor_apt_after - investor_apt_before;
 
         // Should receive more than face value (minus fees)
-        let face_value = redeem_tokens;
+        let _ = redeem_tokens;
         assert!(received > 0, 4);
         // Note: received will be less than face_value due to fees, but represents profitable NAV
     }

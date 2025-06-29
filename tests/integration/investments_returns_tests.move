@@ -40,7 +40,20 @@ module casino::RealInvestmentTest {
         // Initialize modules
         CasinoHouse::init_module_for_test(&casino_account);
         InvestorToken::init(&casino_account);
-        DiceGame::initialize_game(&casino_account, &dice_account); // TODO: fix this
+
+        // NEW TWO-STEP INITIALIZATION:
+        // Step 1: Casino admin registers the dice game
+        CasinoHouse::register_game(
+            &casino_account,
+            @dice_game,
+            string::utf8(b"Dice Game"),
+            1000000,     // 0.01 APT min bet
+            50000000,    // 0.5 APT max bet
+            1667         // 16.67% house edge
+        );
+
+        // Step 2: Dice game claims its capability
+        DiceGame::initialize_game(&dice_account);
 
         (aptos_framework, casino_account)
     }
@@ -54,7 +67,7 @@ module casino::RealInvestmentTest {
 
     #[test]
     fun test_real_10_apt_investment_with_dice_bets() {
-        let (framework, casino_account) = setup_real_test();
+        let (framework, _) = setup_real_test();
 
         // 1. Create investor and deposit 10 APT
         let investor = account::create_account_for_test(@0x1111);
@@ -112,13 +125,8 @@ module casino::RealInvestmentTest {
                 treasury_after_games - treasury_after_investment
             } else { 0 };
 
-        let nav_increase =
-            if (final_nav > initial_nav) {
-                final_nav - initial_nav
-            } else { 0 };
-
         // 4. Investor redeems tokens to see actual return
-        let investor_apt_before_redeem = coin::balance<AptosCoin>(@0x1111);
+        let _ = coin::balance<AptosCoin>(@0x1111);
         InvestorToken::redeem(&investor, investor_tokens);
         let investor_apt_after_redeem = coin::balance<AptosCoin>(@0x1111);
 
@@ -209,5 +217,75 @@ module casino::RealInvestmentTest {
         assert!(InvestorToken::user_balance(@0x3001) > 0, 1);
         assert!(InvestorToken::user_balance(@0x3002) > 0, 2);
         assert!(final_nav > 0, 3);
+    }
+
+    #[test]
+    fun test_dice_game_status_checks() {
+        let (_, _) = setup_real_test();
+
+        // Verify game status after proper initialization
+        assert!(DiceGame::is_registered(), 1);
+        assert!(DiceGame::is_initialized(), 2);
+        assert!(DiceGame::is_ready(), 3);
+
+        // Verify casino knows about the game
+        assert!(CasinoHouse::is_game_registered(@dice_game), 4);
+        assert!(CasinoHouse::is_game_capability_claimed(@dice_game), 5);
+
+        // Test game configuration
+        let (min_bet, max_bet, payout_mult, house_edge) = DiceGame::get_game_config();
+        assert!(min_bet == 1000000, 6);      // 0.01 APT
+        assert!(max_bet == 50000000, 7);     // 0.5 APT  
+        assert!(payout_mult == 5, 8);        // 5x multiplier
+        assert!(house_edge == 1667, 9);      // 16.67% edge
+    }
+
+    #[test]
+    fun test_initialization_sequence_validation() {
+        let aptos_framework = account::create_account_for_test(@aptos_framework);
+        let casino_account = account::create_account_for_test(@casino);
+        let dice_account = account::create_account_for_test(@dice_game);
+
+        // Initialize environment
+        aptos_coin::ensure_initialized_with_apt_fa_metadata_for_test();
+        timestamp::set_time_has_started_for_testing(&aptos_framework);
+        timestamp::update_global_time_for_test(1000000);
+        randomness::initialize_for_testing(&aptos_framework);
+
+        coin::register<AptosCoin>(&casino_account);
+        coin::register<AptosCoin>(&dice_account);
+        aptos_coin::mint(&aptos_framework, @casino, TEN_APT);
+
+        // Initialize casino modules
+        CasinoHouse::init_module_for_test(&casino_account);
+        InvestorToken::init(&casino_account);
+
+        // Test: Dice game NOT ready before registration
+        assert!(!DiceGame::is_registered(), 1);
+        assert!(!DiceGame::is_initialized(), 2);
+        assert!(!DiceGame::is_ready(), 3);
+
+        // Step 1: Casino registers game
+        CasinoHouse::register_game(
+            &casino_account,
+            @dice_game,
+            string::utf8(b"Dice Game"),
+            1000000,
+            50000000,
+            1667
+        );
+
+        // Test: Registered but not initialized
+        assert!(DiceGame::is_registered(), 4);
+        assert!(!DiceGame::is_initialized(), 5);
+        assert!(!DiceGame::is_ready(), 6);
+
+        // Step 2: Dice game initializes
+        DiceGame::initialize_game(&dice_account);
+
+        // Test: Fully ready
+        assert!(DiceGame::is_registered(), 7);
+        assert!(DiceGame::is_initialized(), 8);
+        assert!(DiceGame::is_ready(), 9);
     }
 }
