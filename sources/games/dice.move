@@ -1,3 +1,5 @@
+//! MIT License
+//!
 //! Simple Dice Game for ChainCasino Platform
 //!
 //! Single die guessing game where players bet on the exact outcome (1-6).

@@ -1,3 +1,7 @@
+//! MIT License
+//!
+//! Investment returns integration tests for ChainCasino platform
+
 //! Real integration test: 10 APT investment with actual dice game bets
 
 #[test_only]

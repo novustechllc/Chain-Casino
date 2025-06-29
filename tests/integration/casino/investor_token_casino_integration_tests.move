@@ -1,4 +1,6 @@
-//! Integration tests for InvestorToken and CasinoHouse modules
+//! MIT License
+//!
+//! Integration tests for InvestorToken with CasinoHouse
 
 #[test_only]
 module casino::InvestorTokenCasinoIntegrationTest {

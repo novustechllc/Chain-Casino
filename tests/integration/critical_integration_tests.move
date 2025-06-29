@@ -1,4 +1,6 @@
-//! Critical integration tests for edge cases and failure scenarios
+//! MIT License
+//!
+//! Critical integration tests for ChainCasino platform
 
 #[test_only]
 module casino::CriticalIntegrationTest {

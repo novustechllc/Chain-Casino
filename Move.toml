@@ -6,10 +6,12 @@ authors = ["PersonaNormale"]
 [addresses]
 casino = "_"
 dice_game = "_"
+slot_game = "_"
 
 [dev-addresses]
 casino = "0xCC"
 dice_game = "0xD1CE"
+slot_game = "0x5107"
 
 [dependencies.AptosFramework]
 git = "https://github.com/aptos-labs/aptos-framework.git"

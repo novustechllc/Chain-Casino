@@ -1,3 +1,7 @@
+//! MIT License
+//!
+//! Comprehensive test suite for InvestorToken module
+
 //! Test suite for InvestorToken standalone testing
 
 #[test_only]

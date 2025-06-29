@@ -1,3 +1,5 @@
+//! MIT License
+//!
 //! Comprehensive test suite for CasinoHouse module
 
 #[test_only]
