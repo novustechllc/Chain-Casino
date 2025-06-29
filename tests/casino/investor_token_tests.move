@@ -51,7 +51,8 @@ module casino::InvestorTokenTest {
             1000000,
             150
         );
-        let game_account = account::create_account_for_test(signer::address_of(&casino_account));
+        let game_account =
+            account::create_account_for_test(signer::address_of(&casino_account));
         let capability = CasinoHouse::get_game_capability(&game_account);
 
         // Store capability to avoid compilation error
@@ -229,7 +230,8 @@ module casino::InvestorTokenTest {
             1000000,
             150
         );
-        let game_account = account::create_account_for_test(signer::address_of(&casino_account));
+        let game_account =
+            account::create_account_for_test(signer::address_of(&casino_account));
         let capability = CasinoHouse::get_game_capability(&game_account);
 
         // Store capability to avoid compilation error

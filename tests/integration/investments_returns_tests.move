@@ -47,9 +47,9 @@ module casino::RealInvestmentTest {
             &casino_account,
             @dice_game,
             string::utf8(b"Dice Game"),
-            1000000,     // 0.01 APT min bet
-            50000000,    // 0.5 APT max bet
-            1667         // 16.67% house edge
+            1000000, // 0.01 APT min bet
+            50000000, // 0.5 APT max bet
+            1667 // 16.67% house edge
         );
 
         // Step 2: Dice game claims its capability
@@ -234,10 +234,10 @@ module casino::RealInvestmentTest {
 
         // Test game configuration
         let (min_bet, max_bet, payout_mult, house_edge) = DiceGame::get_game_config();
-        assert!(min_bet == 1000000, 6);      // 0.01 APT
-        assert!(max_bet == 50000000, 7);     // 0.5 APT  
-        assert!(payout_mult == 5, 8);        // 5x multiplier
-        assert!(house_edge == 1667, 9);      // 16.67% edge
+        assert!(min_bet == 1000000, 6); // 0.01 APT
+        assert!(max_bet == 50000000, 7); // 0.5 APT
+        assert!(payout_mult == 5, 8); // 5x multiplier
+        assert!(house_edge == 1667, 9); // 16.67% edge
     }
 
     #[test]

@@ -62,9 +62,9 @@ module casino::FullIntegrationTest {
             &casino_account,
             @dice_game,
             string::utf8(b"Dice Game"),
-            1000000,     // 0.01 APT min bet
-            50000000,    // 0.5 APT max bet
-            1667         // 16.67% house edge
+            1000000, // 0.01 APT min bet
+            50000000, // 0.5 APT max bet
+            1667 // 16.67% house edge
         );
 
         // Step 2: Dice game claims its capability

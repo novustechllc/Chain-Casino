@@ -252,9 +252,7 @@ module casino::CasinoHouse {
         game_info.capability_claimed = true;
 
         // Emit capability claimed event
-        event::emit(
-            GameCapabilityClaimedEvent { game_address, name: game_info.name }
-        );
+        event::emit(GameCapabilityClaimedEvent { game_address, name: game_info.name });
 
         // Return capability for game authorization
         GameCapability { game_address }
