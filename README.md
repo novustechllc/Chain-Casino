@@ -94,12 +94,13 @@ flowchart LR
 
 ## 📦 How to Use
 
-1. Deploy modules: `CasinoHouse`, `InvestorToken`, and any game
-2. Call `InvestorToken::deposit_and_mint()` to fund the treasury and mint CCIT
-3. Casino grant capabilities to call `CasinoHouse::place_bet()` `CasinoHouse::settle_bet()` `CasinoHouse::get_game_capability()` to games smart contracts
-4. Games place bets using `CasinoHouse::place_bet()`
-5. Settle outcomes using `CasinoHouse::settle_bet()`
-6. Investors redeem using `InvestorToken::redeem()`
+1. Deploy modules: `CasinoHouse`, `InvestorToken`, and game contracts
+2. Register games using `CasinoHouse::register_game()` to create game objects
+3. Games initialize and claim capabilities via `CasinoHouse::get_game_capability()`
+4. Fund treasury using `InvestorToken::deposit_and_mint()` to mint CCIT tokens
+5. Players bet through game contracts using `CasinoHouse::place_bet()`
+6. Games settle outcomes using `CasinoHouse::settle_bet()`
+7. Investors redeem profits using `InvestorToken::redeem()`
 
 ---
 
