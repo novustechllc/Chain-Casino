@@ -28,7 +28,7 @@ flowchart TD
   game -->|Call settle_bet| casinohouse
   casinohouse -->|Pays Winnings| player
 
-  treasury -->|NAV Up with Losses| token
+  treasury -->|NAV Up with Games Earnings| token
 ```
 
 ---
