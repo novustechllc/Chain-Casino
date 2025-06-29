@@ -114,8 +114,10 @@ flowchart LR
 ---
 
 ## TODO
-MissinPrevious Branch
+
 - Add Previous Branch Tests Refactor Made Obsolete
+- Optimize for Transaction Parallelization on Aptos Blockchain
+- Gas Waste Removal
 
 ---
 
