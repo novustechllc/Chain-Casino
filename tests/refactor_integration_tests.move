@@ -14,6 +14,7 @@ module casino::ComprehensiveIntegrationTest {
     use aptos_framework::primary_fungible_store;
     use aptos_framework::timestamp;
     use aptos_framework::randomness;
+    use aptos_framework::object;
     use casino::InvestorToken;
     use casino::CasinoHouse;
     use dice_game::DiceGame;
@@ -112,11 +113,12 @@ module casino::ComprehensiveIntegrationTest {
         CasinoHouse::init_module_for_test(&casino_signer);
         InvestorToken::init(&casino_signer);
 
-        // Register games with casino (by module address)
+        // Register games with casino (creates game objects)
         CasinoHouse::register_game(
             &casino_signer,
             DICE_ADDR,
             string::utf8(b"DiceGame"),
+            string::utf8(b"v1"),
             1000000, // 0.01 APT min
             50000000, // 0.5 APT max
             1667 // 16.67% house edge
@@ -126,18 +128,38 @@ module casino::ComprehensiveIntegrationTest {
             &casino_signer,
             SLOT_ADDR,
             string::utf8(b"SlotMachine"),
+            string::utf8(b"v1"),
             1000000, // 0.01 APT min
             50000000, // 0.5 APT max
             1550 // 15.5% house edge
         );
+
+        // Get game objects for verification
+        let dice_object_addr =
+            CasinoHouse::derive_game_object_address(
+                CASINO_ADDR,
+                string::utf8(b"DiceGame"),
+                string::utf8(b"v1")
+            );
+        let dice_game_object =
+            object::address_to_object<CasinoHouse::GameMetadata>(dice_object_addr);
+
+        let slot_object_addr =
+            CasinoHouse::derive_game_object_address(
+                CASINO_ADDR,
+                string::utf8(b"SlotMachine"),
+                string::utf8(b"v1")
+            );
+        let slot_game_object =
+            object::address_to_object<CasinoHouse::GameMetadata>(slot_object_addr);
 
         // Games initialize themselves (creates objects and claims capabilities)
         DiceGame::initialize_game(&dice_signer);
         SlotMachine::initialize_game(&slot_signer);
 
         // Verify ecosystem state
-        assert!(CasinoHouse::is_game_registered(DICE_ADDR), 1);
-        assert!(CasinoHouse::is_game_registered(SLOT_ADDR), 2);
+        assert!(CasinoHouse::is_game_registered(dice_game_object), 1);
+        assert!(CasinoHouse::is_game_registered(slot_game_object), 2);
         assert!(DiceGame::is_ready(), 3);
         assert!(SlotMachine::is_ready(), 4);
 
@@ -274,6 +296,7 @@ module casino::ComprehensiveIntegrationTest {
             &casino_signer,
             DICE_ADDR,
             string::utf8(b"DiceGame"),
+            string::utf8(b"v1"),
             1000000,
             50000000,
             1667
@@ -283,6 +306,7 @@ module casino::ComprehensiveIntegrationTest {
             &casino_signer,
             SLOT_ADDR,
             string::utf8(b"SlotMachine"),
+            string::utf8(b"v1"),
             1000000,
             50000000,
             1550
@@ -295,14 +319,14 @@ module casino::ComprehensiveIntegrationTest {
         // Test derivation matches actual addresses
         let dice_derived =
             CasinoHouse::derive_game_object_address(
-                DICE_ADDR,
+                CASINO_ADDR,
                 string::utf8(b"DiceGame"),
                 string::utf8(b"v1")
             );
 
         let slot_derived =
             CasinoHouse::derive_game_object_address(
-                SLOT_ADDR,
+                CASINO_ADDR,
                 string::utf8(b"SlotMachine"),
                 string::utf8(b"v1")
             );
@@ -310,14 +334,18 @@ module casino::ComprehensiveIntegrationTest {
         let dice_actual = DiceGame::get_game_object_address();
         let slot_actual = SlotMachine::get_game_object_address();
 
-        assert!(dice_derived == dice_actual, 1);
-        assert!(slot_derived == slot_actual, 2);
+        // Verify casino game objects are accessible
+        let dice_casino_object = DiceGame::get_casino_game_object();
+        let slot_casino_object = SlotMachine::get_casino_game_object();
+
+        assert!(object::object_address(&dice_casino_object) == dice_derived, 1);
+        assert!(object::object_address(&slot_casino_object) == slot_derived, 2);
 
         // Test game info retrieval
-        let (dice_creator, dice_obj_addr, dice_name, dice_version) =
+        let (dice_creator, dice_casino_obj, dice_name, dice_version) =
             DiceGame::get_game_info();
         assert!(dice_creator == DICE_ADDR, 3);
-        assert!(dice_obj_addr == dice_actual, 4);
+        assert!(object::object_address(&dice_casino_obj) == dice_derived, 4);
         assert!(dice_name == string::utf8(b"DiceGame"), 5);
         assert!(dice_version == string::utf8(b"v1"), 6);
     }
@@ -335,6 +363,7 @@ module casino::ComprehensiveIntegrationTest {
             &casino_signer,
             DICE_ADDR,
             string::utf8(b"DiceGame"),
+            string::utf8(b"v1"),
             1000000,
             50000000,
             1667
@@ -344,6 +373,7 @@ module casino::ComprehensiveIntegrationTest {
             &casino_signer,
             SLOT_ADDR,
             string::utf8(b"SlotMachine"),
+            string::utf8(b"v1"),
             1000000,
             50000000,
             1550

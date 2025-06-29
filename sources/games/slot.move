@@ -81,7 +81,7 @@ module slot_game::SlotMachine {
     /// Registry tracking the creator and object address for this game
     struct GameRegistry has key {
         creator: address,
-        object_address: address,
+        game_object: Object<CasinoHouse::GameMetadata>,
         game_name: String,
         version: String
     }
@@ -109,6 +109,7 @@ module slot_game::SlotMachine {
     struct GameInitialized has drop, store {
         creator: address,
         object_address: address,
+        game_object: Object<CasinoHouse::GameMetadata>,
         game_name: String,
         version: String,
         min_bet: u64,
@@ -124,13 +125,20 @@ module slot_game::SlotMachine {
     public entry fun initialize_game(slot_admin: &signer) {
         assert!(signer::address_of(slot_admin) == @slot_game, E_UNAUTHORIZED);
         assert!(!exists<GameRegistry>(@slot_game), E_ALREADY_INITIALIZED);
-        assert!(CasinoHouse::is_game_registered(@slot_game), E_GAME_NOT_REGISTERED);
 
-        // Create named object for game instance
+        // Derive the game object that casino should have created
         let game_name = string::utf8(b"SlotMachine");
         let version = string::utf8(GAME_VERSION);
-        let seed = build_seed(game_name, version);
+        let game_object_addr =
+            CasinoHouse::derive_game_object_address(@casino, game_name, version);
+        let game_object: Object<CasinoHouse::GameMetadata> =
+            object::address_to_object(game_object_addr);
 
+        // Verify game object exists
+        assert!(CasinoHouse::game_object_exists(game_object), E_GAME_NOT_REGISTERED);
+
+        // Create named object for game instance
+        let seed = build_seed(game_name, version);
         let constructor_ref = object::create_named_object(slot_admin, seed);
         let object_signer = object::generate_signer(&constructor_ref);
         let object_addr =
@@ -145,8 +153,8 @@ module slot_game::SlotMachine {
         // Generate extend ref for future operations
         let extend_ref = object::generate_extend_ref(&constructor_ref);
 
-        // Get capability from casino
-        let capability = CasinoHouse::get_game_capability(slot_admin);
+        // Get capability from casino using game object
+        let capability = CasinoHouse::get_game_capability(slot_admin, game_object);
 
         // Store GameAuth in the object
         move_to(&object_signer, GameAuth { capability, extend_ref });
@@ -156,7 +164,7 @@ module slot_game::SlotMachine {
             slot_admin,
             GameRegistry {
                 creator: signer::address_of(slot_admin),
-                object_address: object_addr,
+                game_object,
                 game_name,
                 version
             }
@@ -166,6 +174,7 @@ module slot_game::SlotMachine {
             GameInitialized {
                 creator: signer::address_of(slot_admin),
                 object_address: object_addr,
+                game_object,
                 game_name,
                 version,
                 min_bet: MIN_BET,
@@ -346,7 +355,14 @@ module slot_game::SlotMachine {
     #[view]
     public fun get_game_object_address(): address acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@slot_game);
-        registry.object_address
+        let seed = build_seed(registry.game_name, registry.version);
+        object::create_object_address(&registry.creator, seed)
+    }
+
+    #[view]
+    public fun get_casino_game_object(): Object<CasinoHouse::GameMetadata> acquires GameRegistry {
+        let registry = borrow_global<GameRegistry>(@slot_game);
+        registry.game_object
     }
 
     #[view]
@@ -359,14 +375,18 @@ module slot_game::SlotMachine {
     }
 
     #[view]
-    public fun get_game_info(): (address, address, String, String) acquires GameRegistry {
+    public fun get_game_info(): (address, Object<CasinoHouse::GameMetadata>, String, String) acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@slot_game);
-        (registry.creator, registry.object_address, registry.game_name, registry.version)
+        (registry.creator, registry.game_object, registry.game_name, registry.version)
     }
 
     #[view]
-    public fun is_registered(): bool {
-        CasinoHouse::is_game_registered(@slot_game)
+    public fun is_registered(): bool acquires GameRegistry {
+        if (!exists<GameRegistry>(@slot_game)) { false }
+        else {
+            let registry = borrow_global<GameRegistry>(@slot_game);
+            CasinoHouse::is_game_registered(registry.game_object)
+        }
     }
 
     #[view]
@@ -375,7 +395,7 @@ module slot_game::SlotMachine {
     }
 
     #[view]
-    public fun is_ready(): bool {
+    public fun is_ready(): bool acquires GameRegistry {
         is_registered() && is_initialized()
     }
 

@@ -12,11 +12,12 @@ module casino::CasinoHouse {
     use std::option;
     use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata};
     use aptos_framework::primary_fungible_store;
-    use aptos_framework::object::{Self, Object};
+    use aptos_framework::object::{Self, Object, ObjectCore, ExtendRef};
     use aptos_framework::aptos_coin;
     use aptos_framework::coin;
     use aptos_framework::account::{Self, SignerCapability};
     use aptos_framework::event;
+    use aptos_framework::timestamp;
     use aptos_std::ordered_map::{Self, OrderedMap};
 
     //
@@ -43,6 +44,8 @@ module casino::CasinoHouse {
     const E_BET_ALREADY_SETTLED: u64 = 0x0A;
     /// Game capability already claimed
     const E_CAPABILITY_ALREADY_CLAIMED: u64 = 0x0B;
+    /// Invalid game object
+    const E_INVALID_GAME_OBJECT: u64 = 0x0C;
 
     //
     // Resource Specifications
@@ -59,9 +62,23 @@ module casino::CasinoHouse {
         signer_cap: account::SignerCapability
     }
 
-    /// Registry of authorized casino games (by module address)
+    /// Game metadata stored in named object
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct GameMetadata has key {
+        name: String,
+        version: String,
+        module_address: address,
+        min_bet: u64,
+        max_bet: u64,
+        house_edge_bps: u64,
+        created_at: u64,
+        capability_claimed: bool,
+        extend_ref: ExtendRef
+    }
+
+    /// Registry of authorized casino games (by game object)
     struct GameRegistry has key {
-        registered_games: OrderedMap<address, GameInfo>
+        registered_games: OrderedMap<Object<GameMetadata>, bool>
     }
 
     /// Auto-incrementing bet identifier
@@ -74,28 +91,15 @@ module casino::CasinoHouse {
         bets: OrderedMap<u64, BetInfo>
     }
 
-    /// Game metadata and configuration
-    struct GameInfo has copy, drop, store {
-        name: String,
-        module_address: address,
-        min_bet: u64,
-        max_bet: u64,
-        house_edge_bps: u64,
-        capability_claimed: bool,
-        // New fields for object support
-        game_version: String,
-        object_address: option::Option<address>
-    }
-
     /// Bet information for payout validation
     struct BetInfo has copy, drop, store {
         expected_payout: u64,
         settled: bool
     }
 
-    /// Capability resource proving game authorization
+    /// Capability resource proving game authorization (Object-Based)
     struct GameCapability has key, store {
-        game_address: address
+        game_object: Object<GameMetadata>
     }
 
     //
@@ -105,7 +109,7 @@ module casino::CasinoHouse {
     #[event]
     struct BetAcceptedEvent has drop, store {
         bet_id: u64,
-        game_address: address,
+        game_object: Object<GameMetadata>,
         player: address,
         amount: u64,
         expected_payout: u64
@@ -120,31 +124,23 @@ module casino::CasinoHouse {
 
     #[event]
     struct GameRegisteredEvent has drop, store {
-        game_address: address,
+        game_object: Object<GameMetadata>,
         name: String,
         module_address: address,
-        game_version: String
+        version: String
     }
 
     #[event]
     struct GameUnregisteredEvent has drop, store {
-        game_address: address,
+        game_object: Object<GameMetadata>,
         name: String
     }
 
     #[event]
     struct GameCapabilityClaimedEvent has drop, store {
-        game_address: address,
-        name: String,
-        object_address: address
-    }
-
-    #[event]
-    struct GameObjectRegisteredEvent has drop, store {
+        game_object: Object<GameMetadata>,
         module_address: address,
-        object_address: address,
-        name: String,
-        version: String
+        name: String
     }
 
     //
@@ -178,7 +174,7 @@ module casino::CasinoHouse {
         move_to(
             admin,
             GameRegistry {
-                registered_games: ordered_map::new<address, GameInfo>()
+                registered_games: ordered_map::new<Object<GameMetadata>, bool>()
             }
         );
 
@@ -201,126 +197,120 @@ module casino::CasinoHouse {
     // Game Management Interface
     //
 
-    /// Register new game by module address (casino admin only)
+    /// Register new game by creating game object
     public entry fun register_game(
         admin: &signer,
-        game_address: address,
+        game_creator: address,
         name: String,
+        version: String,
         min_bet: u64,
         max_bet: u64,
         house_edge_bps: u64
     ) acquires GameRegistry {
         assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
-
-        let registry = borrow_global_mut<GameRegistry>(@casino);
-
-        assert!(
-            !ordered_map::contains(&registry.registered_games, &game_address),
-            E_GAME_ALREADY_REGISTERED
-        );
-
         assert!(max_bet >= min_bet, E_INVALID_AMOUNT);
 
-        let game_info = GameInfo {
-            name,
-            module_address: game_address,
-            min_bet,
-            max_bet,
-            house_edge_bps,
-            capability_claimed: false,
-            game_version: std::string::utf8(b"v1"), // Default version
-            object_address: option::none<address>()
-        };
+        // Create named object for this game instance
+        let seed = build_game_seed(name, version);
+        let constructor_ref = object::create_named_object(admin, seed);
 
-        registry.registered_games.add(game_address, game_info);
+        // Make it non-transferable for security
+        let transfer_ref = object::generate_transfer_ref(&constructor_ref);
+        object::disable_ungated_transfer(&transfer_ref);
+
+        let object_signer = object::generate_signer(&constructor_ref);
+        let extend_ref = object::generate_extend_ref(&constructor_ref);
+
+        // Store game metadata in the object FIRST
+        move_to(
+            &object_signer,
+            GameMetadata {
+                name,
+                version,
+                module_address: game_creator,
+                min_bet,
+                max_bet,
+                house_edge_bps,
+                created_at: timestamp::now_seconds(),
+                capability_claimed: false,
+                extend_ref
+            }
+        );
+
+        // THEN create object reference
+        let game_object =
+            object::object_from_constructor_ref<GameMetadata>(&constructor_ref);
+
+        // Register in global registry
+        let registry = borrow_global_mut<GameRegistry>(@casino);
+        assert!(
+            !ordered_map::contains(&registry.registered_games, &game_object),
+            E_GAME_ALREADY_REGISTERED
+        );
+        registry.registered_games.add(game_object, true);
 
         event::emit(
-            GameRegisteredEvent {
-                game_address,
-                name,
-                module_address: game_address,
-                game_version: std::string::utf8(b"v1")
-            }
+            GameRegisteredEvent { game_object, name, module_address: game_creator, version }
         );
     }
 
-    /// Game claims its capability and registers object address
-    public fun get_game_capability(game_signer: &signer): GameCapability acquires GameRegistry {
+    /// Game claims its capability using object reference
+    public fun get_game_capability(
+        game_signer: &signer, game_object: Object<GameMetadata>
+    ): GameCapability acquires GameRegistry, GameMetadata {
         let game_address = signer::address_of(game_signer);
+        let object_addr = object::object_address(&game_object);
 
-        let registry = borrow_global_mut<GameRegistry>(@casino);
-
+        // Verify game is registered
+        let registry = borrow_global<GameRegistry>(@casino);
         assert!(
-            registry.registered_games.contains(&game_address),
+            ordered_map::contains(&registry.registered_games, &game_object),
             E_GAME_NOT_REGISTERED
         );
 
-        let game_info = registry.registered_games.borrow_mut(&game_address);
+        // Verify metadata exists and signer matches
+        assert!(exists<GameMetadata>(object_addr), E_INVALID_GAME_OBJECT);
+        let game_metadata = borrow_global_mut<GameMetadata>(object_addr);
 
-        assert!(!game_info.capability_claimed, E_CAPABILITY_ALREADY_CLAIMED);
+        assert!(
+            game_metadata.module_address == game_address,
+            E_NOT_ADMIN
+        );
+        assert!(!game_metadata.capability_claimed, E_CAPABILITY_ALREADY_CLAIMED);
 
-        game_info.capability_claimed = true;
-
-        // Derive the expected object address for this game
-        let object_addr =
-            derive_game_object_address(
-                game_address,
-                game_info.name,
-                game_info.game_version
-            );
-
-        // Update registry with object address
-        game_info.object_address = option::some(object_addr);
+        game_metadata.capability_claimed = true;
 
         event::emit(
             GameCapabilityClaimedEvent {
-                game_address,
-                name: game_info.name,
-                object_address: object_addr
+                game_object,
+                module_address: game_address,
+                name: game_metadata.name
             }
         );
 
-        GameCapability { game_address }
+        GameCapability { game_object }
     }
 
-    /// Register game object address after initialization (called by games)
-    public fun register_game_object(
-        game_signer: &signer,
-        object_address: address,
-        name: String,
-        version: String
-    ) acquires GameRegistry {
-        let module_address = signer::address_of(game_signer);
-
-        let registry = borrow_global_mut<GameRegistry>(@casino);
-        assert!(
-            registry.registered_games.contains(&module_address),
-            E_GAME_NOT_REGISTERED
-        );
-
-        let game_info = registry.registered_games.borrow_mut(&module_address);
-        game_info.object_address = option::some(object_address);
-        game_info.game_version = version;
-
-        event::emit(
-            GameObjectRegisteredEvent { module_address, object_address, name, version }
-        );
-    }
-
-    /// Remove game from registry (casino admin only)
+    /// Remove game from registry
     public entry fun unregister_game(
-        admin: &signer, game_address: address
-    ) acquires GameRegistry {
+        admin: &signer, game_object: Object<GameMetadata>
+    ) acquires GameRegistry, GameMetadata {
         assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
 
         let registry = borrow_global_mut<GameRegistry>(@casino);
         assert!(
-            registry.registered_games.contains(&game_address),
+            ordered_map::contains(&registry.registered_games, &game_object),
             E_GAME_NOT_REGISTERED
         );
 
-        let game_info = registry.registered_games.remove(&game_address);
-        event::emit(GameUnregisteredEvent { game_address, name: game_info.name });
+        registry.registered_games.remove(&game_object);
+
+        let object_addr = object::object_address(&game_object);
+        let game_metadata = borrow_global<GameMetadata>(object_addr);
+
+        event::emit(
+            GameUnregisteredEvent { game_object, name: game_metadata.name }
+        );
     }
 
     //
@@ -333,20 +323,22 @@ module casino::CasinoHouse {
         bet_fa: FungibleAsset,
         player: address,
         expected_payout: u64
-    ): u64 acquires Treasury, BetIndex, GameRegistry, BetRegistry {
-        let game_addr = capability.game_address;
+    ): u64 acquires Treasury, BetIndex, GameRegistry, BetRegistry, GameMetadata {
+        let game_object = capability.game_object;
         let amount = fungible_asset::amount(&bet_fa);
 
-        // Mandatory game registry check
+        // Verify game is registered
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
-            registry.registered_games.contains(&game_addr),
+            ordered_map::contains(&registry.registered_games, &game_object),
             E_GAME_NOT_REGISTERED
         );
-        let game_info = registry.registered_games.borrow(&game_addr);
-        assert!(amount >= game_info.min_bet, E_INVALID_AMOUNT);
-        assert!(amount <= game_info.max_bet, E_INVALID_AMOUNT);
 
+        // Get game constraints from metadata
+        let object_addr = object::object_address(&game_object);
+        let game_metadata = borrow_global<GameMetadata>(object_addr);
+        assert!(amount >= game_metadata.min_bet, E_INVALID_AMOUNT);
+        assert!(amount <= game_metadata.max_bet, E_INVALID_AMOUNT);
         assert!(expected_payout > 0, E_INVALID_AMOUNT);
 
         // Deposit bet to treasury store
@@ -360,7 +352,7 @@ module casino::CasinoHouse {
         let treasury_balance =
             primary_fungible_store::balance(treasury_addr, aptos_metadata);
 
-        // Check if treasury has sufficient funds for expected payout after bet contribution
+        // Check if treasury has sufficient funds for expected payout
         assert!(
             expected_payout <= treasury_balance,
             E_INSUFFICIENT_TREASURY_FOR_PAYOUT
@@ -377,13 +369,7 @@ module casino::CasinoHouse {
         bet_registry.bets.add(bet_id, bet_info);
 
         event::emit(
-            BetAcceptedEvent {
-                bet_id,
-                game_address: game_addr,
-                player,
-                amount,
-                expected_payout
-            }
+            BetAcceptedEvent { bet_id, game_object, player, amount, expected_payout }
         );
 
         bet_id
@@ -396,11 +382,11 @@ module casino::CasinoHouse {
         winner: address,
         payout: u64
     ) acquires BetRegistry, GameRegistry, CasinoSignerCapability {
-        // Mandatory game registry check
-        let game_addr = capability.game_address;
+        // Verify game is registered
+        let game_object = capability.game_object;
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
-            registry.registered_games.contains(&game_addr),
+            ordered_map::contains(&registry.registered_games, &game_object),
             E_GAME_NOT_REGISTERED
         );
 
@@ -477,13 +463,19 @@ module casino::CasinoHouse {
     // Object Address Derivation
     //
 
+    /// Build seed for deterministic object creation
+    fun build_game_seed(name: String, version: String): vector<u8> {
+        let seed = *std::string::bytes(&name);
+        vector::append(&mut seed, b"_");
+        vector::append(&mut seed, *std::string::bytes(&version));
+        seed
+    }
+
     /// Derive game object address from creator and game details
     public fun derive_game_object_address(
         creator: address, name: String, version: String
     ): address {
-        let seed = *std::string::bytes(&name);
-        vector::append(&mut seed, b"_");
-        vector::append(&mut seed, *std::string::bytes(&version));
+        let seed = build_game_seed(name, version);
         object::create_object_address(&creator, seed)
     }
 
@@ -492,46 +484,26 @@ module casino::CasinoHouse {
     //
 
     #[view]
-    public fun get_registered_games(): vector<GameInfo> acquires GameRegistry {
+    public fun get_registered_games(): vector<Object<GameMetadata>> acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@casino);
-        let games = vector::empty<GameInfo>();
-
-        let keys = registry.registered_games.keys();
-        let i = 0;
-        while (i < vector::length(&keys)) {
-            let game_address = *vector::borrow(&keys, i);
-            let game_info =
-                *ordered_map::borrow(&registry.registered_games, &game_address);
-            vector::push_back(&mut games, game_info);
-            i = i + 1;
-        };
-
-        games
+        registry.registered_games.keys()
     }
 
     #[view]
-    public fun get_game_info(game_address: address): GameInfo acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@casino);
-        assert!(
-            ordered_map::contains(&registry.registered_games, &game_address),
-            E_GAME_NOT_REGISTERED
-        );
-        *ordered_map::borrow(&registry.registered_games, &game_address)
-    }
-
-    #[view]
-    public fun get_game_object_address(
-        game_address: address
-    ): option::Option<address> acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@casino);
-        if (!ordered_map::contains(&registry.registered_games, &game_address)) {
-            option::none<address>()
-        } else {
-            let game_info = ordered_map::borrow(
-                &registry.registered_games, &game_address
-            );
-            game_info.object_address
-        }
+    public fun get_game_metadata(
+        game_object: Object<GameMetadata>
+    ): (String, String, address, u64, u64, u64, bool) acquires GameMetadata {
+        let object_addr = object::object_address(&game_object);
+        let metadata = borrow_global<GameMetadata>(object_addr);
+        (
+            metadata.name,
+            metadata.version,
+            metadata.module_address,
+            metadata.min_bet,
+            metadata.max_bet,
+            metadata.house_edge_bps,
+            metadata.capability_claimed
+        )
     }
 
     #[view]
@@ -545,20 +517,26 @@ module casino::CasinoHouse {
     }
 
     #[view]
-    public fun is_game_registered(game_address: address): bool acquires GameRegistry {
+    public fun is_game_registered(game_object: Object<GameMetadata>): bool acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@casino);
-        ordered_map::contains(&registry.registered_games, &game_address)
+        ordered_map::contains(&registry.registered_games, &game_object)
     }
 
     #[view]
-    public fun is_game_capability_claimed(game_address: address): bool acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@casino);
-        if (!ordered_map::contains(&registry.registered_games, &game_address)) { false }
+    public fun is_game_capability_claimed(
+        game_object: Object<GameMetadata>
+    ): bool acquires GameMetadata {
+        let object_addr = object::object_address(&game_object);
+        if (!exists<GameMetadata>(object_addr)) { false }
         else {
-            let game_info = ordered_map::borrow(
-                &registry.registered_games, &game_address
-            );
-            game_info.capability_claimed
+            let metadata = borrow_global<GameMetadata>(object_addr);
+            metadata.capability_claimed
         }
+    }
+
+    #[view]
+    public fun game_object_exists(game_object: Object<GameMetadata>): bool {
+        let object_addr = object::object_address(&game_object);
+        exists<GameMetadata>(object_addr)
     }
 }
