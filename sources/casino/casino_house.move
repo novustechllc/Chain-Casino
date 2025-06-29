@@ -164,28 +164,7 @@ module casino::CasinoHouse {
 
     #[test_only]
     package fun init_module_for_test(admin: &signer) {
-        assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
-
-        move_to(
-            admin,
-            Treasury { vault: coin::zero<AptosCoin>() }
-        );
-
-        move_to(
-            admin,
-            GameRegistry {
-                registered_games: ordered_map::new<address, GameInfo>()
-            }
-        );
-
-        move_to(
-            admin,
-            BetRegistry {
-                bets: ordered_map::new<u64, BetInfo>()
-            }
-        );
-
-        move_to(admin, BetIndex { next: 1 });
+        init_module(admin);
     }
 
     //
