@@ -140,6 +140,9 @@ module slot_game::SlotMachine {
 
         let player_addr = signer::address_of(player);
 
+        // Calculate MAXIMUM possible payout (highest symbol: SEVEN)
+        let expected_payout = bet_amount * SEVEN_PAYOUT;
+
         // Player provides bet coins
         let bet_coins = coin::withdraw<AptosCoin>(player, bet_amount);
 
@@ -147,29 +150,27 @@ module slot_game::SlotMachine {
         let game_auth = borrow_global<GameAuth>(@slot_game);
         let capability = &game_auth.capability;
 
-        // Spin the three reels
+        // Module calls casino with capability authorization (BEFORE spinning reels)
+        let bet_id = CasinoHouse::place_bet(
+            capability,
+            bet_coins,
+            player_addr,
+            expected_payout  // Maximum possible payout
+        );
+
+        // NOW spin the three reels to determine actual result
         let reel1 = spin_reel_internal();
-        let reel2 = spin_reel_internal();
+        let reel2 = spin_reel_internal(); 
         let reel3 = spin_reel_internal();
 
-        // Calculate payout
-        let (payout_multiplier, symbol_name) =
-            calculate_payout_internal(reel1, reel2, reel3);
+        // Calculate actual payout based on result
+        let (payout_multiplier, symbol_name) = calculate_payout_internal(reel1, reel2, reel3);
         let actual_payout = bet_amount * payout_multiplier;
-
-        // Module calls casino with capability authorization
-        let bet_id =
-            CasinoHouse::place_bet(
-                capability,
-                bet_coins,
-                player_addr,
-                actual_payout
-            );
 
         // Determine if player won
         let player_won = payout_multiplier > 0;
 
-        // Settle bet through CasinoHouse
+        // Settle bet through CasinoHouse with actual payout
         CasinoHouse::settle_bet(capability, bet_id, player_addr, actual_payout);
 
         // Emit game event
@@ -187,7 +188,7 @@ module slot_game::SlotMachine {
             }
         );
     }
-
+    
     // Test only
     #[test_only]
     #[lint::allow_unsafe_randomness]
