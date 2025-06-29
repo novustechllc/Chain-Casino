@@ -1,15 +1,18 @@
 //! MIT License
 //!
-//! Slot Machine Game for ChainCasino Platform (Refactored for FA)
+//! Slot Machine Game for ChainCasino Platform (Object-Based Refactor)
 //!
 //! 3-reel slot machine with weighted symbols and secure randomness.
-//! Features 5 symbols with varying rarity and payouts for balanced gameplay.
+//! Now uses named objects for game instance storage instead of fixed addresses.
 
 module slot_game::SlotMachine {
     use aptos_framework::randomness;
     use aptos_framework::event;
+    use aptos_framework::object::{Self, Object, ObjectCore, ExtendRef};
     use std::signer;
     use std::option;
+    use std::string::{Self, String};
+    use std::vector;
     use aptos_framework::fungible_asset::FungibleAsset;
     use aptos_framework::primary_fungible_store;
     use aptos_framework::aptos_coin;
@@ -40,6 +43,8 @@ module slot_game::SlotMachine {
     const MAX_BET: u64 = 50000000;
     /// House edge in basis points (1550 = 15.5%)
     const HOUSE_EDGE_BPS: u64 = 1550;
+    /// Game version for object naming
+    const GAME_VERSION: vector<u8> = b"v1";
 
     /// Symbol weights for weighted random selection
     const CHERRY_WEIGHT: u8 = 40; // 0-39
@@ -66,9 +71,19 @@ module slot_game::SlotMachine {
     // Resources
     //
 
-    /// Stores the game's authorization capability at @slot_game
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// Stores the game's authorization capability in named object
     struct GameAuth has key {
-        capability: GameCapability
+        capability: GameCapability,
+        extend_ref: ExtendRef
+    }
+
+    /// Registry tracking the creator and object address for this game
+    struct GameRegistry has key {
+        creator: address,
+        object_address: address,
+        game_name: String,
+        version: String
     }
 
     //
@@ -90,9 +105,12 @@ module slot_game::SlotMachine {
     }
 
     #[event]
-    /// Emitted when game successfully initializes
+    /// Emitted when game successfully initializes with object details
     struct GameInitialized has drop, store {
-        game_address: address,
+        creator: address,
+        object_address: address,
+        game_name: String,
+        version: String,
         min_bet: u64,
         max_bet: u64,
         house_edge_bps: u64
@@ -102,18 +120,54 @@ module slot_game::SlotMachine {
     // Initialization Interface
     //
 
-    /// Initialize slot machine game - claims capability from casino
+    /// Initialize slot machine game with named object - claims capability from casino
     public entry fun initialize_game(slot_admin: &signer) {
         assert!(signer::address_of(slot_admin) == @slot_game, E_UNAUTHORIZED);
-        assert!(!exists<GameAuth>(@slot_game), E_ALREADY_INITIALIZED);
+        assert!(!exists<GameRegistry>(@slot_game), E_ALREADY_INITIALIZED);
         assert!(CasinoHouse::is_game_registered(@slot_game), E_GAME_NOT_REGISTERED);
 
+        // Create named object for game instance
+        let game_name = string::utf8(b"SlotMachine");
+        let version = string::utf8(GAME_VERSION);
+        let seed = build_seed(game_name, version);
+
+        let constructor_ref = object::create_named_object(slot_admin, seed);
+        let object_signer = object::generate_signer(&constructor_ref);
+        let object_addr =
+            object::object_address(
+                &object::object_from_constructor_ref<ObjectCore>(&constructor_ref)
+            );
+
+        // Configure as non-transferable
+        let transfer_ref = object::generate_transfer_ref(&constructor_ref);
+        object::disable_ungated_transfer(&transfer_ref);
+
+        // Generate extend ref for future operations
+        let extend_ref = object::generate_extend_ref(&constructor_ref);
+
+        // Get capability from casino
         let capability = CasinoHouse::get_game_capability(slot_admin);
-        move_to(slot_admin, GameAuth { capability });
+
+        // Store GameAuth in the object
+        move_to(&object_signer, GameAuth { capability, extend_ref });
+
+        // Store registry info at module address for easy lookup
+        move_to(
+            slot_admin,
+            GameRegistry {
+                creator: signer::address_of(slot_admin),
+                object_address: object_addr,
+                game_name,
+                version
+            }
+        );
 
         event::emit(
             GameInitialized {
-                game_address: @slot_game,
+                creator: signer::address_of(slot_admin),
+                object_address: object_addr,
+                game_name,
+                version,
                 min_bet: MIN_BET,
                 max_bet: MAX_BET,
                 house_edge_bps: HOUSE_EDGE_BPS
@@ -122,12 +176,12 @@ module slot_game::SlotMachine {
     }
 
     //
-    // Core Game Interface - REFACTORED
+    // Core Game Interface
     //
 
     #[randomness]
-    /// Spin the slot machine reels - now uses FungibleAsset operations
-    entry fun spin_slots(player: &signer, bet_amount: u64) acquires GameAuth {
+    /// Spin the slot machine reels - now uses object-based capability
+    entry fun spin_slots(player: &signer, bet_amount: u64) acquires GameRegistry, GameAuth {
         assert!(bet_amount >= MIN_BET, E_INVALID_AMOUNT);
         assert!(bet_amount <= MAX_BET, E_INVALID_AMOUNT);
 
@@ -140,11 +194,12 @@ module slot_game::SlotMachine {
         let aptos_metadata = option::extract(&mut aptos_metadata_option);
         let bet_fa = primary_fungible_store::withdraw(player, aptos_metadata, bet_amount);
 
-        // Get stored capability
-        let game_auth = borrow_global<GameAuth>(@slot_game);
+        // Get capability from object
+        let object_addr = get_game_object_address();
+        let game_auth = borrow_global<GameAuth>(object_addr);
         let capability = &game_auth.capability;
 
-        // Place bet with casino (FA gets deposited to treasury)
+        // Place bet with casino
         let bet_id =
             CasinoHouse::place_bet(
                 capability,
@@ -164,7 +219,7 @@ module slot_game::SlotMachine {
         let actual_payout = bet_amount * payout_multiplier;
         let player_won = payout_multiplier > 0;
 
-        // Settle bet (casino handles FA transfer to winner if any)
+        // Settle bet
         CasinoHouse::settle_bet(capability, bet_id, player_addr, actual_payout);
 
         event::emit(
@@ -187,7 +242,7 @@ module slot_game::SlotMachine {
     /// Test version allowing unsafe randomness
     public entry fun test_only_spin_slots(
         player: &signer, bet_amount: u64
-    ) acquires GameAuth {
+    ) acquires GameRegistry, GameAuth {
         spin_slots(player, bet_amount);
     }
 
@@ -234,6 +289,24 @@ module slot_game::SlotMachine {
     }
 
     //
+    // Object Management Functions
+    //
+
+    /// Build seed for deterministic object creation
+    fun build_seed(name: String, version: String): vector<u8> {
+        let seed = *string::bytes(&name);
+        vector::append(&mut seed, b"_");
+        vector::append(&mut seed, *string::bytes(&version));
+        seed
+    }
+
+    /// Get object signer from stored extend ref
+    fun get_object_signer(object_addr: address): signer acquires GameAuth {
+        let game_auth = borrow_global<GameAuth>(object_addr);
+        object::generate_signer_for_extending(&game_auth.extend_ref)
+    }
+
+    //
     // View Functions
     //
 
@@ -271,18 +344,48 @@ module slot_game::SlotMachine {
     }
 
     #[view]
+    public fun get_game_object_address(): address acquires GameRegistry {
+        let registry = borrow_global<GameRegistry>(@slot_game);
+        registry.object_address
+    }
+
+    #[view]
+    /// Derive object address from creator and game details
+    public fun derive_game_object_address(
+        creator: address, name: String, version: String
+    ): address {
+        let seed = build_seed(name, version);
+        object::create_object_address(&creator, seed)
+    }
+
+    #[view]
+    public fun get_game_info(): (address, address, String, String) acquires GameRegistry {
+        let registry = borrow_global<GameRegistry>(@slot_game);
+        (registry.creator, registry.object_address, registry.game_name, registry.version)
+    }
+
+    #[view]
     public fun is_registered(): bool {
         CasinoHouse::is_game_registered(@slot_game)
     }
 
     #[view]
     public fun is_initialized(): bool {
-        exists<GameAuth>(@slot_game)
+        exists<GameRegistry>(@slot_game)
     }
 
     #[view]
     public fun is_ready(): bool {
         is_registered() && is_initialized()
+    }
+
+    #[view]
+    public fun object_exists(): bool acquires GameRegistry {
+        if (!is_initialized()) { false }
+        else {
+            let object_addr = get_game_object_address();
+            exists<GameAuth>(object_addr)
+        }
     }
 
     #[view]

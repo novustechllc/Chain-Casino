@@ -1,9 +1,9 @@
 //! MIT License
 //!
-//! Casino treasury and game registry management (Refactored for Fungible Assets)
+//! Casino treasury and game registry management (Object-Based Refactor)
 //!
 //! Central hub for game authorization, bet settlement, and treasury operations.
-//! Uses modern Fungible Asset standard instead of deprecated Coin operations.
+//! Now supports object-based game instances with deterministic addressing.
 
 module casino::CasinoHouse {
     use std::string::{String};
@@ -59,7 +59,7 @@ module casino::CasinoHouse {
         signer_cap: account::SignerCapability
     }
 
-    /// Registry of authorized casino games
+    /// Registry of authorized casino games (by module address)
     struct GameRegistry has key {
         registered_games: OrderedMap<address, GameInfo>
     }
@@ -81,7 +81,10 @@ module casino::CasinoHouse {
         min_bet: u64,
         max_bet: u64,
         house_edge_bps: u64,
-        capability_claimed: bool
+        capability_claimed: bool,
+        // New fields for object support
+        game_version: String,
+        object_address: option::Option<address>
     }
 
     /// Bet information for payout validation
@@ -96,7 +99,7 @@ module casino::CasinoHouse {
     }
 
     //
-    // Event Specifications (unchanged)
+    // Event Specifications
     //
 
     #[event]
@@ -119,7 +122,8 @@ module casino::CasinoHouse {
     struct GameRegisteredEvent has drop, store {
         game_address: address,
         name: String,
-        module_address: address
+        module_address: address,
+        game_version: String
     }
 
     #[event]
@@ -131,7 +135,16 @@ module casino::CasinoHouse {
     #[event]
     struct GameCapabilityClaimedEvent has drop, store {
         game_address: address,
-        name: String
+        name: String,
+        object_address: address
+    }
+
+    #[event]
+    struct GameObjectRegisteredEvent has drop, store {
+        module_address: address,
+        object_address: address,
+        name: String,
+        version: String
     }
 
     //
@@ -185,10 +198,10 @@ module casino::CasinoHouse {
     }
 
     //
-    // Game Management Interface (unchanged)
+    // Game Management Interface
     //
 
-    /// Register new game by address (casino admin only)
+    /// Register new game by module address (casino admin only)
     public entry fun register_game(
         admin: &signer,
         game_address: address,
@@ -214,17 +227,24 @@ module casino::CasinoHouse {
             min_bet,
             max_bet,
             house_edge_bps,
-            capability_claimed: false
+            capability_claimed: false,
+            game_version: std::string::utf8(b"v1"), // Default version
+            object_address: option::none<address>()
         };
 
         registry.registered_games.add(game_address, game_info);
 
         event::emit(
-            GameRegisteredEvent { game_address, name, module_address: game_address }
+            GameRegisteredEvent {
+                game_address,
+                name,
+                module_address: game_address,
+                game_version: std::string::utf8(b"v1")
+            }
         );
     }
 
-    /// Game claims its capability (only if registered and not already claimed)
+    /// Game claims its capability and registers object address
     public fun get_game_capability(game_signer: &signer): GameCapability acquires GameRegistry {
         let game_address = signer::address_of(game_signer);
 
@@ -241,9 +261,50 @@ module casino::CasinoHouse {
 
         game_info.capability_claimed = true;
 
-        event::emit(GameCapabilityClaimedEvent { game_address, name: game_info.name });
+        // Derive the expected object address for this game
+        let object_addr =
+            derive_game_object_address(
+                game_address,
+                game_info.name,
+                game_info.game_version
+            );
+
+        // Update registry with object address
+        game_info.object_address = option::some(object_addr);
+
+        event::emit(
+            GameCapabilityClaimedEvent {
+                game_address,
+                name: game_info.name,
+                object_address: object_addr
+            }
+        );
 
         GameCapability { game_address }
+    }
+
+    /// Register game object address after initialization (called by games)
+    public fun register_game_object(
+        game_signer: &signer,
+        object_address: address,
+        name: String,
+        version: String
+    ) acquires GameRegistry {
+        let module_address = signer::address_of(game_signer);
+
+        let registry = borrow_global_mut<GameRegistry>(@casino);
+        assert!(
+            registry.registered_games.contains(&module_address),
+            E_GAME_NOT_REGISTERED
+        );
+
+        let game_info = registry.registered_games.borrow_mut(&module_address);
+        game_info.object_address = option::some(object_address);
+        game_info.game_version = version;
+
+        event::emit(
+            GameObjectRegisteredEvent { module_address, object_address, name, version }
+        );
     }
 
     /// Remove game from registry (casino admin only)
@@ -263,10 +324,10 @@ module casino::CasinoHouse {
     }
 
     //
-    // Bet Flow Interface (REFACTORED)
+    // Bet Flow Interface
     //
 
-    /// Accept bet from authorized game - now uses FungibleAsset
+    /// Accept bet from authorized game
     public fun place_bet(
         capability: &GameCapability,
         bet_fa: FungibleAsset,
@@ -328,7 +389,7 @@ module casino::CasinoHouse {
         bet_id
     }
 
-    /// Settle bet with payout from treasury - now uses FungibleAsset
+    /// Settle bet with payout from treasury
     public fun settle_bet(
         capability: &GameCapability,
         bet_id: u64,
@@ -392,7 +453,7 @@ module casino::CasinoHouse {
         account::create_resource_address(&@casino, b"casino_treasury")
     }
 
-    /// Extract funds from treasury for InvestorToken redemptions - REFACTORED
+    /// Extract funds from treasury for InvestorToken redemptions
     package fun redeem_from_treasury(amount: u64): FungibleAsset acquires CasinoSignerCapability {
         let aptos_metadata_option =
             coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
@@ -406,14 +467,28 @@ module casino::CasinoHouse {
         primary_fungible_store::withdraw(&treasury_signer, aptos_metadata, amount)
     }
 
-    /// Deposit fungible asset to treasury - REFACTORED
+    /// Deposit fungible asset to treasury
     package fun deposit_to_treasury(fa: FungibleAsset) acquires Treasury {
         let treasury = borrow_global<Treasury>(@casino);
         fungible_asset::deposit(treasury.store, fa);
     }
 
     //
-    // View Interface - UPDATED
+    // Object Address Derivation
+    //
+
+    /// Derive game object address from creator and game details
+    public fun derive_game_object_address(
+        creator: address, name: String, version: String
+    ): address {
+        let seed = *std::string::bytes(&name);
+        vector::append(&mut seed, b"_");
+        vector::append(&mut seed, *std::string::bytes(&version));
+        object::create_object_address(&creator, seed)
+    }
+
+    //
+    // View Interface
     //
 
     #[view]
@@ -442,6 +517,21 @@ module casino::CasinoHouse {
             E_GAME_NOT_REGISTERED
         );
         *ordered_map::borrow(&registry.registered_games, &game_address)
+    }
+
+    #[view]
+    public fun get_game_object_address(
+        game_address: address
+    ): option::Option<address> acquires GameRegistry {
+        let registry = borrow_global<GameRegistry>(@casino);
+        if (!ordered_map::contains(&registry.registered_games, &game_address)) {
+            option::none<address>()
+        } else {
+            let game_info = ordered_map::borrow(
+                &registry.registered_games, &game_address
+            );
+            game_info.object_address
+        }
     }
 
     #[view]
