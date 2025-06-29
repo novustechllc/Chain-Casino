@@ -9,7 +9,6 @@ module slot_game::SlotMachine {
     use aptos_framework::randomness;
     use aptos_framework::event;
     use std::signer;
-    use std::vector;
     use aptos_framework::coin;
     use aptos_framework::aptos_coin::AptosCoin;
     use casino::CasinoHouse;

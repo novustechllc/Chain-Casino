@@ -4,7 +4,6 @@
 
 #[test_only]
 module slot_game::SlotMachineTest {
-    use std::string;
     use std::vector;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
@@ -258,7 +257,7 @@ module slot_game::SlotMachineTest {
     fun test_mathematical_house_edge() {
         // Verify the mathematical house edge calculation
         // Expected return calculation based on symbol weights and payouts
-        let (cherry_w, bell_w, coin_w, chain_w, seven_w) =
+        let (cherry_w, _, _, _, seven_w) =
             SlotMachine::get_symbol_weights();
         let (cherry_p, bell_p, coin_p, chain_p, seven_p) =
             SlotMachine::get_payout_multipliers();

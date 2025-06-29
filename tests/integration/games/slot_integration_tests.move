@@ -319,7 +319,7 @@ module casino::SlotMachineIntegrationTest {
 
     #[test]
     fun test_slot_vs_dice_game_coexistence() {
-        let (aptos_framework, casino_account, slot_account, investor, player) =
+        let (aptos_framework, casino_account, _, investor, player) =
             setup_full_integration();
 
         // Also initialize dice game for comparison
