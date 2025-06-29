@@ -308,9 +308,7 @@ module casino::CasinoHouse {
         let object_addr = object::object_address(&game_object);
         let game_metadata = borrow_global<GameMetadata>(object_addr);
 
-        event::emit(
-            GameUnregisteredEvent { game_object, name: game_metadata.name }
-        );
+        event::emit(GameUnregisteredEvent { game_object, name: game_metadata.name });
     }
 
     //
