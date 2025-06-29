@@ -1,3 +1,5 @@
+//! MIT License
+//!
 //! Comprehensive test suite for SlotMachine module
 
 #[test_only]

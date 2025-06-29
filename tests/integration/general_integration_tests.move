@@ -1,3 +1,7 @@
+//! MIT License
+//!
+//! General integration tests for ChainCasino platform
+
 //! Full integration tests for InvestorToken + CasinoHouse + DiceGame
 
 #[test_only]

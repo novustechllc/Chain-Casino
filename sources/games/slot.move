@@ -1,3 +1,5 @@
+//! MIT License
+//!
 //! Slot Machine Game for ChainCasino Platform
 //!
 //! 3-reel slot machine with weighted symbols and secure randomness.

@@ -1,3 +1,5 @@
+//! MIT License
+//!
 //! Comprehensive test suite for DiceGame module
 
 #[test_only]

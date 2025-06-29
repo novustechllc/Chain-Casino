@@ -1,4 +1,4 @@
-//! LICENSE: GPL-3.0
+//! MIT License
 //!
 //! Casino treasury and game registry management
 //!

@@ -1,3 +1,5 @@
+//! MIT License
+//!
 //! InvestorToken Fungible Asset Implementation
 //!
 //! NAV-based investor tokens for the ChainCasino platform.

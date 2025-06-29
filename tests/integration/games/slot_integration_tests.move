@@ -1,3 +1,5 @@
+//! MIT License
+//!
 //! Integration tests for SlotMachine with CasinoHouse and InvestorToken
 
 #[test_only]
