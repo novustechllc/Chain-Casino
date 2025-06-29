@@ -145,7 +145,7 @@ module dice_game::DiceGame {
             );
 
         // Roll the dice (1-6)
-        let dice_result = roll_dice_internal();
+        let dice_result = randomness::u8_range(1, 7);
 
         // Determine outcome
         let player_won = dice_result == guess;
@@ -178,11 +178,6 @@ module dice_game::DiceGame {
         player: &signer, guess: u8, bet_amount: u64
     ) acquires GameAuth {
         play_dice(player, guess, bet_amount);
-    }
-
-    #[lint::allow_unsafe_randomness]
-    fun roll_dice_internal(): u8 {
-        randomness::u8_range(1, 7)
     }
 
     //
