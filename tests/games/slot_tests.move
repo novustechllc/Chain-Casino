@@ -257,8 +257,7 @@ module slot_game::SlotMachineTest {
     fun test_mathematical_house_edge() {
         // Verify the mathematical house edge calculation
         // Expected return calculation based on symbol weights and payouts
-        let (cherry_w, _, _, _, seven_w) =
-            SlotMachine::get_symbol_weights();
+        let (cherry_w, _, _, _, seven_w) = SlotMachine::get_symbol_weights();
         let (cherry_p, bell_p, coin_p, chain_p, seven_p) =
             SlotMachine::get_payout_multipliers();
 
