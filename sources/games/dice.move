@@ -113,11 +113,9 @@ module dice_game::DiceGame {
     // Core Game Interface
     //
 
-    #[lint::allow_unsafe_randomness]
+    #[randomness]
     /// Play dice game - player signs transaction, module calls casino
-    public entry fun play_dice(
-        player: &signer, guess: u8, bet_amount: u64
-    ) acquires GameAuth {
+    entry fun play_dice(player: &signer, guess: u8, bet_amount: u64) acquires GameAuth {
         // Validate inputs
         assert!(guess >= 1 && guess <= 6, E_INVALID_GUESS);
         assert!(bet_amount >= MIN_BET, E_INVALID_AMOUNT);
@@ -168,6 +166,16 @@ module dice_game::DiceGame {
                 payout: actual_payout
             }
         );
+    }
+
+    // Test only
+    #[test_only]
+    #[lint::allow_unsafe_randomness]
+    /// Play dice game - player signs transaction, module calls casino
+    public entry fun test_only_play_dice(
+        player: &signer, guess: u8, bet_amount: u64
+    ) acquires GameAuth {
+        play_dice(player, guess, bet_amount);
     }
 
     #[lint::allow_unsafe_randomness]

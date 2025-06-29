@@ -3,7 +3,6 @@
 #[test_only]
 module casino::FullIntegrationTest {
     use std::string;
-    use std::signer;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::coin;
@@ -102,7 +101,7 @@ module casino::FullIntegrationTest {
         );
 
         // 4. Player makes a dice bet
-        DiceGame::play_dice(&player, 1, DICE_BET);
+        DiceGame::test_only_play_dice(&player, 1, DICE_BET);
 
         // Treasury should have received the bet regardless of outcome
         let treasury_after_bet = CasinoHouse::treasury_balance();
@@ -177,9 +176,9 @@ module casino::FullIntegrationTest {
         aptos_coin::mint(&aptos_framework, @0x333, DICE_BET * 2);
 
         // Multiple dice bets
-        DiceGame::play_dice(&player1, 1, DICE_BET);
-        DiceGame::play_dice(&player2, 3, DICE_BET);
-        DiceGame::play_dice(&player3, 6, DICE_BET);
+        DiceGame::test_only_play_dice(&player1, 1, DICE_BET);
+        DiceGame::test_only_play_dice(&player2, 3, DICE_BET);
+        DiceGame::test_only_play_dice(&player3, 6, DICE_BET);
 
         // Treasury should have accumulated bet amounts regardless of outcomes
         let treasury_after_bets = CasinoHouse::treasury_balance();
@@ -286,7 +285,7 @@ module casino::FullIntegrationTest {
         let fund_coins = coin::withdraw<AptosCoin>(&casino_account, 100000000);
         CasinoHouse::deposit_to_treasury(fund_coins);
 
-        DiceGame::play_dice(&player, 2, DICE_BET);
+        DiceGame::test_only_play_dice(&player, 2, DICE_BET);
 
         // Add profit simulation
         let profit_coins = coin::withdraw<AptosCoin>(&casino_account, 25000000);

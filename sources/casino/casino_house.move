@@ -163,7 +163,7 @@ module casino::CasinoHouse {
     }
 
     #[test_only]
-    package fun init_module_for_test(admin: &signer) {
+    public fun init_module_for_test(admin: &signer) {
         init_module(admin);
     }
 

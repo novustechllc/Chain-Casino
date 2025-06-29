@@ -109,7 +109,7 @@ module casino::RealInvestmentTest {
             let guess = (i % 6) + 1; // Guess 1-6
 
             // Make real bet through DiceGame
-            DiceGame::play_dice(&player, (guess as u8), bet_amount);
+            DiceGame::test_only_play_dice(&player, (guess as u8), bet_amount);
 
             total_bets_placed = total_bets_placed + 1;
             total_bet_volume = total_bet_volume + bet_amount;
@@ -186,7 +186,7 @@ module casino::RealInvestmentTest {
 
         // Create some game activity
         let player1 = create_funded_player(&framework, @0x4001);
-        DiceGame::play_dice(&player1, 3, 30000000); // 0.3 APT bet
+        DiceGame::test_only_play_dice(&player1, 3, 30000000); // 0.3 APT bet
 
         let nav_after_game1 = InvestorToken::nav();
 
@@ -197,8 +197,8 @@ module casino::RealInvestmentTest {
         // More game activity
         let player2 = create_funded_player(&framework, @0x4002);
         let player3 = create_funded_player(&framework, @0x4003);
-        DiceGame::play_dice(&player2, 1, 25000000); // 0.25 APT
-        DiceGame::play_dice(&player3, 6, 40000000); // 0.4 APT
+        DiceGame::test_only_play_dice(&player2, 1, 25000000); // 0.25 APT
+        DiceGame::test_only_play_dice(&player3, 6, 40000000); // 0.4 APT
 
         let final_nav = InvestorToken::nav();
 
