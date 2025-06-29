@@ -48,6 +48,29 @@ flowchart LR
 
 ---
 
+## 🚀 Key Concepts
+
+- **NAV-Based Tokenomics**  
+  Minting and redemption adjust token supply to keep NAV constant for others.  
+  Treasury grows → NAV increases → CCIT is worth more.
+
+- **Modular Game Authorization**  
+  Games are **independent contracts**. Casino only grants treasury access using `GameCapability`.  
+  Anyone can write games, no central control.
+
+- **On-Chain Fairness**  
+  Aptos randomness is used in all games. Events log all rolls, spins, and payouts.
+
+---
+
+## 🔬 Move 2 Feature Explorations
+
+- `fungible-assets` - Modern FA standard implementation
+- `randomness` - Randomness patterns  
+- `object-composability` - Object relationships & inheritance
+
+---
+
 ## 🔧 Modules
 
 ### `CasinoHouse.move`
@@ -64,21 +87,6 @@ flowchart LR
 - Example modular games
 - Use randomness for outcome
 - Call CasinoHouse to settle bets
-
----
-
-## 🚀 Key Concepts
-
-- **NAV-Based Tokenomics**  
-  Minting and redemption adjust token supply to keep NAV constant for others.  
-  Treasury grows → NAV increases → CCIT is worth more.
-
-- **Modular Game Authorization**  
-  Games are **independent contracts**. Casino only grants treasury access using `GameCapability`.  
-  Anyone can write games, no central control.
-
-- **On-Chain Fairness**  
-  Aptos randomness is used in all games. Events log all rolls, spins, and payouts.
 
 ---
 
@@ -100,6 +108,12 @@ flowchart LR
 - Payout: 5x  
 - House Edge: ~16.67%  
 - Treasury absorbs losses → NAV grows
+
+---
+
+## TODO
+
+- Add Previous Branch Tests Refactor Made Obsolete
 
 ---
 
