@@ -15,8 +15,8 @@ module casino::SlotMachineIntegrationTest {
     use slot_game::SlotMachine;
 
     // Test constants
-    const INITIAL_BALANCE: u64 = 1000000000; // 10 APT
-    const INVESTOR_DEPOSIT: u64 = 200000000; // 2 APT
+    const INITIAL_BALANCE: u64 = 20000000000; // 200 APT
+    const INVESTOR_DEPOSIT: u64 = 20000000000; // 200 APT
     const SLOT_BET: u64 = 10000000; // 0.1 APT
     const NAV_SCALE: u64 = 1000000;
 
