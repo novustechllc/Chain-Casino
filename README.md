@@ -82,6 +82,14 @@ flowchart LR
 
 ---
 
+## 🔬 Move 2 Feature Explorations
+
+- `fungible-assets` - Modern FA standard implementation
+- `randomness` - Randomness patterns  
+- `object-composability` - Object relationships & inheritance
+
+---
+
 ## 📦 How to Use
 
 1. Deploy modules: `CasinoHouse`, `InvestorToken`, and any game
