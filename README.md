@@ -18,17 +18,32 @@ ChainCasino turns **"The House Always Wins"** into **"The Investor Always Earns.
 ## 📐 Architecture Overview
 
 ```mermaid
-flowchart TD
-  investor[Investor] -->|Deposit APT| token["InvestorToken Contract"]
-  token -->|Mint CCIT| investor
-  token -->|Send APT| treasury["Treasury (APT)"]
-  
-  player[Player] -->|Places Bet| game["Game Contract"]
-  game -->|Call place_bet| casinohouse["CasinoHouse Contract"]
-  game -->|Call settle_bet| casinohouse
-  casinohouse -->|Pays Winnings| player
+flowchart LR
 
-  treasury -->|NAV Up with Games Earnings| token
+  subgraph Investors
+    investor[Investor]
+    token["InvestorToken"]
+  end
+
+  subgraph Core_System
+    treasury["Treasury"]
+    casino["CasinoHouse"]
+  end
+
+  subgraph Players
+    player[Player]
+    game["Game Contract"]
+  end
+
+  investor -->|Deposit APT| token
+  token -->|Send APT| treasury
+  treasury -->|NAV Up with Game Earnings| token
+
+  player -->|Bet| game
+  game -->|place_bet / settle_bet| casino
+  casino -->|Payout| player
+
+  casino <--> treasury
 ```
 
 ---
