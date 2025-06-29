@@ -4,7 +4,6 @@
 module casino::InvestorTokenTest {
     use std::string;
     use std::signer;
-    use std::debug;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::coin;
@@ -12,6 +11,13 @@ module casino::InvestorTokenTest {
     use aptos_framework::object;
     use casino::InvestorToken;
     use casino::CasinoHouse;
+    use casino::CasinoHouse::GameCapability;
+
+    // Test game wrapper to handle GameCapability
+    #[test_only]
+    struct TestGameAuth has key {
+        capability: GameCapability
+    }
 
     const INITIAL_BALANCE: u64 = 1000000000; // 10 APT in octas
     const TEST_DEPOSIT: u64 = 100000000; // 1 APT in octas
@@ -45,6 +51,12 @@ module casino::InvestorTokenTest {
             1000000,
             150
         );
+        let game_account =
+            account::create_account_for_test(signer::address_of(&casino_account));
+        let capability = CasinoHouse::get_game_capability(&game_account);
+
+        // Store capability to avoid compilation error
+        move_to(&game_account, TestGameAuth { capability });
 
         (casino_account, user_account)
     }
@@ -218,6 +230,12 @@ module casino::InvestorTokenTest {
             1000000,
             150
         );
+        let game_account =
+            account::create_account_for_test(signer::address_of(&casino_account));
+        let capability = CasinoHouse::get_game_capability(&game_account);
+
+        // Store capability to avoid compilation error
+        move_to(&game_account, TestGameAuth { capability });
 
         InvestorToken::deposit_and_mint(&user1, TEST_DEPOSIT);
         InvestorToken::deposit_and_mint(&user2, TEST_DEPOSIT * 2);
