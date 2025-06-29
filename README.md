@@ -48,25 +48,6 @@ flowchart LR
 
 ---
 
-## 🔧 Modules
-
-### `CasinoHouse.move`
-- Treasury manager
-- Game registry and capability issuer
-- Bet placement and settlement logic
-
-### `InvestorToken.move`
-- CCIT minting/redeeming
-- NAV tracking
-- Redemption fee logic
-
-### `DiceGame.move` & `SlotMachine.move`
-- Example modular games
-- Use randomness for outcome
-- Call CasinoHouse to settle bets
-
----
-
 ## 🚀 Key Concepts
 
 - **NAV-Based Tokenomics**  
@@ -90,6 +71,25 @@ flowchart LR
 
 ---
 
+## 🔧 Modules
+
+### `CasinoHouse.move`
+- Treasury manager
+- Game registry and capability issuer
+- Bet placement and settlement logic
+
+### `InvestorToken.move`
+- CCIT minting/redeeming
+- NAV tracking
+- Redemption fee logic
+
+### `DiceGame.move` & `SlotMachine.move`
+- Example modular games
+- Use randomness for outcome
+- Call CasinoHouse to settle bets
+
+---
+
 ## 📦 How to Use
 
 1. Deploy modules: `CasinoHouse`, `InvestorToken`, and any game
@@ -108,6 +108,12 @@ flowchart LR
 - Payout: 5x  
 - House Edge: ~16.67%  
 - Treasury absorbs losses → NAV grows
+
+---
+
+## TODO
+
+- Add Missing Tests Refactor Made Invalid
 
 ---
 
