@@ -17,6 +17,18 @@ ChainCasino turns **"The House Always Wins"** into **"The Investor Always Earns.
 
 ---
 
+## 🚀 Quick Start
+
+```bash
+# Compile the project
+aptos move compile
+
+# Run tests
+aptos move test
+```
+
+---
+
 ## 📐 Architecture Overview
 
 ### Core System Flow
@@ -94,6 +106,59 @@ flowchart TD
     class Player1,Player2 player
 ```
 
+### Treasury Architecture & Auto-Rebalancing
+
+```mermaid
+flowchart TD
+    subgraph "🏦 Treasury Ecosystem"
+        subgraph "Central Treasury"
+            Central[💰 Central Treasury<br/>• Large payouts when &gt; game balance<br/>• Liquidity provider<br/>• Investor redemptions]
+        end
+        
+        subgraph "Game Treasury A"
+            DiceStore[🎲 Dice Hot Store<br/>FA Primary Store]
+            DiceConfig[📊 Dice Config<br/>• Target: 7-day volume × 1.5<br/>• Overflow: Target × 110%<br/>• Drain: Target × 25%<br/>• Rolling Volume Tracking]
+            DiceStore --- DiceConfig
+        end
+        
+        subgraph "Game Treasury B"
+            SlotStore[🎰 Slot Hot Store<br/>FA Primary Store]
+            SlotConfig[📊 Slot Config<br/>• Target: 7-day volume × 1.5<br/>• Overflow: Target × 110%<br/>• Drain: Target × 25%<br/>• Rolling Volume Tracking]
+            SlotStore --- SlotConfig
+        end
+    end
+
+    subgraph "🔄 Auto-Rebalancing Logic"
+        Overflow[💹 Overflow Trigger<br/>When balance > 110% target<br/>→ Send 10% excess to Central]
+        
+        Drain[⚠️ Drain Trigger<br/>When balance < 25% target<br/>→ Request funds from Central]
+        
+        Volume[📈 Volume Updates<br/>Each bet updates:<br/>rolling_volume = old×6 + new×1.5 ÷ 7<br/>→ Recalculates all thresholds]
+    end
+
+    %% Rebalancing Flows
+    DiceStore -.->|"Balance > Overflow"| Overflow
+    SlotStore -.->|"Balance > Overflow"| Overflow
+    Overflow -->|"Transfer excess"| Central
+    
+    Central -->|"Inject liquidity"| Drain
+    Drain -.->|"Balance < Drain"| DiceStore
+    Drain -.->|"Balance < Drain"| SlotStore
+    
+    DiceStore --> Volume
+    SlotStore --> Volume
+    Volume --> DiceConfig
+    Volume --> SlotConfig
+
+    classDef central fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef game fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef logic fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    
+    class Central central
+    class DiceStore,SlotStore,DiceConfig,SlotConfig game
+    class Overflow,Drain,Volume logic
+```
+
 ### Block-STM Parallel Execution
 
 ```mermaid
@@ -137,7 +202,10 @@ flowchart TD
     class ParTx1,ParTx2,ParTx3,DiceTreasury,SlotTreasury parallel
 ```
 
-**Key Insight:** Different treasury addresses = No resource conflicts = True parallel execution
+**Key Insights:** 
+- Different treasury addresses = No resource conflicts = True parallel execution
+- Dynamic rebalancing maintains optimal liquidity distribution
+- Rolling volume calculation adapts to actual game activity
 
 ---
 
@@ -176,17 +244,17 @@ flowchart TD
 
 ## 🔧 Modules
 
-### `CasinoHouse.move`
+### `sources/casino/casino_house.move`
 - Treasury manager
 - Game registry and capability issuer
 - Bet placement and settlement logic
 
-### `InvestorToken.move`
+### `sources/casino/investor_token.move`
 - CCIT minting/redeeming
 - NAV tracking
 - Redemption fee logic
 
-### `DiceGame.move` & `SlotMachine.move`
+### `sources/games/dice.move` & `sources/games/slot.move`
 - Example modular games
 - Use randomness for outcome
 - Call CasinoHouse to settle bets
@@ -199,7 +267,7 @@ flowchart TD
 2. Register games using `CasinoHouse::register_game()` to create game objects
 3. Games initialize and claim capabilities via `CasinoHouse::get_game_capability()`
 4. Fund treasury using `InvestorToken::deposit_and_mint()` to mint CCIT tokens
-5. Players bet through game contracts using `CasinoHouse::place_bet()`
+5. Players interact through game contracts (`DiceGame::play_dice()`, `SlotMachine::spin_slots()`)
 6. Games settle outcomes using `CasinoHouse::settle_bet()`
 7. Investors redeem profits using `InvestorToken::redeem()`
 
@@ -217,7 +285,6 @@ flowchart TD
 
 ## TODO
 
-- Add Previous Branch Tests Refactor Made Obsolete
 - Optimize for Transaction Parallelization on Aptos Blockchain
 - Gas Waste Removal
 
