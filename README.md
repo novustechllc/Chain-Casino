@@ -41,18 +41,18 @@ flowchart TD
     end
 
     subgraph "🏛️ Casino Core"
-        Casino[🏠 CasinoHouse<br/>• Game Registry<br/>• Treasury Manager<br/>• Bet Settlement]
+        Casino[🏠 CasinoHouse<br/>• Game Registry<br/>• Treasury Router<br/>• Bet Settlement<br/>• Auto-Rebalancing]
     end
 
     subgraph "🎮 Game Modules"
-        DiceGame[🎲 DiceGame<br/>• Own Capability<br/>• Secure Randomness]
-        SlotGame[🎰 SlotMachine<br/>• Own Capability<br/>• Secure Randomness]
+        DiceGame[🎲 DiceGame<br/>• Secure Randomness<br/>• Capability Auth]
+        SlotGame[🎰 SlotMachine<br/>• Secure Randomness<br/>• Capability Auth]
     end
 
     subgraph "💳 Treasury System"
-        Central[🏦 Central Treasury<br/>@central_account]
-        DiceTreasury[💎 Dice Treasury<br/>@dice_treasury_account]
-        SlotTreasury[🎰 Slot Treasury<br/>@slot_treasury_account]
+        Central[🏦 Central Treasury<br/>• Investor funds<br/>• Large payouts<br/>• Liquidity provider]
+        DiceTreasury[💎 Dice Treasury<br/>• Hot operational funds<br/>• Auto-rebalancing]
+        SlotTreasury[🎰 Slot Treasury<br/>• Hot operational funds<br/>• Auto-rebalancing]
     end
 
     subgraph "👥 Players"
@@ -62,31 +62,34 @@ flowchart TD
 
     %% Investment Flow
     Investor -->|deposit_and_mint<br/>APT → CCIT| CCIT
-    CCIT -->|Funds flow to| Central
-    CCIT -->|redeem<br/>CCIT → APT| Investor
+    CCIT -->|All deposits| Central
+    CCIT <-->|redeem<br/>CCIT ↔ APT| Investor
 
-    %% Game Registration
-    Casino -.->|Creates Objects| DiceGame
-    Casino -.->|Creates Objects| SlotGame
-
-    %% Player Gaming (Parallel Paths)
+    %% Player Gaming Flow
     Player1 -->|play_dice| DiceGame
     Player2 -->|spin_slots| SlotGame
 
-    %% Bet Settlement Flow
-    DiceGame -->|place_bet/settle_bet<br/>via capability| Casino
-    SlotGame -->|place_bet/settle_bet<br/>via capability| Casino
+    %% Bet Processing Flow
+    DiceGame -->|place_bet via capability<br/>Casino decides routing| Casino
+    SlotGame -->|place_bet via capability<br/>Casino decides routing| Casino
 
-    %% Treasury Routing (Block-STM Isolation)
-    Casino -->|Route bet to| DiceTreasury
-    Casino -->|Route bet to| SlotTreasury
-    Casino -->|Large payouts from| Central
+    %% Treasury Routing Logic
+    Casino -->|If game balance > drain threshold| DiceTreasury
+    Casino -->|If game balance > drain threshold| SlotTreasury
+    Casino -->|If game balance < drain threshold| Central
 
-    %% Auto-Rebalancing
-    DiceTreasury -.->|Excess flows| Central
-    SlotTreasury -.->|Excess flows| Central
-    Central -.->|Inject liquidity| DiceTreasury
-    Central -.->|Inject liquidity| SlotTreasury
+    %% Settlement Flow
+    Casino -->|settle_bet<br/>Payout from source treasury| Player1
+    Casino -->|settle_bet<br/>Payout from source treasury| Player2
+
+    %% Auto-Rebalancing Triggers
+    Casino -->|After large payouts<br/>Check thresholds| DiceTreasury
+    Casino -->|After large payouts<br/>Check thresholds| SlotTreasury
+    
+    DiceTreasury -.->|Excess > 110% target<br/>Send 10% to central| Central
+    SlotTreasury -.->|Excess > 110% target<br/>Send 10% to central| Central
+    Central -.->|Balance < 25% target<br/>Inject liquidity| DiceTreasury
+    Central -.->|Balance < 25% target<br/>Inject liquidity| SlotTreasury
 
     %% NAV Calculation
     Central -->|Balance aggregated| CCIT
