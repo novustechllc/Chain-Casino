@@ -3,12 +3,13 @@
 //! Slot Machine Game for ChainCasino Platform (Block-STM Compatible)
 //!
 //! 3-reel slot machine with weighted symbols and secure randomness.
-//! Uses per-game treasury system for parallel execution.
+//! Uses simplified bet flow with BetId struct.
 
 module slot_game::SlotMachine {
     use aptos_framework::randomness;
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object, ObjectCore, ExtendRef};
+    use aptos_framework::account;
     use std::signer;
     use std::option;
     use std::string::{Self, String};
@@ -96,7 +97,6 @@ module slot_game::SlotMachine {
     #[event]
     /// Emitted when slot reels are spun and bet is resolved
     struct SlotSpinEvent has drop, store {
-        bet_id: u64,
         player: address,
         bet_amount: u64,
         reel1: u8,
@@ -104,7 +104,8 @@ module slot_game::SlotMachine {
         reel3: u8,
         won: bool,
         payout: u64,
-        symbol_name: vector<u8>
+        symbol_name: vector<u8>,
+        treasury_used: address
     }
 
     #[event]
@@ -188,17 +189,16 @@ module slot_game::SlotMachine {
     }
 
     //
-    // Core Game Interface - SECURE RANDOMNESS PATTERN
+    // Core Game Interface
     //
 
     #[randomness]
-    /// Spin the slot machine reels - SECURE: entry only (not public)
+    /// Spin the slot machine reels
     entry fun spin_slots(player: &signer, bet_amount: u64) acquires GameRegistry, GameAuth {
         assert!(bet_amount >= MIN_BET, E_INVALID_AMOUNT);
         assert!(bet_amount <= MAX_BET, E_INVALID_AMOUNT);
 
         let player_addr = signer::address_of(player);
-        let expected_payout = bet_amount * SEVEN_PAYOUT; // Maximum possible payout
 
         // Withdraw bet as FungibleAsset from player
         let aptos_metadata_option =
@@ -211,14 +211,9 @@ module slot_game::SlotMachine {
         let game_auth = borrow_global<GameAuth>(object_addr);
         let capability = &game_auth.capability;
 
-        // Place bet with casino - CasinoHouse handles treasury routing automatically
-        let bet_id =
-            CasinoHouse::place_bet(
-                capability,
-                bet_fa,
-                player_addr,
-                expected_payout
-            );
+        // Casino creates and returns bet_id
+        let (treasury_source, bet_id) =
+            CasinoHouse::place_bet(capability, bet_fa, player_addr);
 
         // Spin the three reels with secure randomness
         let reel1 = spin_reel_internal();
@@ -228,30 +223,37 @@ module slot_game::SlotMachine {
         // Calculate actual payout
         let (payout_multiplier, symbol_name) =
             calculate_payout_internal(reel1, reel2, reel3);
-        let actual_payout = bet_amount * payout_multiplier;
+        let payout = bet_amount * payout_multiplier;
         let player_won = payout_multiplier > 0;
 
-        // Settle bet - CasinoHouse handles treasury routing automatically
-        CasinoHouse::settle_bet(capability, bet_id, player_addr, actual_payout);
+        // Settle bet (BetId gets consumed here)
+        CasinoHouse::settle_bet(
+            capability,
+            bet_id,
+            player_addr,
+            payout,
+            treasury_source
+        );
 
+        // Game emits own event without bet_id
         event::emit(
             SlotSpinEvent {
-                bet_id,
                 player: player_addr,
                 bet_amount,
                 reel1,
                 reel2,
                 reel3,
                 won: player_won,
-                payout: actual_payout,
-                symbol_name
+                payout,
+                symbol_name,
+                treasury_used: treasury_source
             }
         );
     }
 
     #[test_only]
     #[lint::allow_unsafe_randomness]
-    /// Test version allowing unsafe randomness - ONLY FOR TESTING
+    /// Test version allowing unsafe randomness
     public entry fun test_only_spin_slots(
         player: &signer, bet_amount: u64
     ) acquires GameRegistry, GameAuth {
@@ -259,7 +261,7 @@ module slot_game::SlotMachine {
     }
 
     //
-    // Internal Game Logic - OPTIMIZED
+    // Internal Game Logic
     //
 
     #[lint::allow_unsafe_randomness]

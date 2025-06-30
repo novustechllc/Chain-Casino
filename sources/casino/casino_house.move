@@ -2,8 +2,8 @@
 //!
 //! Casino treasury and game registry management (Block-STM Optimized)
 //!
-//! Parallel execution via per-game treasury pools with central backstop.
-//! Games operate on isolated resource accounts for true parallelization.
+//! Simplified architecture: Casino handles treasury operations and events.
+//! Games with capabilities are trusted to manage their own bet logic.
 
 module casino::CasinoHouse {
     use std::string::{String};
@@ -34,14 +34,6 @@ module casino::CasinoHouse {
     const E_GAME_ALREADY_REGISTERED: u64 = 0x05;
     /// Insufficient treasury balance for payout
     const E_INSUFFICIENT_TREASURY: u64 = 0x06;
-    /// Invalid bet settlement parameters
-    const E_INVALID_SETTLEMENT: u64 = 0x07;
-    /// Insufficient treasury balance for expected payout
-    const E_INSUFFICIENT_TREASURY_FOR_PAYOUT: u64 = 0x08;
-    /// Payout exceeds expected payout for bet
-    const E_PAYOUT_EXCEEDS_EXPECTED: u64 = 0x09;
-    /// Bet already settled
-    const E_BET_ALREADY_SETTLED: u64 = 0x0A;
     /// Game capability already claimed
     const E_CAPABILITY_ALREADY_CLAIMED: u64 = 0x0B;
     /// Invalid game object
@@ -61,6 +53,16 @@ module casino::CasinoHouse {
     const SAFETY_MULTIPLIER: u64 = 150;
     /// Percentage basis (100%)
     const PERCENTAGE_BASE: u64 = 100;
+
+    //
+    // Collision-Free Bet Identifier
+    //
+
+    /// Collision-free bet identifier using player address + sequence number
+    public struct BetId has drop, store {
+        player: address,
+        sequence: u64
+    }
 
     //
     // Resource Specifications
@@ -113,49 +115,14 @@ module casino::CasinoHouse {
         registered_games: OrderedMap<Object<GameMetadata>, bool>
     }
 
-    /// Auto-incrementing bet identifier
-    struct BetIndex has key {
-        next: u64
-    }
-
-    /// Registry of bet information for payout validation
-    struct BetRegistry has key {
-        bets: OrderedMap<u64, BetInfo>
-    }
-
-    /// Bet information for payout validation
-    struct BetInfo has copy, drop, store {
-        expected_payout: u64,
-        settled: bool,
-        game_treasury_addr: address
-    }
-
     /// Capability resource proving game authorization (Object-Based)
     struct GameCapability has key, store {
         game_object: Object<GameMetadata>
     }
 
     //
-    // Event Specifications
+    // Event Specifications (Updated for BetId tracking)
     //
-
-    #[event]
-    struct BetAcceptedEvent has drop, store {
-        bet_id: u64,
-        game_object: Object<GameMetadata>,
-        player: address,
-        amount: u64,
-        expected_payout: u64,
-        treasury_source: address
-    }
-
-    #[event]
-    struct BetSettledEvent has drop, store {
-        bet_id: u64,
-        winner: address,
-        payout: u64,
-        treasury_source: address
-    }
 
     #[event]
     struct GameRegisteredEvent has drop, store {
@@ -193,6 +160,24 @@ module casino::CasinoHouse {
         amount: u64
     }
 
+    #[event]
+    struct BetPlacedEvent has drop, store {
+        player: address,
+        sequence: u64,
+        game_object: Object<GameMetadata>,
+        amount: u64,
+        treasury_source: address
+    }
+
+    #[event]
+    struct BetSettledEvent has drop, store {
+        player: address,
+        sequence: u64,
+        winner: address,
+        payout: u64,
+        treasury_source: address
+    }
+
     //
     // Initialization Interface
     //
@@ -213,7 +198,7 @@ module casino::CasinoHouse {
                 aptos_metadata
             );
 
-        // Initialize all registries
+        // Initialize registries (NO BetIndex/BetRegistry needed!)
         move_to(
             admin,
             TreasuryRegistry {
@@ -229,15 +214,6 @@ module casino::CasinoHouse {
                 registered_games: ordered_map::new<Object<GameMetadata>, bool>()
             }
         );
-
-        move_to(
-            admin,
-            BetRegistry {
-                bets: ordered_map::new<u64, BetInfo>()
-            }
-        );
-
-        move_to(admin, BetIndex { next: 1 });
     }
 
     #[test_only]
@@ -425,20 +401,21 @@ module casino::CasinoHouse {
     }
 
     //
-    // Bet Flow Interface
+    // Simplified Bet Flow Interface (Trust Authorized Games)
     //
 
-    /// Accept bet from authorized game - Block-STM optimized routing
+    /// Accept bet from authorized game - simplified treasury operations only
     public fun place_bet(
-        capability: &GameCapability,
-        bet_fa: FungibleAsset,
-        player: address,
-        expected_payout: u64
-    ): u64 acquires GameRegistry, TreasuryRegistry, GameTreasury, BetIndex, BetRegistry, GameMetadata {
+        capability: &GameCapability, bet_fa: FungibleAsset, player_addr: address
+    ): (address, BetId) acquires GameRegistry, TreasuryRegistry, GameTreasury, GameMetadata {
+
         let game_object = capability.game_object;
         let amount = fungible_asset::amount(&bet_fa);
 
-        // Phase 1: Validate game registration and constraints
+        // Get sequence number BEFORE creating BetId struct
+        let sequence = account::get_sequence_number(player_addr);
+
+        // Validate game registration and constraints
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
             ordered_map::contains(&registry.registered_games, &game_object),
@@ -449,91 +426,69 @@ module casino::CasinoHouse {
         let game_metadata = borrow_global<GameMetadata>(object_addr);
         assert!(amount >= game_metadata.min_bet, E_INVALID_AMOUNT);
         assert!(amount <= game_metadata.max_bet, E_INVALID_AMOUNT);
-        assert!(expected_payout > 0, E_INVALID_AMOUNT);
 
-        // Phase 2: Determine treasury routing
+        // Determine treasury routing
         let treasury_registry = borrow_global<TreasuryRegistry>(@casino);
         let game_treasury_addr = *treasury_registry.game_treasuries.borrow(&game_object);
 
-        let (use_central, treasury_source) = {
+        let treasury_source = {
             let game_treasury = borrow_global<GameTreasury>(game_treasury_addr);
             let game_balance =
                 primary_fungible_store::balance(
                     game_treasury_addr, get_aptos_metadata()
                 );
 
-            // Use central if game treasury can't handle payout or would drain
-            if (expected_payout > game_balance
-                || (game_balance - expected_payout) < game_treasury.drain_threshold) {
-                (true, get_central_treasury_address())
+            // Use central if game treasury balance is low
+            if (game_balance < game_treasury.drain_threshold) {
+                get_central_treasury_address()
             } else {
-                (false, game_treasury_addr)
+                game_treasury_addr
             }
         };
 
-        // Phase 3: Deposit to appropriate treasury
-        if (use_central) {
+        // Deposit to appropriate treasury
+        if (treasury_source == get_central_treasury_address()) {
             let treasury_registry = borrow_global<TreasuryRegistry>(@casino);
             fungible_asset::deposit(treasury_registry.central_store, bet_fa);
-
-            // Verify central treasury balance
-            let central_balance =
-                fungible_asset::balance(treasury_registry.central_store);
-            assert!(
-                expected_payout <= central_balance,
-                E_INSUFFICIENT_TREASURY_FOR_PAYOUT
-            );
         } else {
-            // Phase 1: Extract hot_store from immutable borrow
+            // Extract hot_store and update volume in separate phases
             let hot_store = {
                 let game_treasury = borrow_global<GameTreasury>(game_treasury_addr);
                 game_treasury.hot_store
             };
-
-            // Phase 2: Perform operations (borrow now dropped)
             fungible_asset::deposit(hot_store, bet_fa);
             update_rolling_volume(game_treasury_addr, amount);
-            let game_balance = fungible_asset::balance(hot_store);
-            assert!(
-                expected_payout <= game_balance,
-                E_INSUFFICIENT_TREASURY_FOR_PAYOUT
-            );
         };
 
-        // Phase 4: Generate bet ID and store bet info
-        let bet_index = borrow_global_mut<BetIndex>(@casino);
-        let bet_id = bet_index.next;
-        bet_index.next = bet_id + 1;
-
-        let bet_registry = borrow_global_mut<BetRegistry>(@casino);
-        let bet_info = BetInfo {
-            expected_payout,
-            settled: false,
-            game_treasury_addr: treasury_source
-        };
-        bet_registry.bets.add(bet_id, bet_info);
-
+        // EMIT EVENT FIRST - using raw fields
         event::emit(
-            BetAcceptedEvent {
-                bet_id,
+            BetPlacedEvent {
+                player: player_addr,
+                sequence,
                 game_object,
-                player,
                 amount,
-                expected_payout,
                 treasury_source
             }
         );
 
-        bet_id
+        // CREATE BetId struct AFTER event emission
+        let bet_id = BetId { player: player_addr, sequence };
+
+        (treasury_source, bet_id)
     }
 
-    /// Settle bet with payout from appropriate treasury
+    /// Settle bet with payout - simplified payout operations only
     public fun settle_bet(
         capability: &GameCapability,
-        bet_id: u64,
+        bet_id: BetId,
         winner: address,
-        payout: u64
-    ) acquires BetRegistry, GameRegistry, TreasuryRegistry, GameTreasury {
+        payout: u64,
+        treasury_source: address
+    ) acquires GameRegistry, TreasuryRegistry, GameTreasury {
+
+        // EXTRACT fields from BetId BEFORE it gets consumed
+        let BetId { player, sequence } = bet_id;
+
         // Verify game registration
         let game_object = capability.game_object;
         let registry = borrow_global<GameRegistry>(@casino);
@@ -542,26 +497,15 @@ module casino::CasinoHouse {
             E_GAME_NOT_REGISTERED
         );
 
-        // Get and validate bet information
-        let bet_registry = borrow_global_mut<BetRegistry>(@casino);
-        assert!(bet_registry.bets.contains(&bet_id), E_INVALID_SETTLEMENT);
-
-        let bet_info = bet_registry.bets.borrow_mut(&bet_id);
-        assert!(!bet_info.settled, E_BET_ALREADY_SETTLED);
-        assert!(payout <= bet_info.expected_payout, E_PAYOUT_EXCEEDS_EXPECTED);
-
-        bet_info.settled = true;
-        let treasury_source = bet_info.game_treasury_addr;
-
         // Pay winner if payout > 0
         if (payout > 0) {
             let central_addr = get_central_treasury_address();
 
             if (treasury_source == central_addr) {
                 // Pay from central treasury
-                let treasury_signer = get_central_treasury_signer();
+                let central_treasury_signer = get_central_treasury_signer();
                 primary_fungible_store::transfer(
-                    &treasury_signer,
+                    &central_treasury_signer,
                     get_aptos_metadata(),
                     winner,
                     payout
@@ -581,8 +525,9 @@ module casino::CasinoHouse {
             };
         };
 
+        // EMIT EVENT using extracted fields
         event::emit(
-            BetSettledEvent { bet_id, winner, payout, treasury_source }
+            BetSettledEvent { player, sequence, winner, payout, treasury_source }
         );
     }
 
