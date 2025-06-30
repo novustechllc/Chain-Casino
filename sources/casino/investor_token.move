@@ -1,23 +1,16 @@
 //! MIT License
 //!
-//! InvestorToken Fungible Asset Implementation (Refactored)
+//! InvestorToken Fungible Asset Implementation (Block-STM Compatible)
 //!
 //! NAV-based investor tokens for the ChainCasino platform.
-//! Now uses modern Fungible Asset standard throughout.
+//! Now aggregates treasury balance from central + all game treasuries.
 
 module casino::InvestorToken {
     use std::string;
     use std::signer;
     use std::option;
     use aptos_framework::object::{Self, Object, ExtendRef};
-    use aptos_framework::fungible_asset::{
-        Self,
-        Metadata,
-        MintRef,
-        BurnRef,
-        TransferRef,
-        FungibleAsset
-    };
+    use aptos_framework::fungible_asset::{Self, Metadata, MintRef, BurnRef, TransferRef};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::event;
     use aptos_framework::timestamp;
@@ -83,6 +76,15 @@ module casino::InvestorToken {
         amount: u64
     }
 
+    #[event]
+    /// Emitted when treasury composition changes
+    struct TreasuryCompositionEvent has drop, store {
+        central_balance: u64,
+        total_game_balance: u64,
+        total_balance: u64,
+        nav_per_token: u64
+    }
+
     //
     // Initialization Interface
     //
@@ -125,19 +127,19 @@ module casino::InvestorToken {
     }
 
     //
-    // Core Economic Interface - REFACTORED
+    // Core Economic Interface
     //
 
     #[view]
-    /// Calculate current Net Asset Value per token (safe overflow handling)
+    /// Calculate current Net Asset Value per token (aggregates all treasuries)
     public fun nav(): u64 {
-        let treasury_balance = treasury_balance();
+        let total_treasury_balance = treasury_balance();
         let total_supply = total_supply();
 
         if (total_supply == 0) {
             NAV_SCALE
         } else {
-            let treasury_u128 = (treasury_balance as u128);
+            let treasury_u128 = (total_treasury_balance as u128);
             let nav_scale_u128 = (NAV_SCALE as u128);
             let supply_u128 = (total_supply as u128);
 
@@ -146,13 +148,13 @@ module casino::InvestorToken {
         }
     }
 
-    /// Deposit APT and mint proportional InvestorTokens - REFACTORED
+    /// Deposit APT and mint proportional InvestorTokens
     public entry fun deposit_and_mint(
         user: &signer, amount: u64
     ) acquires InvestorTokenRefs, DividendMetadata {
         assert!(amount > 0, E_INVALID_AMOUNT);
 
-        let treasury_balance = treasury_balance();
+        let total_treasury_balance = treasury_balance();
         let total_supply = total_supply();
         let metadata = get_metadata();
 
@@ -161,7 +163,7 @@ module casino::InvestorToken {
             else {
                 let amount_u128 = (amount as u128);
                 let supply_u128 = (total_supply as u128);
-                let treasury_u128 = (treasury_balance as u128);
+                let treasury_u128 = (total_treasury_balance as u128);
 
                 let result_u128 = (amount_u128 * supply_u128) / treasury_u128;
                 (result_u128 as u64)
@@ -173,8 +175,8 @@ module casino::InvestorToken {
         let aptos_metadata = option::extract(&mut aptos_metadata_option);
         let deposit_fa = primary_fungible_store::withdraw(user, aptos_metadata, amount);
 
-        // Transfer APT to casino treasury
-        deposit_to_treasury(deposit_fa);
+        // Transfer APT to central treasury (deposits flow to central)
+        CasinoHouse::deposit_to_treasury(deposit_fa);
 
         // Mint tokens to user
         let refs = borrow_global<InvestorTokenRefs>(object::object_address(&metadata));
@@ -187,9 +189,10 @@ module casino::InvestorToken {
         fungible_asset::deposit(user_store, fa);
 
         update_nav_tracking();
+        emit_treasury_composition_event();
     }
 
-    /// Burn InvestorTokens and redeem APT at current NAV - REFACTORED
+    /// Burn InvestorTokens and redeem APT at current NAV
     public entry fun redeem(user: &signer, tokens: u64) acquires InvestorTokenRefs, DividendMetadata {
         assert!(tokens > 0, E_INVALID_AMOUNT);
 
@@ -212,17 +215,17 @@ module casino::InvestorToken {
             gross_amount - fee
         } else { 0 };
 
-        let treasury_balance = treasury_balance();
-        assert!(net_amount <= treasury_balance, E_INSUFFICIENT_TREASURY);
+        let total_treasury_balance = treasury_balance();
+        assert!(net_amount <= total_treasury_balance, E_INSUFFICIENT_TREASURY);
 
         // Burn user tokens
         let refs = borrow_global<InvestorTokenRefs>(object::object_address(&metadata));
         let fa_to_burn = primary_fungible_store::withdraw(user, metadata, tokens);
         fungible_asset::burn(&refs.burn_ref, fa_to_burn);
 
-        // Withdraw from treasury and pay user (only if net_amount > 0)
+        // Withdraw from central treasury and pay user (only if net_amount > 0)
         if (net_amount > 0) {
-            let payout_fa = redeem_from_treasury(net_amount);
+            let payout_fa = CasinoHouse::redeem_from_treasury(net_amount);
             let aptos_metadata_option =
                 coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
             let aptos_metadata = option::extract(&mut aptos_metadata_option);
@@ -242,6 +245,7 @@ module casino::InvestorToken {
         event::emit(DividendPaidEvent { recipient: user_addr, amount: profit });
 
         update_nav_tracking();
+        emit_treasury_composition_event();
     }
 
     //
@@ -251,6 +255,26 @@ module casino::InvestorToken {
     fun calculate_fee(gross_amount: u64): u64 {
         let percentage_fee = (gross_amount * DEFAULT_FEE_BPS) / 10000;
         math64::max(percentage_fee, MIN_FEE_APT)
+    }
+
+    //
+    // Treasury Composition Tracking
+    //
+
+    fun emit_treasury_composition_event() {
+        let central_balance = CasinoHouse::central_treasury_balance();
+        let total_balance = CasinoHouse::treasury_balance();
+        let total_game_balance = total_balance - central_balance;
+        let nav_per_token = nav();
+
+        event::emit(
+            TreasuryCompositionEvent {
+                central_balance,
+                total_game_balance,
+                total_balance,
+                nav_per_token
+            }
+        );
     }
 
     //
@@ -294,21 +318,29 @@ module casino::InvestorToken {
     }
 
     #[view]
+    /// Get total treasury balance (central + all game treasuries)
     public fun treasury_balance(): u64 {
         CasinoHouse::treasury_balance()
     }
 
-    //
-    // Treasury Integration Functions - REFACTORED
-    //
-
-    fun deposit_to_treasury(fa: FungibleAsset) {
-        CasinoHouse::deposit_to_treasury(fa);
+    #[view]
+    /// Get central treasury balance only
+    public fun central_treasury_balance(): u64 {
+        CasinoHouse::central_treasury_balance()
     }
 
-    fun redeem_from_treasury(amount: u64): FungibleAsset {
-        CasinoHouse::redeem_from_treasury(amount)
+    #[view]
+    /// Get treasury composition breakdown
+    public fun treasury_composition(): (u64, u64, u64) {
+        let central_balance = CasinoHouse::central_treasury_balance();
+        let total_balance = CasinoHouse::treasury_balance();
+        let game_balance = total_balance - central_balance;
+        (central_balance, game_balance, total_balance)
     }
+
+    //
+    // Internal Functions
+    //
 
     fun update_nav_tracking() acquires DividendMetadata {
         let metadata = get_metadata();
