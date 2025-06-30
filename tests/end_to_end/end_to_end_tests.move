@@ -658,7 +658,7 @@ module casino::EndToEndTests {
         let whale_tokens = InvestorToken::user_balance(WHALE_INVESTOR_ADDR);
         // Whale's tokens/APT ratio depends on NAV when they entered
         let whale_token_per_apt = (whale_tokens * 1_000_000) / WHALE_INVESTOR_CAPITAL;
-        let expected_ratio = 1_000_000 / nav_when_whale_enters;
+        let expected_ratio = (1_000_000 * 1_000_000) / nav_when_whale_enters;
         // Allow for small rounding differences in calculation
         assert!(whale_token_per_apt <= expected_ratio + 1000, 4);
         assert!(whale_token_per_apt >= expected_ratio - 1000, 5);
