@@ -3,7 +3,7 @@
 //! Simple Dice Game for ChainCasino Platform (Block-STM Compatible)
 //!
 //! Single die guessing game where players bet on the exact outcome (1-6).
-//! Now uses per-game treasury system for parallel execution.
+//! Now uses simplified bet tracking with BetId struct.
 
 module dice_game::DiceGame {
     use aptos_framework::randomness;
@@ -76,13 +76,13 @@ module dice_game::DiceGame {
     #[event]
     /// Emitted when dice is rolled and bet is resolved
     struct DiceRolled has drop, store {
-        bet_id: u64,
         player: address,
         guess: u8,
         result: u8,
         bet_amount: u64,
         won: bool,
-        payout: u64
+        payout: u64,
+        treasury_used: address
     }
 
     #[event]
@@ -172,14 +172,13 @@ module dice_game::DiceGame {
     //
 
     #[randomness]
-    /// Play dice game - uses Block-STM compatible treasury routing
+    /// Play dice game - uses simplified bet flow
     entry fun play_dice(player: &signer, guess: u8, bet_amount: u64) acquires GameRegistry, GameAuth {
         assert!(guess >= 1 && guess <= 6, E_INVALID_GUESS);
         assert!(bet_amount >= MIN_BET, E_INVALID_AMOUNT);
         assert!(bet_amount <= MAX_BET, E_INVALID_AMOUNT);
 
         let player_addr = signer::address_of(player);
-        let expected_payout = bet_amount * PAYOUT_MULTIPLIER;
 
         // Withdraw bet as FungibleAsset from player
         let aptos_metadata_option =
@@ -192,34 +191,37 @@ module dice_game::DiceGame {
         let game_auth = borrow_global<GameAuth>(object_addr);
         let capability = &game_auth.capability;
 
-        // Place bet with casino - CasinoHouse handles treasury routing automatically
-        let bet_id =
-            CasinoHouse::place_bet(
-                capability,
-                bet_fa,
-                player_addr,
-                expected_payout
-            );
+        // Casino creates and returns bet_id
+        let (treasury_source, bet_id) =
+            CasinoHouse::place_bet(capability, bet_fa, player_addr);
 
         // Roll dice and determine outcome
         let dice_result = randomness::u8_range(1, 7);
         let player_won = dice_result == guess;
-        let actual_payout = if (player_won) {
-            expected_payout
-        } else { 0 };
+        let payout =
+            if (player_won) {
+                bet_amount * PAYOUT_MULTIPLIER
+            } else { 0 };
 
-        // Settle bet - CasinoHouse handles treasury routing automatically
-        CasinoHouse::settle_bet(capability, bet_id, player_addr, actual_payout);
+        // Settle bet (BetId gets consumed here)
+        CasinoHouse::settle_bet(
+            capability,
+            bet_id,
+            player_addr,
+            payout,
+            treasury_source
+        );
 
+        // Game emits own event without bet_id (or creates new event data)
         event::emit(
             DiceRolled {
-                bet_id,
                 player: player_addr,
                 guess,
                 result: dice_result,
                 bet_amount,
                 won: player_won,
-                payout: actual_payout
+                payout,
+                treasury_used: treasury_source
             }
         );
     }

@@ -17,6 +17,18 @@ ChainCasino turns **"The House Always Wins"** into **"The Investor Always Earns.
 
 ---
 
+## 🚀 Quick Start
+
+```bash
+# Compile the project
+aptos move compile
+
+# Run tests
+aptos move test
+```
+
+---
+
 ## 📐 Architecture Overview
 
 ### Core System Flow
@@ -29,18 +41,18 @@ flowchart TD
     end
 
     subgraph "🏛️ Casino Core"
-        Casino[🏠 CasinoHouse<br/>• Game Registry<br/>• Treasury Manager<br/>• Bet Settlement]
+        Casino[🏠 CasinoHouse<br/>• Game Registry<br/>• Treasury Router<br/>• Bet Settlement<br/>• Auto-Rebalancing]
     end
 
     subgraph "🎮 Game Modules"
-        DiceGame[🎲 DiceGame<br/>• Own Capability<br/>• Secure Randomness]
-        SlotGame[🎰 SlotMachine<br/>• Own Capability<br/>• Secure Randomness]
+        DiceGame[🎲 DiceGame<br/>• Secure Randomness<br/>• Capability Auth]
+        SlotGame[🎰 SlotMachine<br/>• Secure Randomness<br/>• Capability Auth]
     end
 
     subgraph "💳 Treasury System"
-        Central[🏦 Central Treasury<br/>@central_account]
-        DiceTreasury[💎 Dice Treasury<br/>@dice_treasury_account]
-        SlotTreasury[🎰 Slot Treasury<br/>@slot_treasury_account]
+        Central[🏦 Central Treasury<br/>• Investor funds<br/>• Large payouts<br/>• Liquidity provider]
+        DiceTreasury[💎 Dice Treasury<br/>• Hot operational funds<br/>• Auto-rebalancing]
+        SlotTreasury[🎰 Slot Treasury<br/>• Hot operational funds<br/>• Auto-rebalancing]
     end
 
     subgraph "👥 Players"
@@ -50,31 +62,34 @@ flowchart TD
 
     %% Investment Flow
     Investor -->|deposit_and_mint<br/>APT → CCIT| CCIT
-    CCIT -->|Funds flow to| Central
-    CCIT -->|redeem<br/>CCIT → APT| Investor
+    CCIT -->|All deposits| Central
+    CCIT <-->|redeem<br/>CCIT ↔ APT| Investor
 
-    %% Game Registration
-    Casino -.->|Creates Objects| DiceGame
-    Casino -.->|Creates Objects| SlotGame
-
-    %% Player Gaming (Parallel Paths)
+    %% Player Gaming Flow
     Player1 -->|play_dice| DiceGame
     Player2 -->|spin_slots| SlotGame
 
-    %% Bet Settlement Flow
-    DiceGame -->|place_bet/settle_bet<br/>via capability| Casino
-    SlotGame -->|place_bet/settle_bet<br/>via capability| Casino
+    %% Bet Processing Flow
+    DiceGame -->|place_bet via capability<br/>Casino decides routing| Casino
+    SlotGame -->|place_bet via capability<br/>Casino decides routing| Casino
 
-    %% Treasury Routing (Block-STM Isolation)
-    Casino -->|Route bet to| DiceTreasury
-    Casino -->|Route bet to| SlotTreasury
-    Casino -->|Large payouts from| Central
+    %% Treasury Routing Logic
+    Casino -->|If game balance > drain threshold| DiceTreasury
+    Casino -->|If game balance > drain threshold| SlotTreasury
+    Casino -->|If game balance < drain threshold| Central
 
-    %% Auto-Rebalancing
-    DiceTreasury -.->|Excess flows| Central
-    SlotTreasury -.->|Excess flows| Central
-    Central -.->|Inject liquidity| DiceTreasury
-    Central -.->|Inject liquidity| SlotTreasury
+    %% Settlement Flow
+    Casino -->|settle_bet<br/>Payout from source treasury| Player1
+    Casino -->|settle_bet<br/>Payout from source treasury| Player2
+
+    %% Auto-Rebalancing Triggers
+    Casino -->|After large payouts<br/>Check thresholds| DiceTreasury
+    Casino -->|After large payouts<br/>Check thresholds| SlotTreasury
+    
+    DiceTreasury -.->|Excess > 110% target<br/>Send 10% to central| Central
+    SlotTreasury -.->|Excess > 110% target<br/>Send 10% to central| Central
+    Central -.->|Balance < 25% target<br/>Inject liquidity| DiceTreasury
+    Central -.->|Balance < 25% target<br/>Inject liquidity| SlotTreasury
 
     %% NAV Calculation
     Central -->|Balance aggregated| CCIT
@@ -92,6 +107,59 @@ flowchart TD
     class DiceGame,SlotGame game
     class Central,DiceTreasury,SlotTreasury treasury
     class Player1,Player2 player
+```
+
+### Treasury Architecture & Auto-Rebalancing
+
+```mermaid
+flowchart TD
+    subgraph "🏦 Treasury Ecosystem"
+        subgraph "Central Treasury"
+            Central[💰 Central Treasury<br/>• Large payouts when &gt; game balance<br/>• Liquidity provider<br/>• Investor redemptions]
+        end
+        
+        subgraph "Game Treasury A"
+            DiceStore[🎲 Dice Hot Store<br/>FA Primary Store]
+            DiceConfig[📊 Dice Config<br/>• Target: 7-day volume × 1.5<br/>• Overflow: Target × 110%<br/>• Drain: Target × 25%<br/>• Rolling Volume Tracking]
+            DiceStore --- DiceConfig
+        end
+        
+        subgraph "Game Treasury B"
+            SlotStore[🎰 Slot Hot Store<br/>FA Primary Store]
+            SlotConfig[📊 Slot Config<br/>• Target: 7-day volume × 1.5<br/>• Overflow: Target × 110%<br/>• Drain: Target × 25%<br/>• Rolling Volume Tracking]
+            SlotStore --- SlotConfig
+        end
+    end
+
+    subgraph "🔄 Auto-Rebalancing Logic"
+        Overflow[💹 Overflow Trigger<br/>When balance > 110% target<br/>→ Send 10% excess to Central]
+        
+        Drain[⚠️ Drain Trigger<br/>When balance < 25% target<br/>→ Request funds from Central]
+        
+        Volume[📈 Volume Updates<br/>Each bet updates:<br/>rolling_volume = old×6 + new×1.5 ÷ 7<br/>→ Recalculates all thresholds]
+    end
+
+    %% Rebalancing Flows
+    DiceStore -.->|"Balance > Overflow"| Overflow
+    SlotStore -.->|"Balance > Overflow"| Overflow
+    Overflow -->|"Transfer excess"| Central
+    
+    Central -->|"Inject liquidity"| Drain
+    Drain -.->|"Balance < Drain"| DiceStore
+    Drain -.->|"Balance < Drain"| SlotStore
+    
+    DiceStore --> Volume
+    SlotStore --> Volume
+    Volume --> DiceConfig
+    Volume --> SlotConfig
+
+    classDef central fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef game fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef logic fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    
+    class Central central
+    class DiceStore,SlotStore,DiceConfig,SlotConfig game
+    class Overflow,Drain,Volume logic
 ```
 
 ### Block-STM Parallel Execution
@@ -137,7 +205,10 @@ flowchart TD
     class ParTx1,ParTx2,ParTx3,DiceTreasury,SlotTreasury parallel
 ```
 
-**Key Insight:** Different treasury addresses = No resource conflicts = True parallel execution
+**Key Insights:** 
+- Different treasury addresses = No resource conflicts = True parallel execution
+- Dynamic rebalancing maintains optimal liquidity distribution
+- Rolling volume calculation adapts to actual game activity
 
 ---
 
@@ -176,17 +247,17 @@ flowchart TD
 
 ## 🔧 Modules
 
-### `CasinoHouse.move`
+### `sources/casino/casino_house.move`
 - Treasury manager
 - Game registry and capability issuer
 - Bet placement and settlement logic
 
-### `InvestorToken.move`
+### `sources/casino/investor_token.move`
 - CCIT minting/redeeming
 - NAV tracking
 - Redemption fee logic
 
-### `DiceGame.move` & `SlotMachine.move`
+### `sources/games/dice.move` & `sources/games/slot.move`
 - Example modular games
 - Use randomness for outcome
 - Call CasinoHouse to settle bets
@@ -199,7 +270,7 @@ flowchart TD
 2. Register games using `CasinoHouse::register_game()` to create game objects
 3. Games initialize and claim capabilities via `CasinoHouse::get_game_capability()`
 4. Fund treasury using `InvestorToken::deposit_and_mint()` to mint CCIT tokens
-5. Players bet through game contracts using `CasinoHouse::place_bet()`
+5. Players interact through game contracts (`DiceGame::play_dice()`, `SlotMachine::spin_slots()`)
 6. Games settle outcomes using `CasinoHouse::settle_bet()`
 7. Investors redeem profits using `InvestorToken::redeem()`
 
@@ -217,7 +288,6 @@ flowchart TD
 
 ## TODO
 
-- Add Previous Branch Tests Refactor Made Obsolete
 - Optimize for Transaction Parallelization on Aptos Blockchain
 - Gas Waste Removal
 
