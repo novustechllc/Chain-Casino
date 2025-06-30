@@ -19,34 +19,135 @@ ChainCasino turns **"The House Always Wins"** into **"The Investor Always Earns.
 
 ## 📐 Architecture Overview
 
+### Core System Flow
+
 ```mermaid
-flowchart LR
+flowchart TD
+    subgraph "💰 Investment Layer"
+        Investor[👤 Investor]
+        CCIT[🪙 CCIT Token<br/>NAV-based FA]
+    end
 
-  subgraph Investors
-    investor[Investor]
-    token["InvestorToken"]
-  end
+    subgraph "🏛️ Casino Core"
+        Casino[🏠 CasinoHouse<br/>• Game Registry<br/>• Treasury Manager<br/>• Bet Settlement]
+    end
 
-  subgraph Core_System
-    treasury["Treasury"]
-    casino["CasinoHouse"]
-  end
+    subgraph "🎮 Game Modules"
+        DiceGame[🎲 DiceGame<br/>• Own Capability<br/>• Secure Randomness]
+        SlotGame[🎰 SlotMachine<br/>• Own Capability<br/>• Secure Randomness]
+    end
 
-  subgraph Players
-    player[Player]
-    game["Game Contract"]
-  end
+    subgraph "💳 Treasury System"
+        Central[🏦 Central Treasury<br/>@central_account]
+        DiceTreasury[💎 Dice Treasury<br/>@dice_treasury_account]
+        SlotTreasury[🎰 Slot Treasury<br/>@slot_treasury_account]
+    end
 
-  investor -->|Deposit APT| token
-  token -->|Send APT| treasury
-  treasury -->|NAV Up with Game Earnings| token
+    subgraph "👥 Players"
+        Player1[👤 Player A]
+        Player2[👤 Player B]
+    end
 
-  player -->|Bet| game
-  game -->|place_bet / settle_bet| casino
-  casino -->|Payout| player
+    %% Investment Flow
+    Investor -->|deposit_and_mint<br/>APT → CCIT| CCIT
+    CCIT -->|Funds flow to| Central
+    CCIT -->|redeem<br/>CCIT → APT| Investor
 
-  casino <--> treasury
+    %% Game Registration
+    Casino -.->|Creates Objects| DiceGame
+    Casino -.->|Creates Objects| SlotGame
+
+    %% Player Gaming (Parallel Paths)
+    Player1 -->|play_dice| DiceGame
+    Player2 -->|spin_slots| SlotGame
+
+    %% Bet Settlement Flow
+    DiceGame -->|place_bet/settle_bet<br/>via capability| Casino
+    SlotGame -->|place_bet/settle_bet<br/>via capability| Casino
+
+    %% Treasury Routing (Block-STM Isolation)
+    Casino -->|Route bet to| DiceTreasury
+    Casino -->|Route bet to| SlotTreasury
+    Casino -->|Large payouts from| Central
+
+    %% Auto-Rebalancing
+    DiceTreasury -.->|Excess flows| Central
+    SlotTreasury -.->|Excess flows| Central
+    Central -.->|Inject liquidity| DiceTreasury
+    Central -.->|Inject liquidity| SlotTreasury
+
+    %% NAV Calculation
+    Central -->|Balance aggregated| CCIT
+    DiceTreasury -->|Balance aggregated| CCIT
+    SlotTreasury -->|Balance aggregated| CCIT
+
+    classDef investment fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef casino fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef game fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef treasury fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef player fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+
+    class Investor,CCIT investment
+    class Casino casino
+    class DiceGame,SlotGame game
+    class Central,DiceTreasury,SlotTreasury treasury
+    class Player1,Player2 player
 ```
+
+### Block-STM Parallel Execution
+
+```mermaid
+flowchart TD
+    subgraph "❌ Traditional Sequential Casino"
+        SeqTx1[Player A bets on Dice]
+        SeqTx2[Player B bets on Slots]
+        SeqTx3[Player C bets on Dice]
+        
+        SeqTreasury[Single Treasury Account<br/>@casino_treasury]
+        
+        SeqTx1 --> SeqTreasury
+        SeqTx2 --> SeqTreasury  
+        SeqTx3 --> SeqTreasury
+        
+        SeqTx1 -.->|"❌ BLOCKS"| SeqTx2
+        SeqTx2 -.->|"❌ BLOCKS"| SeqTx3
+    end
+
+    subgraph "✅ ChainCasino Block-STM Design"
+        ParTx1[Player A bets on Dice]
+        ParTx2[Player B bets on Slots]
+        ParTx3[Player C bets on Dice]
+        
+        DiceTreasury[Dice Treasury<br/>@dice_treasury_addr]
+        SlotTreasury[Slot Treasury<br/>@slot_treasury_addr]
+        
+        ParTx1 --> DiceTreasury
+        ParTx2 --> SlotTreasury
+        ParTx3 --> DiceTreasury
+        
+        ParTx1 -.->|"✅ PARALLEL"| ParTx2
+        ParTx2 -.->|"✅ PARALLEL"| ParTx3
+    end
+
+    classDef sequential fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    classDef parallel fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef treasury fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+
+    class SeqTx1,SeqTx2,SeqTx3,SeqTreasury sequential
+    class ParTx1,ParTx2,ParTx3,DiceTreasury,SlotTreasury parallel
+```
+
+**Key Insight:** Different treasury addresses = No resource conflicts = True parallel execution
+
+---
+
+### Security Model
+
+**Capability-Based Authorization:**
+1. **Casino** creates game objects and holds authority
+2. **Games** claim unforgeable capability tokens  
+3. **Only capability holders** can access treasury functions
+4. **Move 2 guarantees** capabilities cannot be forged or copied
 
 ---
 
