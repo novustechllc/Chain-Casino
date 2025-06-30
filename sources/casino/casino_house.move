@@ -318,9 +318,7 @@ module casino::CasinoHouse {
 
     /// Create per-game treasury resource account
     fun create_game_treasury(
-        admin: &signer,
-        game_object: Object<GameMetadata>,
-        initial_target_reserve: u64
+        admin: &signer, game_object: Object<GameMetadata>, initial_target_reserve: u64
     ): address {
         let game_seed = object::object_address(&game_object);
         let treasury_seed = vector::empty<u8>();
@@ -328,8 +326,9 @@ module casino::CasinoHouse {
         vector::append(&mut treasury_seed, bcs::to_bytes(&game_seed));
 
         // Create resource account for game treasury
-        let (treasury_signer, _) =
-            account::create_resource_account(admin, treasury_seed);
+        let (treasury_signer, _) = account::create_resource_account(
+            admin, treasury_seed
+        );
         let treasury_addr = signer::address_of(&treasury_signer);
 
         // Create treasury object
@@ -340,15 +339,14 @@ module casino::CasinoHouse {
         // Create FA store
         let hot_store =
             primary_fungible_store::ensure_primary_store_exists(
-                treasury_addr,
-                get_aptos_metadata()
+                treasury_addr, get_aptos_metadata()
             );
 
         // Calculate thresholds
         let overflow_threshold =
             (initial_target_reserve * OVERFLOW_MULTIPLIER) / PERCENTAGE_BASE;
-        let drain_threshold =
-            (initial_target_reserve * DRAIN_MULTIPLIER) / PERCENTAGE_BASE;
+        let drain_threshold = (initial_target_reserve * DRAIN_MULTIPLIER)
+            / PERCENTAGE_BASE;
 
         // Store GameTreasury
         move_to(
@@ -369,8 +367,7 @@ module casino::CasinoHouse {
 
     /// Game claims capability using object reference
     public fun get_game_capability(
-        game_signer: &signer,
-        game_object: Object<GameMetadata>
+        game_signer: &signer, game_object: Object<GameMetadata>
     ): GameCapability acquires GameRegistry, GameMetadata {
         let game_address = signer::address_of(game_signer);
         let object_addr = object::object_address(&game_object);
@@ -403,8 +400,7 @@ module casino::CasinoHouse {
 
     /// Remove game from registry
     public entry fun unregister_game(
-        admin: &signer,
-        game_object: Object<GameMetadata>
+        admin: &signer, game_object: Object<GameMetadata>
     ) acquires GameRegistry, GameMetadata, TreasuryRegistry {
         assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
 
@@ -462,11 +458,13 @@ module casino::CasinoHouse {
         let (use_central, treasury_source) = {
             let game_treasury = borrow_global<GameTreasury>(game_treasury_addr);
             let game_balance =
-                primary_fungible_store::balance(game_treasury_addr, get_aptos_metadata());
+                primary_fungible_store::balance(
+                    game_treasury_addr, get_aptos_metadata()
+                );
 
             // Use central if game treasury can't handle payout or would drain
-            if (expected_payout > game_balance ||
-                (game_balance - expected_payout) < game_treasury.drain_threshold) {
+            if (expected_payout > game_balance
+                || (game_balance - expected_payout) < game_treasury.drain_threshold) {
                 (true, get_central_treasury_address())
             } else {
                 (false, game_treasury_addr)
@@ -479,7 +477,8 @@ module casino::CasinoHouse {
             fungible_asset::deposit(treasury_registry.central_store, bet_fa);
 
             // Verify central treasury balance
-            let central_balance = fungible_asset::balance(treasury_registry.central_store);
+            let central_balance =
+                fungible_asset::balance(treasury_registry.central_store);
             assert!(
                 expected_payout <= central_balance,
                 E_INSUFFICIENT_TREASURY_FOR_PAYOUT
@@ -582,7 +581,9 @@ module casino::CasinoHouse {
             };
         };
 
-        event::emit(BetSettledEvent { bet_id, winner, payout, treasury_source });
+        event::emit(
+            BetSettledEvent { bet_id, winner, payout, treasury_source }
+        );
     }
 
     //
@@ -591,8 +592,7 @@ module casino::CasinoHouse {
 
     /// Inject liquidity into specific game treasury
     package fun inject_liquidity(
-        game_treasury_addr: address,
-        amount: u64
+        game_treasury_addr: address, amount: u64
     ) acquires TreasuryRegistry {
         let central_treasury_signer = get_central_treasury_signer();
         primary_fungible_store::transfer(
@@ -607,8 +607,7 @@ module casino::CasinoHouse {
 
     /// Withdraw excess from game treasury to central
     package fun withdraw_excess(
-        game_treasury_addr: address,
-        amount: u64
+        game_treasury_addr: address, amount: u64
     ): FungibleAsset acquires GameTreasury {
         let game_treasury_signer = get_game_treasury_signer(game_treasury_addr);
         primary_fungible_store::withdraw(
@@ -673,8 +672,7 @@ module casino::CasinoHouse {
 
     /// Update rolling volume for target reserve calculation
     fun update_rolling_volume(
-        game_treasury_addr: address,
-        new_volume: u64
+        game_treasury_addr: address, new_volume: u64
     ) acquires GameTreasury {
         let game_treasury = borrow_global_mut<GameTreasury>(game_treasury_addr);
 
@@ -760,9 +758,7 @@ module casino::CasinoHouse {
 
     /// Games can request limit changes (reduce risk only)
     public fun request_limit_update(
-        capability: &GameCapability,
-        new_min_bet: u64,
-        new_max_bet: u64
+        capability: &GameCapability, new_min_bet: u64, new_max_bet: u64
     ) acquires GameMetadata {
         let game_object = capability.game_object;
         let object_addr = object::object_address(&game_object);
@@ -790,9 +786,7 @@ module casino::CasinoHouse {
 
     /// Derive game object address
     public fun derive_game_object_address(
-        creator: address,
-        name: String,
-        version: String
+        creator: address, name: String, version: String
     ): address {
         let seed = build_game_seed(name, version);
         object::create_object_address(&creator, seed)
@@ -840,8 +834,9 @@ module casino::CasinoHouse {
         let len = vector::length(&game_addrs);
         while (i < len) {
             let game_addr = *vector::borrow(&game_addrs, i);
-            let game_balance =
-                primary_fungible_store::balance(game_addr, aptos_metadata);
+            let game_balance = primary_fungible_store::balance(
+                game_addr, aptos_metadata
+            );
             game_total = game_total + game_balance;
             i = i + 1;
         };
@@ -909,9 +904,8 @@ module casino::CasinoHouse {
         game_object: Object<GameMetadata>
     ): bool acquires GameMetadata {
         let object_addr = object::object_address(&game_object);
-        if (!exists<GameMetadata>(object_addr)) {
-            false
-        } else {
+        if (!exists<GameMetadata>(object_addr)) { false }
+        else {
             let metadata = borrow_global<GameMetadata>(object_addr);
             metadata.capability_claimed
         }
