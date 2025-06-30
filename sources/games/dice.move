@@ -1,9 +1,9 @@
 //! MIT License
 //!
-//! Simple Dice Game for ChainCasino Platform (Object-Based Refactor)
+//! Simple Dice Game for ChainCasino Platform (Block-STM Compatible)
 //!
 //! Single die guessing game where players bet on the exact outcome (1-6).
-//! Now uses named objects for game instance storage instead of fixed addresses.
+//! Now uses per-game treasury system for parallel execution.
 
 module dice_game::DiceGame {
     use aptos_framework::randomness;
@@ -172,7 +172,7 @@ module dice_game::DiceGame {
     //
 
     #[randomness]
-    /// Play dice game - now uses object-based capability
+    /// Play dice game - uses Block-STM compatible treasury routing
     entry fun play_dice(player: &signer, guess: u8, bet_amount: u64) acquires GameRegistry, GameAuth {
         assert!(guess >= 1 && guess <= 6, E_INVALID_GUESS);
         assert!(bet_amount >= MIN_BET, E_INVALID_AMOUNT);
@@ -192,7 +192,7 @@ module dice_game::DiceGame {
         let game_auth = borrow_global<GameAuth>(object_addr);
         let capability = &game_auth.capability;
 
-        // Place bet with casino
+        // Place bet with casino - CasinoHouse handles treasury routing automatically
         let bet_id =
             CasinoHouse::place_bet(
                 capability,
@@ -208,7 +208,7 @@ module dice_game::DiceGame {
             expected_payout
         } else { 0 };
 
-        // Settle bet
+        // Settle bet - CasinoHouse handles treasury routing automatically
         CasinoHouse::settle_bet(capability, bet_id, player_addr, actual_payout);
 
         event::emit(
@@ -231,6 +231,25 @@ module dice_game::DiceGame {
         player: &signer, guess: u8, bet_amount: u64
     ) acquires GameRegistry, GameAuth {
         play_dice(player, guess, bet_amount);
+    }
+
+    //
+    // Game Configuration Management
+    //
+
+    /// Request betting limit changes (games can only reduce risk)
+    public entry fun request_limit_update(
+        game_admin: &signer, new_min_bet: u64, new_max_bet: u64
+    ) acquires GameRegistry, GameAuth {
+        assert!(signer::address_of(game_admin) == @dice_game, E_UNAUTHORIZED);
+        assert!(new_max_bet >= new_min_bet, E_INVALID_AMOUNT);
+
+        let object_addr = get_game_object_address();
+        let game_auth = borrow_global<GameAuth>(object_addr);
+        let capability = &game_auth.capability;
+
+        // Games can only reduce risk (increase min or decrease max)
+        CasinoHouse::request_limit_update(capability, new_min_bet, new_max_bet);
     }
 
     //
@@ -291,6 +310,41 @@ module dice_game::DiceGame {
     public fun get_game_info(): (address, Object<CasinoHouse::GameMetadata>, String, String) acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@dice_game);
         (registry.creator, registry.game_object, registry.game_name, registry.version)
+    }
+
+    #[view]
+    /// Check if game treasury has sufficient balance for a bet
+    public fun can_handle_payout(bet_amount: u64): bool acquires GameRegistry {
+        let registry = borrow_global<GameRegistry>(@dice_game);
+        let expected_payout = bet_amount * PAYOUT_MULTIPLIER;
+        let game_treasury_balance =
+            CasinoHouse::game_treasury_balance(registry.game_object);
+
+        // Game can handle if treasury has enough or central will cover
+        game_treasury_balance >= expected_payout
+            || CasinoHouse::central_treasury_balance() >= expected_payout
+    }
+
+    #[view]
+    /// Get game treasury balance
+    public fun game_treasury_balance(): u64 acquires GameRegistry {
+        let registry = borrow_global<GameRegistry>(@dice_game);
+        CasinoHouse::game_treasury_balance(registry.game_object)
+    }
+
+    #[view]
+    /// Get game treasury address
+    public fun game_treasury_address(): address acquires GameRegistry {
+        let registry = borrow_global<GameRegistry>(@dice_game);
+        CasinoHouse::get_game_treasury_address(registry.game_object)
+    }
+
+    #[view]
+    /// Get game treasury configuration
+    public fun game_treasury_config(): (u64, u64, u64, u64) acquires GameRegistry {
+        let registry = borrow_global<GameRegistry>(@dice_game);
+        let treasury_addr = CasinoHouse::get_game_treasury_address(registry.game_object);
+        CasinoHouse::get_game_treasury_config(treasury_addr)
     }
 
     #[view]
