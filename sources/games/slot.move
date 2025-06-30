@@ -9,7 +9,6 @@ module slot_game::SlotMachine {
     use aptos_framework::randomness;
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object, ObjectCore, ExtendRef};
-    use aptos_framework::account;
     use std::signer;
     use std::option;
     use std::string::{Self, String};
