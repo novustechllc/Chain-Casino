@@ -10,6 +10,7 @@ module casino::EndToEndTests {
     use std::string;
     use std::option;
     use std::vector;
+    use std::signer;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::coin;
