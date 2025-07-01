@@ -911,4 +911,285 @@ module casino::EndToEndTests {
             1500
         );
     }
+
+    #[test]
+    fun test_game_authorization_and_management_edge_cases() {
+        let (
+            _,
+            casino_signer,
+            dice_signer,
+            slot_signer,
+            _,
+            whale_investor,
+            _,
+            _,
+            casual_player,
+            _,
+            _,
+            _
+        ) = setup_realistic_ecosystem();
+
+        // === PHASE 1: SETUP ===
+        CasinoHouse::init_module_for_test(&casino_signer);
+        InvestorToken::init(&casino_signer);
+        InvestorToken::deposit_and_mint(&whale_investor, WHALE_INVESTOR_CAPITAL);
+
+        // === PHASE 2: TEST COMPLETE GAME REGISTRATION AND INITIALIZATION FLOW ===
+
+        // Register game first
+        CasinoHouse::register_game(
+            &casino_signer,
+            DICE_ADDR,
+            string::utf8(b"DiceGame"),
+            string::utf8(b"v1"),
+            1000000,
+            50000000,
+            1667
+        );
+
+        let games = CasinoHouse::get_registered_games();
+        let game_object = *vector::borrow(&games, 0);
+
+        // Verify capability not claimed initially
+        assert!(!CasinoHouse::is_game_capability_claimed(game_object), 1);
+
+        // Complete initialization flow (handles capability internally)
+        DiceGame::initialize_game(&dice_signer);
+
+        // Verify capability is now claimed
+        assert!(CasinoHouse::is_game_capability_claimed(game_object), 2);
+
+        // Verify game is ready
+        assert!(DiceGame::is_ready(), 3);
+
+        // === PHASE 3: TEST GAME LIMIT MANAGEMENT ===
+
+        // Test casino admin updating limits
+        CasinoHouse::update_game_limits(&casino_signer, game_object, 2000000, 45000000);
+
+        let (_, _, _, min_bet, max_bet, _, _) =
+            CasinoHouse::get_game_metadata(game_object);
+        assert!(min_bet == 2000000, 4);
+        assert!(max_bet == 45000000, 5);
+
+        // Test game requesting conservative limit changes (reduce risk only)
+        DiceGame::request_limit_update(&dice_signer, 3000000, 40000000);
+
+        let (_, _, _, new_min, new_max, _, _) =
+            CasinoHouse::get_game_metadata(game_object);
+        assert!(new_min == 3000000, 6);
+        assert!(new_max == 40000000, 7);
+
+        // === PHASE 4: TEST COMPLETE GAME OPERATIONS ===
+
+        // Test that games work after limit changes
+        DiceGame::test_only_play_dice(&casual_player, 3, 30000000); // Within new limits
+        assert!(DiceGame::is_ready(), 8); // Should still be operational
+
+        // === PHASE 5: TEST UNREGISTRATION FLOW ===
+
+        // Register a second game for complete testing
+        CasinoHouse::register_game(
+            &casino_signer,
+            SLOT_ADDR,
+            string::utf8(b"SlotMachine"),
+            string::utf8(b"v1"),
+            1000000,
+            50000000,
+            1550
+        );
+
+        let games_before = CasinoHouse::get_registered_games();
+        assert!(vector::length(&games_before) == 2, 9);
+
+        // Unregister first game
+        CasinoHouse::unregister_game(&casino_signer, game_object);
+
+        let games_after = CasinoHouse::get_registered_games();
+        assert!(vector::length(&games_after) == 1, 10);
+        assert!(!CasinoHouse::is_game_registered(game_object), 11);
+
+        // === PHASE 6: VERIFY SYSTEM REMAINS FUNCTIONAL ===
+
+        // Remaining game should still work
+        let remaining_game = *vector::borrow(&games_after, 0);
+        assert!(CasinoHouse::is_game_registered(remaining_game), 12);
+
+        // Can still get treasury info for remaining game
+        let treasury_addr = CasinoHouse::get_game_treasury_address(remaining_game);
+        assert!(treasury_addr != @0x0, 13);
+
+        let balance = CasinoHouse::game_treasury_balance(remaining_game);
+        assert!(balance == 0, 14); // Should be empty initially
+
+        // Initialize and test remaining game
+        SlotMachine::initialize_game(&slot_signer);
+        assert!(SlotMachine::is_ready(), 15);
+    }
+
+    #[test]
+    fun test_treasury_rebalancing_and_game_operations() {
+        let (
+            _,
+            casino_signer,
+            dice_signer,
+            slot_signer,
+            _,
+            whale_investor,
+            _,
+            _,
+            casual_player,
+            high_roller,
+            _,
+            _
+        ) = setup_realistic_ecosystem();
+
+        // === PHASE 1: SETUP WITH SUFFICIENT LIQUIDITY ===
+        CasinoHouse::init_module_for_test(&casino_signer);
+        InvestorToken::init(&casino_signer);
+        InvestorToken::deposit_and_mint(&whale_investor, WHALE_INVESTOR_CAPITAL);
+
+        // Register and initialize games
+        CasinoHouse::register_game(
+            &casino_signer,
+            DICE_ADDR,
+            string::utf8(b"DiceGame"),
+            string::utf8(b"v1"),
+            1000000,
+            50000000,
+            1667
+        );
+
+        CasinoHouse::register_game(
+            &casino_signer,
+            SLOT_ADDR,
+            string::utf8(b"SlotMachine"),
+            string::utf8(b"v1"),
+            1000000,
+            50000000,
+            1550
+        );
+
+        DiceGame::initialize_game(&dice_signer);
+        SlotMachine::initialize_game(&slot_signer);
+
+        // === PHASE 2: TEST TREASURY ROUTING LOGIC ===
+
+        let games = CasinoHouse::get_registered_games();
+        let dice_object = *vector::borrow(&games, 0);
+        let slot_object = *vector::borrow(&games, 1);
+
+        // Get initial treasury configurations
+        let dice_treasury_addr = CasinoHouse::get_game_treasury_address(dice_object);
+        let slot_treasury_addr = CasinoHouse::get_game_treasury_address(slot_object);
+
+        let (dice_target, dice_overflow, dice_drain, _) =
+            CasinoHouse::get_game_treasury_config(dice_treasury_addr);
+        let (slot_target, slot_overflow, slot_drain, _) =
+            CasinoHouse::get_game_treasury_config(slot_treasury_addr);
+
+        // Verify thresholds were calculated correctly
+        assert!(dice_overflow > dice_target, 1);
+        assert!(dice_drain < dice_target, 2);
+        assert!(slot_overflow > slot_target, 3);
+        assert!(slot_drain < slot_target, 4);
+
+        // === PHASE 3: TEST GAME TREASURY OPERATIONS ===
+
+        // Play games to exercise treasury operations
+        let gaming_rounds = 15; // Reduced to avoid funding issues
+        let planned_bets = gaming_rounds * STANDARD_BET; // Use standard bet, not large
+        let aptos_metadata = option::extract(&mut coin::paired_metadata<AptosCoin>());
+
+        // Verify players have sufficient funds
+        assert!(
+            primary_fungible_store::balance(CASUAL_PLAYER_ADDR, aptos_metadata)
+                >= planned_bets,
+            999
+        );
+        assert!(
+            primary_fungible_store::balance(HIGH_ROLLER_ADDR, aptos_metadata)
+                >= planned_bets,
+            999
+        );
+
+        let i = 0;
+        while (i < gaming_rounds) {
+            // Alternate between games to build up different treasury balances
+            if (i % 2 == 0) {
+                DiceGame::test_only_play_dice(
+                    &casual_player, (((i % 6) + 1) as u8), STANDARD_BET
+                );
+            } else {
+                SlotMachine::test_only_spin_slots(&high_roller, STANDARD_BET);
+            };
+            i = i + 1;
+        };
+
+        // === PHASE 4: VERIFY TREASURY BALANCES AND AGGREGATION ===
+
+        let dice_balance_after = CasinoHouse::game_treasury_balance(dice_object);
+        let slot_balance_after = CasinoHouse::game_treasury_balance(slot_object);
+        let central_balance = CasinoHouse::central_treasury_balance();
+        let total_balance = CasinoHouse::treasury_balance();
+
+        // Verify aggregation is correct
+        assert!(
+            total_balance == central_balance + dice_balance_after + slot_balance_after,
+            5
+        );
+
+        // === PHASE 5: TEST PAYOUT CAPACITY CHECKS ===
+
+        // Games should be able to handle reasonable payouts
+        assert!(DiceGame::can_handle_payout(STANDARD_BET), 6);
+        assert!(SlotMachine::can_handle_payout(STANDARD_BET), 7);
+
+        // Test larger payouts that would require central treasury
+        let max_dice_payout = LARGE_BET * 5; // 5x dice payout
+        let max_slot_payout = LARGE_BET * 100; // 100x slot payout
+
+        assert!(DiceGame::can_handle_payout(max_dice_payout), 8);
+        assert!(SlotMachine::can_handle_payout(max_slot_payout), 9);
+
+        // === PHASE 6: VERIFY TREASURY COMPOSITION TRACKING ===
+
+        let (central_only, game_balances, total_check) =
+            InvestorToken::treasury_composition();
+        assert!(central_only == central_balance, 10);
+        assert!(
+            game_balances == dice_balance_after + slot_balance_after,
+            11
+        );
+        assert!(total_check == total_balance, 12);
+
+        // NAV should reflect total treasury value
+        let nav = InvestorToken::nav();
+        let supply = InvestorToken::total_supply();
+        let expected_nav =
+            if (supply == 0) {
+                1_000_000
+            } else {
+                (total_balance * 1_000_000) / supply
+            };
+
+        // Allow for small rounding differences
+        assert!(nav <= expected_nav + 1000, 13);
+        assert!(nav >= expected_nav - 1000, 14);
+
+        // === PHASE 7: TEST EDGE CASES FOR UNCOVERED PATHS ===
+
+        // Test view functions that might not be covered
+        assert!(CasinoHouse::game_object_exists(dice_object), 15);
+        assert!(CasinoHouse::game_object_exists(slot_object), 16);
+
+        // Test metadata access
+        let (name, version, module_addr, _, _, house_edge, claimed) =
+            CasinoHouse::get_game_metadata(dice_object);
+        assert!(name == string::utf8(b"DiceGame"), 17);
+        assert!(version == string::utf8(b"v1"), 18);
+        assert!(module_addr == DICE_ADDR, 19);
+        assert!(house_edge == 1667, 20);
+        assert!(claimed == true, 21); // Should be claimed after initialization
+    }
 }
