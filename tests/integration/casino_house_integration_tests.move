@@ -435,5 +435,4 @@ module casino::CasinoHouseIntegrationTests {
             1500
         );
     }
-
 }

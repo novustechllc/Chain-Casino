@@ -595,7 +595,7 @@ module casino::EndToEndTests {
             casual_player,
             high_roller,
             _,
-            _,
+            _
         ) = setup_realistic_ecosystem();
 
         // Setup
