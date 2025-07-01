@@ -312,9 +312,8 @@ module casino::CasinoHouse {
         vector::append(&mut treasury_seed, bcs::to_bytes(&game_seed));
 
         // Create resource account for game treasury
-        let (treasury_signer, resource_signer_cap) = account::create_resource_account(
-            admin, treasury_seed
-        );
+        let (treasury_signer, resource_signer_cap) =
+            account::create_resource_account(admin, treasury_seed);
         let treasury_addr = signer::address_of(&treasury_signer);
 
         // Create FA store at the resource account address
@@ -397,33 +396,34 @@ module casino::CasinoHouse {
         // Phase 1: Extract needed data to avoid borrow conflicts
         let (game_treasury_addr_opt, central_store) = {
             let treasury_registry = borrow_global<TreasuryRegistry>(@casino);
-            let addr_opt = if (treasury_registry.game_treasuries.contains(&game_object)) {
-                option::some(*treasury_registry.game_treasuries.borrow(&game_object))
-            } else {
-                option::none()
-            };
+            let addr_opt =
+                if (treasury_registry.game_treasuries.contains(&game_object)) {
+                    option::some(*treasury_registry.game_treasuries.borrow(&game_object))
+                } else {
+                    option::none()
+                };
             (addr_opt, treasury_registry.central_store)
         };
 
         // Phase 2: Handle treasury withdrawal if game treasury exists
         if (option::is_some(&game_treasury_addr_opt)) {
             let game_treasury_addr = option::extract(&mut game_treasury_addr_opt);
-            
+
             // Withdraw all funds back to central treasury
-            let current_balance = primary_fungible_store::balance(
-                game_treasury_addr, get_aptos_metadata()
-            );
-            
+            let current_balance =
+                primary_fungible_store::balance(
+                    game_treasury_addr, get_aptos_metadata()
+                );
+
             if (current_balance > 0) {
                 let withdrawn_fa = withdraw_excess(game_treasury_addr, current_balance);
                 fungible_asset::deposit(central_store, withdrawn_fa);
-                
-                event::emit(LiquidityWithdrawnEvent { 
-                    game_treasury_addr, 
-                    amount: current_balance 
-                });
+
+                event::emit(
+                    LiquidityWithdrawnEvent { game_treasury_addr, amount: current_balance }
+                );
             };
-            
+
             // Phase 3: Remove from registry (separate mutable borrow)
             let treasury_registry = borrow_global_mut<TreasuryRegistry>(@casino);
             treasury_registry.game_treasuries.remove(&game_object);
@@ -485,7 +485,9 @@ module casino::CasinoHouse {
         if (treasury_source == get_central_treasury_address()) {
             fungible_asset::deposit(treasury_registry.central_store, bet_fa);
         } else {
-            fungible_asset::deposit(borrow_global<GameTreasury>(game_treasury_addr).hot_store, bet_fa);
+            fungible_asset::deposit(
+                borrow_global<GameTreasury>(game_treasury_addr).hot_store, bet_fa
+            );
             update_rolling_volume(game_treasury_addr, amount);
         };
 
@@ -554,7 +556,7 @@ module casino::CasinoHouse {
         // Always check rebalancing regardless of treasury source
         let treasury_registry = borrow_global<TreasuryRegistry>(@casino);
         let game_treasury_addr = *treasury_registry.game_treasuries.borrow(&game_object);
-        
+
         rebalance_game_treasury(game_treasury_addr);
 
         // EMIT EVENT using extracted fields
@@ -588,16 +590,17 @@ module casino::CasinoHouse {
     ): FungibleAsset acquires GameTreasury {
         let game_treasury_signer = get_game_treasury_signer(game_treasury_addr);
         let treasury_signer_addr = signer::address_of(&game_treasury_signer);
-        
+
         // Verify addresses match
         assert!(treasury_signer_addr == game_treasury_addr, E_INVALID_GAME_OBJECT);
-        
-        let withdrawn_fa = primary_fungible_store::withdraw(
-            &game_treasury_signer,
-            get_aptos_metadata(),
-            amount
-        );
-        
+
+        let withdrawn_fa =
+            primary_fungible_store::withdraw(
+                &game_treasury_signer,
+                get_aptos_metadata(),
+                amount
+            );
+
         withdrawn_fa
     }
 
@@ -625,7 +628,7 @@ module casino::CasinoHouse {
             // Send excess to central treasury
             let excess = current_balance - target_reserve;
             let transfer_amount = excess / 10; // 10% of excess
-            
+
             let excess_fa = withdraw_excess(game_treasury_addr, transfer_amount);
 
             let treasury_registry = borrow_global<TreasuryRegistry>(@casino);
@@ -642,7 +645,7 @@ module casino::CasinoHouse {
         } else if (current_balance < drain_threshold) {
             // Request liquidity from central
             let needed = target_reserve - current_balance;
-            
+
             inject_liquidity(game_treasury_addr, needed);
 
             event::emit(
@@ -692,8 +695,9 @@ module casino::CasinoHouse {
     /// FIXED: Get game treasury signer from resource account capability
     fun get_game_treasury_signer(game_treasury_addr: address): signer acquires GameTreasury {
         let game_treasury = borrow_global<GameTreasury>(game_treasury_addr);
-        let signer = account::create_signer_with_capability(&game_treasury.resource_signer_cap);
-        
+        let signer =
+            account::create_signer_with_capability(&game_treasury.resource_signer_cap);
+
         let signer_addr = signer::address_of(&signer);
         // This should now match!
         assert!(signer_addr == game_treasury_addr, E_INVALID_GAME_OBJECT);

@@ -140,5 +140,4 @@ module casino::CasinoHouseTests {
         assert!(addr1 == addr2, 1); // Same inputs = same address
         assert!(addr1 != addr3, 2); // Different inputs = different address
     }
-
 }

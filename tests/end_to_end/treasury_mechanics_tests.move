@@ -41,7 +41,8 @@ module casino::TreasuryMechanicsDemo {
     const MIN_BET: u64 = 1000000; // 0.01 APT
     const MAX_BET: u64 = 50000000; // 0.5 APT
 
-    fun setup_demo_ecosystem(): (signer, signer, signer, signer, signer, signer, signer, signer) {
+    fun setup_demo_ecosystem():
+        (signer, signer, signer, signer, signer, signer, signer, signer) {
         let aptos_framework = account::create_account_for_test(@aptos_framework);
         let casino_signer = account::create_account_for_test(CASINO_ADDR);
         let dice_signer = account::create_account_for_test(DICE_ADDR);
@@ -60,8 +61,13 @@ module casino::TreasuryMechanicsDemo {
         // Setup primary stores
         let aptos_metadata = option::extract(&mut coin::paired_metadata<AptosCoin>());
         let all_addresses = vector[
-            CASINO_ADDR, DICE_ADDR, SLOT_ADDR, WHALE_INVESTOR_ADDR,
-            PLAYER_A_ADDR, PLAYER_B_ADDR, DRAIN_PLAYER_ADDR
+            CASINO_ADDR,
+            DICE_ADDR,
+            SLOT_ADDR,
+            WHALE_INVESTOR_ADDR,
+            PLAYER_A_ADDR,
+            PLAYER_B_ADDR,
+            DRAIN_PLAYER_ADDR
         ];
         let i = 0;
         while (i < vector::length(&all_addresses)) {
@@ -79,14 +85,30 @@ module casino::TreasuryMechanicsDemo {
         aptos_coin::mint(&aptos_framework, PLAYER_B_ADDR, PLAYER_FUNDING);
         aptos_coin::mint(&aptos_framework, DRAIN_PLAYER_ADDR, PLAYER_FUNDING);
 
-        (aptos_framework, casino_signer, dice_signer, slot_signer, whale_investor, 
-         player_a, player_b, drain_player)
+        (
+            aptos_framework,
+            casino_signer,
+            dice_signer,
+            slot_signer,
+            whale_investor,
+            player_a,
+            player_b,
+            drain_player
+        )
     }
 
     #[test]
     fun test_complete_treasury_mechanics_demonstration() {
-        let (_, casino_signer, dice_signer, slot_signer, whale_investor, 
-             player_a, player_b, drain_player) = setup_demo_ecosystem();
+        let (
+            _,
+            casino_signer,
+            dice_signer,
+            slot_signer,
+            whale_investor,
+            player_a,
+            player_b,
+            drain_player
+        ) = setup_demo_ecosystem();
 
         // === PHASE 1: ECOSYSTEM BOOTSTRAP ===
         CasinoHouse::init_module_for_test(&casino_signer);
@@ -135,26 +157,30 @@ module casino::TreasuryMechanicsDemo {
         AlwaysLoseGame::initialize_game(&dice_signer);
 
         // Get game objects for treasury inspection
-        let dice_object = object::address_to_object<CasinoHouse::GameMetadata>(
-            CasinoHouse::derive_game_object_address(
-                CASINO_ADDR, string::utf8(b"DiceGame"), string::utf8(b"v1")
-            )
-        );
-        let slot_object = object::address_to_object<CasinoHouse::GameMetadata>(
-            CasinoHouse::derive_game_object_address(
-                CASINO_ADDR, string::utf8(b"SlotMachine"), string::utf8(b"v1")
-            )
-        );
-        let always_lose_object = object::address_to_object<CasinoHouse::GameMetadata>(
-            CasinoHouse::derive_game_object_address(
-                CASINO_ADDR, string::utf8(b"AlwaysLoseGame"), string::utf8(b"v1")
-            )
-        );
+        let dice_object =
+            object::address_to_object<CasinoHouse::GameMetadata>(
+                CasinoHouse::derive_game_object_address(
+                    CASINO_ADDR, string::utf8(b"DiceGame"), string::utf8(b"v1")
+                )
+            );
+        let slot_object =
+            object::address_to_object<CasinoHouse::GameMetadata>(
+                CasinoHouse::derive_game_object_address(
+                    CASINO_ADDR, string::utf8(b"SlotMachine"), string::utf8(b"v1")
+                )
+            );
+        let always_lose_object =
+            object::address_to_object<CasinoHouse::GameMetadata>(
+                CasinoHouse::derive_game_object_address(
+                    CASINO_ADDR, string::utf8(b"AlwaysLoseGame"), string::utf8(b"v1")
+                )
+            );
 
         // === PHASE 3: VERIFY BLOCK-STM PARALLEL EXECUTION SETUP ===
         let dice_treasury_addr = CasinoHouse::get_game_treasury_address(dice_object);
         let slot_treasury_addr = CasinoHouse::get_game_treasury_address(slot_object);
-        let always_lose_treasury_addr = CasinoHouse::get_game_treasury_address(always_lose_object);
+        let always_lose_treasury_addr =
+            CasinoHouse::get_game_treasury_address(always_lose_object);
 
         // Verify different addresses (key for Block-STM parallelization)
         assert!(dice_treasury_addr != slot_treasury_addr, 1);
@@ -167,7 +193,7 @@ module casino::TreasuryMechanicsDemo {
         let always_lose_balance = CasinoHouse::game_treasury_balance(always_lose_object);
 
         assert!(dice_balance == MAX_BET * 10, 4); // 5 APT
-        assert!(slot_balance == MAX_BET * 10, 5); // 5 APT  
+        assert!(slot_balance == MAX_BET * 10, 5); // 5 APT
         assert!(always_lose_balance == LARGE_BET * 10, 6); // 1 APT
 
         // === PHASE 4: DEMONSTRATE TREASURY ROUTING ===
@@ -177,9 +203,9 @@ module casino::TreasuryMechanicsDemo {
 
         // === PHASE 5: VOLUME UPDATES & THRESHOLD CHANGES ===
         // Get initial threshold config
-        let (initial_target, initial_overflow, initial_drain, _) = 
+        let (initial_target, initial_overflow, initial_drain, _) =
             CasinoHouse::get_game_treasury_config(dice_treasury_addr);
-            
+
         // Multiple bets to update rolling volume
         let i = 0;
         while (i < 5) {
@@ -187,9 +213,9 @@ module casino::TreasuryMechanicsDemo {
             i = i + 1;
         };
 
-        let (updated_target, updated_overflow, updated_drain, updated_volume) = 
+        let (updated_target, updated_overflow, updated_drain, updated_volume) =
             CasinoHouse::get_game_treasury_config(dice_treasury_addr);
-            
+
         assert!(updated_target != initial_target, 7); // Thresholds should change
 
         // === PHASE 6: OVERFLOW REBALANCING ===
@@ -205,7 +231,8 @@ module casino::TreasuryMechanicsDemo {
         };
 
         // === PHASE 7: DRAIN SCENARIO WITH ALWAYS LOSE GAME ===
-        let always_lose_before_drain = CasinoHouse::game_treasury_balance(always_lose_object);
+        let always_lose_before_drain =
+            CasinoHouse::game_treasury_balance(always_lose_object);
         let central_before_drain = CasinoHouse::central_treasury_balance();
 
         // AlwaysLoseGame pays 3x every bet - will quickly drain treasury
@@ -216,7 +243,8 @@ module casino::TreasuryMechanicsDemo {
             j = j + 1;
         };
 
-        let always_lose_after_drain = CasinoHouse::game_treasury_balance(always_lose_object);
+        let always_lose_after_drain =
+            CasinoHouse::game_treasury_balance(always_lose_object);
         let central_after_drain = CasinoHouse::central_treasury_balance();
 
         // DRAIN REBALANCING: Treasury refilled from central
@@ -229,7 +257,10 @@ module casino::TreasuryMechanicsDemo {
         let final_always_lose = CasinoHouse::game_treasury_balance(always_lose_object);
 
         // Verify treasury aggregation is correct
-        assert!(final_total == final_central + final_dice + final_slot + final_always_lose, 8);
+        assert!(
+            final_total == final_central + final_dice + final_slot + final_always_lose,
+            8
+        );
 
         // Verify all games remain operational
         assert!(DiceGame::is_ready(), 9);
@@ -242,7 +273,10 @@ module casino::TreasuryMechanicsDemo {
         SlotMachine::test_only_spin_slots(&player_b, STANDARD_BET);
 
         // === FINAL DEMONSTRATION: ALL MECHANICS WORKING! ===
-        assert!(final_total == final_central + final_dice + final_slot + final_always_lose, 8);
+        assert!(
+            final_total == final_central + final_dice + final_slot + final_always_lose,
+            8
+        );
         assert!(DiceGame::is_ready(), 9);
         assert!(SlotMachine::is_ready(), 10);
         assert!(AlwaysLoseGame::is_ready(), 11);

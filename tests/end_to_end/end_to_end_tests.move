@@ -317,5 +317,4 @@ module casino::EndToEndTests {
             1500
         );
     }
-
 }
