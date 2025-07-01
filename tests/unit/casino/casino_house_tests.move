@@ -10,7 +10,7 @@
 //! - Error conditions through public APIs
 
 #[test_only]
-module casino::CasinoHouseFocusedTests {
+module casino::CasinoHouseTests {
     use std::string;
     use std::vector;
     use aptos_framework::account;
