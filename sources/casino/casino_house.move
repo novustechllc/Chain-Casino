@@ -5,7 +5,7 @@
 //! FIXED: Treasury signer mismatch - now uses SignerCapability for resource accounts
 
 module casino::CasinoHouse {
-    use std::string::{Self, String};
+    use std::string::{String};
     use std::vector;
     use std::signer;
     use std::option;
@@ -666,9 +666,6 @@ module casino::CasinoHouse {
         game_treasury_addr: address, new_volume: u64
     ) acquires GameTreasury {
         let game_treasury = borrow_global_mut<GameTreasury>(game_treasury_addr);
-
-        let old_volume = game_treasury.rolling_volume;
-        let old_target = game_treasury.target_reserve;
 
         // Simple rolling average (7-day weighted)
         game_treasury.rolling_volume =

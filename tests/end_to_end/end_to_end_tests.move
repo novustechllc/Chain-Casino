@@ -10,7 +10,6 @@ module casino::EndToEndTests {
     use std::string;
     use std::option;
     use std::vector;
-    use std::signer;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::coin;
@@ -21,7 +20,6 @@ module casino::EndToEndTests {
     use casino::InvestorToken;
     use casino::CasinoHouse;
     use dice_game::DiceGame;
-    use slot_game::SlotMachine;
 
     // === REALISTIC MONEY AMOUNTS ===
     // Players: Small amounts (they can lose everything due to randomness)

@@ -203,7 +203,7 @@ module casino::TreasuryMechanicsDemo {
 
         // === PHASE 5: VOLUME UPDATES & THRESHOLD CHANGES ===
         // Get initial threshold config
-        let (initial_target, initial_overflow, initial_drain, _) =
+        let (initial_target, _, _, _) =
             CasinoHouse::get_game_treasury_config(dice_treasury_addr);
 
         // Multiple bets to update rolling volume
@@ -213,27 +213,22 @@ module casino::TreasuryMechanicsDemo {
             i = i + 1;
         };
 
-        let (updated_target, updated_overflow, updated_drain, updated_volume) =
+        let (updated_target, _, _, _) =
             CasinoHouse::get_game_treasury_config(dice_treasury_addr);
 
         assert!(updated_target != initial_target, 7); // Thresholds should change
 
         // === PHASE 6: OVERFLOW REBALANCING ===
         let central_before_overflow = CasinoHouse::central_treasury_balance();
-        let dice_before_overflow = CasinoHouse::game_treasury_balance(dice_object);
 
         // The rebalancing already happened during previous bets due to overflow
         let central_after = CasinoHouse::central_treasury_balance();
-        let dice_after = CasinoHouse::game_treasury_balance(dice_object);
 
         if (central_after > central_before_overflow) {
             // OVERFLOW REBALANCING: Excess sent to central
         };
 
         // === PHASE 7: DRAIN SCENARIO WITH ALWAYS LOSE GAME ===
-        let always_lose_before_drain =
-            CasinoHouse::game_treasury_balance(always_lose_object);
-        let central_before_drain = CasinoHouse::central_treasury_balance();
 
         // AlwaysLoseGame pays 3x every bet - will quickly drain treasury
         let drain_rounds = 3;
@@ -242,10 +237,6 @@ module casino::TreasuryMechanicsDemo {
             AlwaysLoseGame::always_lose_bet(&drain_player, LARGE_BET);
             j = j + 1;
         };
-
-        let always_lose_after_drain =
-            CasinoHouse::game_treasury_balance(always_lose_object);
-        let central_after_drain = CasinoHouse::central_treasury_balance();
 
         // DRAIN REBALANCING: Treasury refilled from central
 
