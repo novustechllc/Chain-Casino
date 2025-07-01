@@ -14,11 +14,8 @@ module casino::CasinoHouseTests {
     use std::string;
     use std::vector;
     use aptos_framework::account;
-    use aptos_framework::aptos_coin::{Self, AptosCoin};
-    use aptos_framework::coin;
-    use aptos_framework::primary_fungible_store;
+    use aptos_framework::aptos_coin::Self;
     use aptos_framework::timestamp;
-    use aptos_framework::object;
     use casino::CasinoHouse;
 
     // Test constants

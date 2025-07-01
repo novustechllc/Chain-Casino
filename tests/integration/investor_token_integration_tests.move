@@ -133,7 +133,6 @@ module casino::InvestorTokenIntegrationTests {
         assert!(central + game == total, 8);
 
         // === PHASE 3: FIRST INVESTMENT (EARLY INVESTOR ADVANTAGE) ===
-        let initial_nav = InvestorToken::nav();
         InvestorToken::deposit_and_mint(&early_investor, EARLY_CAPITAL);
 
         // Verify early investor gets 1:1 ratio at NAV = 1.0
@@ -271,7 +270,7 @@ module casino::InvestorTokenIntegrationTests {
             i = i + 1;
         };
 
-        let nav_after_gaming = InvestorToken::nav();
+        let _nav_after_gaming = InvestorToken::nav();
         // NAV might be higher due to house edge (though randomness affects this)
 
         // === PHASE 3: TEST NORMAL REDEMPTION ===
@@ -480,7 +479,7 @@ module casino::InvestorTokenIntegrationTests {
 
         let early_balance_before_stress =
             InvestorToken::user_balance(EARLY_INVESTOR_ADDR);
-        let whale_balance_before_stress =
+        let _whale_balance_before_stress =
             InvestorToken::user_balance(WHALE_INVESTOR_ADDR);
 
         // Multiple small redemptions

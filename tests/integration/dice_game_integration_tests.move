@@ -16,7 +16,6 @@ module dice_game::DiceGameIntegrationTests {
     use aptos_framework::primary_fungible_store;
     use aptos_framework::timestamp;
     use aptos_framework::randomness;
-    use aptos_framework::object;
     use casino::InvestorToken;
     use casino::CasinoHouse;
     use dice_game::DiceGame;
