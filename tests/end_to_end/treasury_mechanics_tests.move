@@ -316,8 +316,7 @@ module casino::TreasuryMechanicsDemo {
 
         // === PHASE 2: BUILD UP GAME TREASURY WITH LOSING BETS ===
         let game_treasury_addr = CasinoHouse::get_game_treasury_address(dice_object);
-        let (_, overflow_threshold, _, _) =
-            CasinoHouse::get_game_treasury_config(game_treasury_addr);
+        let (_, _, _, _) = CasinoHouse::get_game_treasury_config(game_treasury_addr);
         let central_before_accumulation = CasinoHouse::central_treasury_balance();
 
         // Place many bets to accumulate funds (most will lose due to house edge)
@@ -365,7 +364,7 @@ module casino::TreasuryMechanicsDemo {
         assert!(final_central >= central_before_accumulation, 3);
 
         // Game treasury should be managed within reasonable bounds
-        let (final_target, final_overflow, _, _) =
+        let (_, final_overflow, _, _) =
             CasinoHouse::get_game_treasury_config(game_treasury_addr);
 
         // Treasury should be at or below overflow threshold after rebalancing
