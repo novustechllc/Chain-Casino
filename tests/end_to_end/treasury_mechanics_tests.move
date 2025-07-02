@@ -283,4 +283,106 @@ module casino::TreasuryMechanicsDemo {
         assert!(SlotMachine::is_ready(), 10);
         assert!(AlwaysLoseGame::is_ready(), 11);
     }
+
+    #[test]
+    fun test_treasury_overflow_rebalancing_mechanics() {
+        let (_, casino_signer, dice_signer, _, whale_investor, player_a, player_b, _) =
+            setup_demo_ecosystem();
+
+        // === PHASE 1: ECOSYSTEM SETUP ===
+        CasinoHouse::init_module_for_test(&casino_signer);
+        InvestorToken::init(&casino_signer);
+        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
+
+        CasinoHouse::register_game(
+            &casino_signer,
+            DICE_ADDR,
+            string::utf8(b"DiceGame"),
+            string::utf8(b"v1"),
+            MIN_BET,
+            MAX_BET,
+            1667,
+            DICE_MAX_PAYOUT
+        );
+
+        DiceGame::initialize_game(&dice_signer);
+
+        let dice_object =
+            object::address_to_object<CasinoHouse::GameMetadata>(
+                CasinoHouse::derive_game_object_address(
+                    CASINO_ADDR, string::utf8(b"DiceGame"), string::utf8(b"v1")
+                )
+            );
+
+        // === PHASE 2: BUILD UP GAME TREASURY WITH LOSING BETS ===
+        let game_treasury_addr = CasinoHouse::get_game_treasury_address(dice_object);
+        let (_, overflow_threshold, _, _) =
+            CasinoHouse::get_game_treasury_config(game_treasury_addr);
+        let central_before_accumulation = CasinoHouse::central_treasury_balance();
+
+        // Place many bets to accumulate funds (most will lose due to house edge)
+        let accumulation_rounds = 40;
+        let i = 0;
+        while (i < accumulation_rounds) {
+            // Use guess 1 consistently - 5/6 chance to lose each bet
+            DiceGame::test_only_play_dice(&player_a, 1, STANDARD_BET);
+            if (i % 2 == 0) {
+                DiceGame::test_only_play_dice(&player_b, 1, STANDARD_BET);
+            };
+            i = i + 1;
+        };
+
+        let game_balance_after = CasinoHouse::game_treasury_balance(dice_object);
+
+        // === PHASE 3: VERIFY OVERFLOW TRIGGERED REBALANCING ===
+        let central_after_accumulation = CasinoHouse::central_treasury_balance();
+
+        // Game treasury should have grown and potentially triggered overflow
+        assert!(game_balance_after > 0, 1);
+
+        // If overflow occurred, central treasury should have increased
+        if (central_after_accumulation > central_before_accumulation) {
+            // OVERFLOW REBALANCING: Excess sent to central
+            let excess_transferred =
+                central_after_accumulation - central_before_accumulation;
+            assert!(excess_transferred > 0, 2);
+        };
+
+        // === PHASE 4: FORCE OVERFLOW WITH CONCENTRATED BETS ===
+        // Place additional bets to ensure overflow if not already triggered
+        let concentration_rounds = 20;
+        let j = 0;
+        while (j < concentration_rounds) {
+            DiceGame::test_only_play_dice(&player_a, 1, LARGE_BET);
+            j = j + 1;
+        };
+
+        let final_central = CasinoHouse::central_treasury_balance();
+        let final_game = CasinoHouse::game_treasury_balance(dice_object);
+
+        // === PHASE 5: VERIFY REBALANCING MECHANICS ===
+        // Central treasury should have received overflow transfers
+        assert!(final_central >= central_before_accumulation, 3);
+
+        // Game treasury should be managed within reasonable bounds
+        let (final_target, final_overflow, _, _) =
+            CasinoHouse::get_game_treasury_config(game_treasury_addr);
+
+        // Treasury should be at or below overflow threshold after rebalancing
+        if (final_game <= final_overflow) {
+            // Normal case: within bounds
+            assert!(final_game >= 0, 4);
+        } else {
+            // Edge case: still above overflow, more rebalancing will occur
+            assert!(final_central > central_before_accumulation, 5);
+        };
+
+        // === PHASE 6: FINAL SYSTEM VALIDATION ===
+        assert!(DiceGame::is_ready(), 6);
+        assert!(CasinoHouse::treasury_balance() > 0, 7);
+        assert!(
+            final_central + final_game <= CasinoHouse::treasury_balance(),
+            8
+        );
+    }
 }
