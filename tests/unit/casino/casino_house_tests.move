@@ -143,4 +143,44 @@ module casino::CasinoHouseTests {
         assert!(addr1 == addr2, 1); // Same inputs = same address
         assert!(addr1 != addr3, 2); // Different inputs = different address
     }
+
+    // === ADD THESE 3 SIMPLE TESTS TO tests/unit/casino/casino_house_tests.move ===
+
+    #[test]
+    #[expected_failure(abort_code = casino::CasinoHouse::E_INVALID_AMOUNT)]
+    fun test_register_game_zero_max_payout() {
+        let (_, casino_admin, _) = setup_basic();
+        CasinoHouse::init_module_for_test(&casino_admin);
+
+        CasinoHouse::register_game(
+            &casino_admin,
+            GAME_MODULE_1,
+            string::utf8(b"TestGame"),
+            string::utf8(b"v1"),
+            1000000,
+            50000000,
+            1500,
+            0 // Zero max_payout - should fail immediately
+        );
+    }
+
+    #[test]
+    #[expected_failure(abort_code = casino::CasinoHouse::E_NOT_ADMIN)]
+    fun test_register_game_unauthorized() {
+        let (_, _, unauthorized) = setup_basic();
+        CasinoHouse::init_module_for_test(&unauthorized); // Wrong admin - should fail
+    }
+
+    #[test]
+    fun test_view_functions_with_empty_state() {
+        let (_, casino_admin, _) = setup_basic();
+        CasinoHouse::init_module_for_test(&casino_admin);
+
+        // Test view functions work with empty state
+        assert!(CasinoHouse::treasury_balance() == 0, 1);
+        assert!(CasinoHouse::central_treasury_balance() == 0, 2);
+
+        let games = CasinoHouse::get_registered_games();
+        assert!(vector::length(&games) == 0, 3);
+    }
 }
