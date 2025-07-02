@@ -34,12 +34,17 @@ module casino::TreasuryMechanicsDemo {
     const DRAIN_PLAYER_ADDR: address = @0x2003;
 
     // Funding amounts
-    const WHALE_CAPITAL: u64 = 100000000000; // 1000 APT for liquidity
+    const WHALE_CAPITAL: u64 = 150000000000; // 1500 APT for liquidity
     const PLAYER_FUNDING: u64 = 10000000000; // 100 APT per player
     const STANDARD_BET: u64 = 5000000; // 0.05 APT
     const LARGE_BET: u64 = 10000000; // 0.1 APT (max for always lose game)
     const MIN_BET: u64 = 1000000; // 0.01 APT
     const MAX_BET: u64 = 50000000; // 0.5 APT
+
+    // Max payout constants for initial funding assertions
+    const DICE_MAX_PAYOUT: u64 = 250_000_000; // 2.5 APT
+    const SLOT_MAX_PAYOUT: u64 = 12_500_000_000; // 125 APT
+    const ALWAYS_LOSE_MAX_PAYOUT: u64 = 30_000_000; // 0.3 APT
 
     fun setup_demo_ecosystem():
         (signer, signer, signer, signer, signer, signer, signer, signer) {
@@ -126,7 +131,8 @@ module casino::TreasuryMechanicsDemo {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         // Register SlotMachine (normal game)
@@ -137,7 +143,8 @@ module casino::TreasuryMechanicsDemo {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         // Register AlwaysLoseGame (will drain treasury)
@@ -148,7 +155,8 @@ module casino::TreasuryMechanicsDemo {
             string::utf8(b"v1"),
             MIN_BET,
             LARGE_BET, // Smaller max bet for faster draining
-            20000 // Massive negative house edge
+            20000, // Massive negative house edge
+            30_000_000
         );
 
         // Initialize games
@@ -192,9 +200,12 @@ module casino::TreasuryMechanicsDemo {
         let slot_balance = CasinoHouse::game_treasury_balance(slot_object);
         let always_lose_balance = CasinoHouse::game_treasury_balance(always_lose_object);
 
-        assert!(dice_balance == MAX_BET * 10, 4); // 5 APT
-        assert!(slot_balance == MAX_BET * 10, 5); // 5 APT
-        assert!(always_lose_balance == LARGE_BET * 10, 6); // 1 APT
+        assert!(dice_balance == DICE_MAX_PAYOUT * 5, 4);
+        assert!(slot_balance == SLOT_MAX_PAYOUT * 5, 5);
+        assert!(
+            always_lose_balance == ALWAYS_LOSE_MAX_PAYOUT * 5,
+            6
+        );
 
         // === PHASE 4: DEMONSTRATE TREASURY ROUTING ===
         // Concurrent gaming on different treasuries (parallel execution!)

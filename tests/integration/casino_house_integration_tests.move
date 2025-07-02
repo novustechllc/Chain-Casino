@@ -35,7 +35,7 @@ module casino::CasinoHouseIntegrationTests {
     const ADMIN_ADDR: address = @0x3001;
 
     // Funding amounts
-    const LARGE_FUNDING: u64 = 100000000000; // 1000 APT
+    const LARGE_FUNDING: u64 = 150000000000; // 1500 APT
     const STANDARD_FUNDING: u64 = 10000000000; // 100 APT
     const STANDARD_BET: u64 = 5000000; // 0.05 APT
     const MIN_BET: u64 = 1000000; // 0.01 APT
@@ -109,7 +109,8 @@ module casino::CasinoHouseIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -241,7 +242,8 @@ module casino::CasinoHouseIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         CasinoHouse::register_game(
@@ -251,7 +253,8 @@ module casino::CasinoHouseIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -275,7 +278,7 @@ module casino::CasinoHouseIntegrationTests {
         // Test casino admin updating limits
         CasinoHouse::update_game_limits(&casino_signer, dice_object, 2000000, 40000000); // 0.02 - 0.4 APT
 
-        let (_, _, _, new_min, new_max, _, _) =
+        let (_, _, _, new_min, new_max, _, _dice_payout, _) =
             CasinoHouse::get_game_metadata(dice_object);
         assert!(new_min == 2000000, 1);
         assert!(new_max == 40000000, 2);
@@ -283,7 +286,7 @@ module casino::CasinoHouseIntegrationTests {
         // Test games requesting limit changes (risk reduction only)
         DiceGame::request_limit_update(&dice_signer, 5000000, 35000000); // 0.05 - 0.35 APT
 
-        let (_, _, _, updated_min, updated_max, _, _) =
+        let (_, _, _, updated_min, updated_max, _, _dice_payout2, _) =
             CasinoHouse::get_game_metadata(dice_object);
         assert!(updated_min == 5000000, 3);
         assert!(updated_max == 35000000, 4);
@@ -339,6 +342,7 @@ module casino::CasinoHouseIntegrationTests {
             dice_min_final,
             dice_max_final,
             dice_edge,
+            _dice_max_payout,
             dice_claimed
         ) = CasinoHouse::get_game_metadata(dice_object);
 
@@ -351,7 +355,14 @@ module casino::CasinoHouseIntegrationTests {
         assert!(dice_claimed, 25); // Should be claimed
 
         let (
-            slot_name, slot_version, slot_addr, slot_min, slot_max, slot_edge, slot_claimed
+            slot_name,
+            slot_version,
+            slot_addr,
+            slot_min,
+            slot_max,
+            slot_edge,
+            _slot_max_payout,
+            slot_claimed
         ) = CasinoHouse::get_game_metadata(slot_object);
 
         assert!(slot_name == string::utf8(b"SlotMachine"), 26);
@@ -411,7 +422,8 @@ module casino::CasinoHouseIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1500
+            1500,
+            100_000_000 // 1 APT max_payout
         );
     }
 
@@ -432,7 +444,8 @@ module casino::CasinoHouseIntegrationTests {
             string::utf8(b"v1"),
             MAX_BET,
             MIN_BET, // max < min
-            1500
+            1500,
+            100_000_000 // 1 APT max_payout
         );
     }
 }

@@ -85,7 +85,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550 // 15.5% house edge
+            1550, // 15.5% house edge
+            12_500_000_000
         );
 
         // === PHASE 3: TEST BEFORE INITIALIZATION ===
@@ -171,7 +172,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);
@@ -276,7 +278,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);
@@ -288,7 +291,7 @@ module slot_game::SlotMachineIntegrationTests {
 
         // Verify limits were updated in casino metadata
         let casino_game_obj = SlotMachine::get_casino_game_object();
-        let (_, _, _, min_bet, max_bet, _, _) =
+        let (_, _, _, min_bet, max_bet, _, _slot_payout1, _) =
             CasinoHouse::get_game_metadata(casino_game_obj);
         assert!(min_bet == 2000000, 1);
         assert!(max_bet == 40000000, 2);
@@ -296,7 +299,7 @@ module slot_game::SlotMachineIntegrationTests {
         // Test another valid update (further risk reduction)
         SlotMachine::request_limit_update(&slot_signer, 5000000, 35000000); // 0.05 APT min, 0.35 APT max
 
-        let (_, _, _, min_bet2, max_bet2, _, _) =
+        let (_, _, _, min_bet2, max_bet2, _, _slot_payout2, _) =
             CasinoHouse::get_game_metadata(casino_game_obj);
         assert!(min_bet2 == 5000000, 3);
         assert!(max_bet2 == 35000000, 4);
@@ -386,7 +389,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         // Try to initialize with wrong signer - should fail
@@ -410,7 +414,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);
@@ -437,7 +442,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);
@@ -464,7 +470,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);
@@ -491,7 +498,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);
@@ -517,7 +525,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);

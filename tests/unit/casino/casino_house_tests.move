@@ -81,7 +81,8 @@ module casino::CasinoHouseTests {
             string::utf8(b"v1"),
             50000000,
             1000000,
-            1500 // max < min
+            1500, // max < min
+            100_000_000
         );
     }
 
@@ -100,7 +101,8 @@ module casino::CasinoHouseTests {
             string::utf8(b"v1"),
             1000000,
             50000000,
-            1500
+            1500,
+            100_000_000
         );
 
         // Try to register same game again - object creation will fail
@@ -111,7 +113,8 @@ module casino::CasinoHouseTests {
             string::utf8(b"v1"),
             1000000,
             50000000,
-            1500
+            1500,
+            100_000_000
         );
     }
 

@@ -40,6 +40,10 @@ module casino::CasinoHouse {
     const E_INVALID_GAME_OBJECT: u64 = 0x0C;
     /// Game treasury not found
     const E_GAME_TREASURY_NOT_FOUND: u64 = 0x0D;
+    /// Payout requested exceeds configured limit
+    const E_PAYOUT_EXCEEDS_LIMIT: u64 = 0x0E;
+    /// Insufficient central treasury for new game funding
+    const E_INSUFFICIENT_CENTRAL_TREASURY: u64 = 0x10;
 
     //
     // Constants
@@ -53,6 +57,10 @@ module casino::CasinoHouse {
     const SAFETY_MULTIPLIER: u64 = 150;
     /// Percentage basis (100%)
     const PERCENTAGE_BASE: u64 = 100;
+    /// Initial funding multiplier for new games
+    const INITIAL_FUNDING_MULTIPLIER: u64 = 5;
+    /// Required central treasury ratio (60% of total game treasuries)
+    const CENTRAL_TREASURY_RATIO: u64 = 60;
 
     //
     // Collision-Free Bet Identifier
@@ -106,6 +114,8 @@ module casino::CasinoHouse {
         min_bet: u64,
         max_bet: u64,
         house_edge_bps: u64,
+        /// Maximum single bet payout allowed for this game
+        max_payout: u64,
         created_at: u64,
         capability_claimed: bool,
         extend_ref: ExtendRef
@@ -240,10 +250,12 @@ module casino::CasinoHouse {
         version: String,
         min_bet: u64,
         max_bet: u64,
-        house_edge_bps: u64
+        house_edge_bps: u64,
+        max_payout: u64
     ) acquires GameRegistry, TreasuryRegistry {
         assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
         assert!(max_bet >= min_bet, E_INVALID_AMOUNT);
+        assert!(max_payout > 0, E_INVALID_AMOUNT);
 
         // Create named object for game instance
         let seed = build_game_seed(name, version);
@@ -264,6 +276,7 @@ module casino::CasinoHouse {
                 min_bet,
                 max_bet,
                 house_edge_bps,
+                max_payout,
                 created_at: timestamp::now_seconds(),
                 capability_claimed: false,
                 extend_ref
@@ -281,6 +294,23 @@ module casino::CasinoHouse {
         );
         registry.registered_games.add(game_object, true);
 
+        // ===============================
+        // Financial safety guard
+        // Ensure central treasury remains healthy after funding the new game
+        // ===============================
+
+        let new_game_funding = max_payout * INITIAL_FUNDING_MULTIPLIER;
+        let current_total_games = sum_all_game_treasury_balances();
+        let future_total_games = current_total_games + new_game_funding;
+        let required_central =
+            (future_total_games * CENTRAL_TREASURY_RATIO) / PERCENTAGE_BASE;
+        let central_balance = central_treasury_balance();
+
+        assert!(
+            central_balance >= required_central + new_game_funding,
+            E_INSUFFICIENT_CENTRAL_TREASURY
+        );
+
         // Create dedicated treasury
         let treasury_addr = create_game_treasury(admin, game_object, min_bet * 100);
 
@@ -288,8 +318,8 @@ module casino::CasinoHouse {
         let treasury_registry = borrow_global_mut<TreasuryRegistry>(@casino);
         treasury_registry.game_treasuries.add(game_object, treasury_addr);
 
-        // Fund game treasury with 10x max bet for initial liquidity
-        inject_liquidity(treasury_addr, max_bet * 10);
+        // Fund game treasury with INITIAL_FUNDING_MULTIPLIER x max payout for initial liquidity
+        inject_liquidity(treasury_addr, max_payout * INITIAL_FUNDING_MULTIPLIER);
 
         event::emit(
             GameRegisteredEvent {
@@ -515,7 +545,7 @@ module casino::CasinoHouse {
         winner: address,
         payout: u64,
         treasury_source: address
-    ) acquires GameRegistry, TreasuryRegistry, GameTreasury {
+    ) acquires GameRegistry, TreasuryRegistry, GameTreasury, GameMetadata {
 
         // EXTRACT fields from BetId BEFORE it gets consumed
         let BetId { player, sequence } = bet_id;
@@ -528,8 +558,13 @@ module casino::CasinoHouse {
             E_GAME_NOT_REGISTERED
         );
 
-        // Pay winner if payout > 0
+        // Validate payout does not exceed configured max_payout
         if (payout > 0) {
+            let object_addr = object::object_address(&game_object);
+            let game_metadata = borrow_global<GameMetadata>(object_addr);
+            assert!(payout <= game_metadata.max_payout, E_PAYOUT_EXCEEDS_LIMIT);
+
+            // Pay winner after validation
             let central_addr = get_central_treasury_address();
 
             if (treasury_source == central_addr) {
@@ -732,6 +767,24 @@ module casino::CasinoHouse {
         fungible_asset::deposit(treasury_registry.central_store, fa);
     }
 
+    /// Calculate sum of all game treasury balances
+    fun sum_all_game_treasury_balances(): u64 acquires TreasuryRegistry {
+        let treasury_registry = borrow_global<TreasuryRegistry>(@casino);
+        let aptos_metadata = get_aptos_metadata();
+        let total = 0u64;
+
+        let game_addrs = treasury_registry.game_treasuries.values();
+        let i = 0;
+        let len = vector::length(&game_addrs);
+        while (i < len) {
+            let game_addr = *vector::borrow(&game_addrs, i);
+            let balance = primary_fungible_store::balance(game_addr, aptos_metadata);
+            total = total + balance;
+            i = i + 1;
+        };
+        total
+    }
+
     //
     // Game Limit Management Interface
     //
@@ -802,7 +855,7 @@ module casino::CasinoHouse {
     #[view]
     public fun get_game_metadata(
         game_object: Object<GameMetadata>
-    ): (String, String, address, u64, u64, u64, bool) acquires GameMetadata {
+    ): (String, String, address, u64, u64, u64, u64, bool) acquires GameMetadata {
         let object_addr = object::object_address(&game_object);
         let metadata = borrow_global<GameMetadata>(object_addr);
         (
@@ -812,6 +865,7 @@ module casino::CasinoHouse {
             metadata.min_bet,
             metadata.max_bet,
             metadata.house_edge_bps,
+            metadata.max_payout,
             metadata.capability_claimed
         )
     }

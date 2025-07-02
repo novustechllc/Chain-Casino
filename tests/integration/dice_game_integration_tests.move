@@ -95,7 +95,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667 // 16.67% house edge
+            1667, // 16.67% house edge
+            250_000_000 // max_payout
         );
 
         // === PHASE 3: TEST BEFORE INITIALIZATION ===
@@ -201,7 +202,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -340,7 +342,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -352,7 +355,7 @@ module dice_game::DiceGameIntegrationTests {
 
         // Verify limits were updated in casino metadata
         let casino_game_obj = DiceGame::get_casino_game_object();
-        let (_, _, _, min_bet, max_bet, _, _) =
+        let (_, _, _, min_bet, max_bet, _, _payout1, _) =
             CasinoHouse::get_game_metadata(casino_game_obj);
         assert!(min_bet == 2000000, 1);
         assert!(max_bet == 40000000, 2);
@@ -360,7 +363,7 @@ module dice_game::DiceGameIntegrationTests {
         // Test another valid update (further risk reduction)
         DiceGame::request_limit_update(&dice_signer, 5000000, 35000000); // 0.05 APT min, 0.35 APT max
 
-        let (_, _, _, min_bet2, max_bet2, _, _) =
+        let (_, _, _, min_bet2, max_bet2, _, _payout2, _) =
             CasinoHouse::get_game_metadata(casino_game_obj);
         assert!(min_bet2 == 5000000, 3);
         assert!(max_bet2 == 35000000, 4);
@@ -446,7 +449,7 @@ module dice_game::DiceGameIntegrationTests {
         assert!(CasinoHouse::treasury_balance() > 0, 32);
 
         // Verify updated limits are still in effect
-        let (_, _, _, final_min, final_max, _, _) =
+        let (_, _, _, final_min, final_max, _, _final_payout, _) =
             CasinoHouse::get_game_metadata(casino_obj);
         assert!(final_min == 5000000, 33); // Last update value
         assert!(final_max == 35000000, 34); // Last update value
@@ -472,7 +475,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         // Try to initialize with wrong signer - should fail
@@ -497,7 +501,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -524,7 +529,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -551,7 +557,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -578,7 +585,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -605,7 +613,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -633,7 +642,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -660,7 +670,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);

@@ -212,7 +212,8 @@ module casino::InvestorTokenIntegrationTests {
             string::utf8(b"v1"),
             1000000,
             50000000,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
