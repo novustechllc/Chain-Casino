@@ -1,11 +1,11 @@
 //! MIT License
 //!
-//! Simple Dice Game for ChainCasino Platform (Block-STM Compatible)
+//! European Roulette Game for ChainCasino Platform (Block-STM Compatible)
 //!
-//! Single die guessing game where players bet on the exact outcome (1-6).
-//! Now uses simplified bet tracking with BetId struct.
+//! European roulette with 37 numbers (0-36) and single number betting.
+//! Uses secure randomness and simplified bet flow with BetId struct.
 
-module casino::DiceGame {
+module roulette_game::AptosRoulette {
     use aptos_framework::randomness;
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object, ObjectCore, ExtendRef};
@@ -22,8 +22,8 @@ module casino::DiceGame {
     // Error Codes
     //
 
-    /// Invalid guess (must be 1-6)
-    const E_INVALID_GUESS: u64 = 0x01;
+    /// Invalid number (must be 0-36 for European roulette)
+    const E_INVALID_NUMBER: u64 = 0x01;
     /// Invalid bet amount
     const E_INVALID_AMOUNT: u64 = 0x02;
     /// Unauthorized initialization
@@ -32,21 +32,21 @@ module casino::DiceGame {
     const E_GAME_NOT_REGISTERED: u64 = 0x04;
     /// Game already initialized
     const E_ALREADY_INITIALIZED: u64 = 0x05;
-    /// Game object does not exist
-    const E_GAME_OBJECT_NOT_EXISTS: u64 = 0x06;
 
     //
     // Constants
     //
 
-    /// Payout multiplier for correct guess
-    const PAYOUT_MULTIPLIER: u64 = 5;
+    /// European roulette numbers (0-36)
+    const MAX_ROULETTE_NUMBER: u8 = 36;
+    /// Single number payout multiplier (35:1)
+    const SINGLE_NUMBER_PAYOUT: u64 = 35;
     /// Minimum bet amount (0.01 APT in octas)
     const MIN_BET: u64 = 1000000;
-    /// Maximum bet amount (0.5 APT in octas)
-    const MAX_BET: u64 = 50000000;
-    /// House edge in basis points (1667 = 16.67%)
-    const HOUSE_EDGE_BPS: u64 = 1667;
+    /// Maximum bet amount (0.3 APT in octas) - conservative for 35:1 payout
+    const MAX_BET: u64 = 30000000;
+    /// House edge in basis points (270 = 2.70% for European roulette)
+    const HOUSE_EDGE_BPS: u64 = 270;
     /// Game version for object naming
     const GAME_VERSION: vector<u8> = b"v1";
 
@@ -74,11 +74,11 @@ module casino::DiceGame {
     //
 
     #[event]
-    /// Emitted when dice is rolled and bet is resolved
-    struct DiceRolled has drop, store {
+    /// Emitted when roulette wheel is spun and bet is resolved
+    struct RouletteSpinEvent has drop, store {
         player: address,
-        guess: u8,
-        result: u8,
+        bet_number: u8,
+        winning_number: u8,
         bet_amount: u64,
         won: bool,
         payout: u64,
@@ -103,13 +103,13 @@ module casino::DiceGame {
     // Initialization Interface
     //
 
-    /// Initialize dice game with named object - claims capability from casino
-    public entry fun initialize_game(dice_admin: &signer) {
-        assert!(signer::address_of(dice_admin) == @casino, E_UNAUTHORIZED);
-        assert!(!exists<GameRegistry>(@casino), E_ALREADY_INITIALIZED);
+    /// Initialize roulette game with named object - claims capability from casino
+    public entry fun initialize_game(roulette_admin: &signer) {
+        assert!(signer::address_of(roulette_admin) == @roulette_game, E_UNAUTHORIZED);
+        assert!(!exists<GameRegistry>(@roulette_game), E_ALREADY_INITIALIZED);
 
         // Derive the game object that casino should have created
-        let game_name = string::utf8(b"DiceGame");
+        let game_name = string::utf8(b"AptosRoulette");
         let version = string::utf8(GAME_VERSION);
         let game_object_addr =
             CasinoHouse::derive_game_object_address(@casino, game_name, version);
@@ -121,7 +121,7 @@ module casino::DiceGame {
 
         // Create named object for game instance
         let seed = build_seed(game_name, version);
-        let constructor_ref = object::create_named_object(dice_admin, seed);
+        let constructor_ref = object::create_named_object(roulette_admin, seed);
         let object_signer = object::generate_signer(&constructor_ref);
         let object_addr =
             object::object_address(
@@ -136,16 +136,16 @@ module casino::DiceGame {
         let extend_ref = object::generate_extend_ref(&constructor_ref);
 
         // Get capability from casino using game object
-        let capability = CasinoHouse::get_game_capability(dice_admin, game_object);
+        let capability = CasinoHouse::get_game_capability(roulette_admin, game_object);
 
         // Store GameAuth in the object
         move_to(&object_signer, GameAuth { capability, extend_ref });
 
         // Store registry info at module address for easy lookup
         move_to(
-            dice_admin,
+            roulette_admin,
             GameRegistry {
-                creator: signer::address_of(dice_admin),
+                creator: signer::address_of(roulette_admin),
                 game_object,
                 game_name,
                 version
@@ -154,14 +154,14 @@ module casino::DiceGame {
 
         event::emit(
             GameInitialized {
-                creator: signer::address_of(dice_admin),
+                creator: signer::address_of(roulette_admin),
                 object_address: object_addr,
                 game_object,
                 game_name,
                 version,
                 min_bet: MIN_BET,
                 max_bet: MAX_BET,
-                payout_multiplier: PAYOUT_MULTIPLIER,
+                payout_multiplier: SINGLE_NUMBER_PAYOUT,
                 house_edge_bps: HOUSE_EDGE_BPS
             }
         );
@@ -172,9 +172,11 @@ module casino::DiceGame {
     //
 
     #[randomness]
-    /// Play dice game - uses simplified bet flow
-    entry fun play_dice(player: &signer, guess: u8, bet_amount: u64) acquires GameRegistry, GameAuth {
-        assert!(guess >= 1 && guess <= 6, E_INVALID_GUESS);
+    /// Spin the European roulette wheel - single number betting
+    entry fun spin_roulette(
+        player: &signer, bet_number: u8, bet_amount: u64
+    ) acquires GameRegistry, GameAuth {
+        assert!(bet_number <= MAX_ROULETTE_NUMBER, E_INVALID_NUMBER);
         assert!(bet_amount >= MIN_BET, E_INVALID_AMOUNT);
         assert!(bet_amount <= MAX_BET, E_INVALID_AMOUNT);
 
@@ -195,12 +197,14 @@ module casino::DiceGame {
         let (treasury_source, bet_id) =
             CasinoHouse::place_bet(capability, bet_fa, player_addr);
 
-        // Roll dice and determine outcome
-        let dice_result = randomness::u8_range(1, 7);
-        let player_won = dice_result == guess;
+        // Spin the roulette wheel with secure randomness (0-36 for European)
+        let winning_number = randomness::u8_range(0, 37); // 0 to 36 inclusive
+
+        // Calculate payout
+        let player_won = winning_number == bet_number;
         let payout =
             if (player_won) {
-                bet_amount * PAYOUT_MULTIPLIER
+                bet_amount * SINGLE_NUMBER_PAYOUT
             } else { 0 };
 
         // Settle bet (BetId gets consumed here)
@@ -212,12 +216,12 @@ module casino::DiceGame {
             treasury_source
         );
 
-        // Game emits own event without bet_id (or creates new event data)
+        // Game emits own event without bet_id
         event::emit(
-            DiceRolled {
+            RouletteSpinEvent {
                 player: player_addr,
-                guess,
-                result: dice_result,
+                bet_number,
+                winning_number,
                 bet_amount,
                 won: player_won,
                 payout,
@@ -229,10 +233,10 @@ module casino::DiceGame {
     #[test_only]
     #[lint::allow_unsafe_randomness]
     /// Test version allowing unsafe randomness
-    public entry fun test_only_play_dice(
-        player: &signer, guess: u8, bet_amount: u64
+    public entry fun test_only_spin_roulette(
+        player: &signer, bet_number: u8, bet_amount: u64
     ) acquires GameRegistry, GameAuth {
-        play_dice(player, guess, bet_amount);
+        spin_roulette(player, bet_number, bet_amount);
     }
 
     //
@@ -243,7 +247,7 @@ module casino::DiceGame {
     public entry fun request_limit_update(
         game_admin: &signer, new_min_bet: u64, new_max_bet: u64
     ) acquires GameRegistry, GameAuth {
-        assert!(signer::address_of(game_admin) == @casino, E_UNAUTHORIZED);
+        assert!(signer::address_of(game_admin) == @roulette_game, E_UNAUTHORIZED);
         assert!(new_max_bet >= new_min_bet, E_INVALID_AMOUNT);
 
         let object_addr = get_game_object_address();
@@ -278,24 +282,34 @@ module casino::DiceGame {
 
     #[view]
     public fun get_game_config(): (u64, u64, u64, u64) {
-        (MIN_BET, MAX_BET, PAYOUT_MULTIPLIER, HOUSE_EDGE_BPS)
+        (MIN_BET, MAX_BET, SINGLE_NUMBER_PAYOUT, HOUSE_EDGE_BPS)
     }
 
     #[view]
-    public fun calculate_payout(bet_amount: u64): u64 {
-        bet_amount * PAYOUT_MULTIPLIER
+    public fun calculate_single_number_payout(bet_amount: u64): u64 {
+        bet_amount * SINGLE_NUMBER_PAYOUT
+    }
+
+    #[view]
+    public fun is_valid_roulette_number(number: u8): bool {
+        number <= MAX_ROULETTE_NUMBER
+    }
+
+    #[view]
+    public fun get_roulette_range(): (u8, u8) {
+        (0, MAX_ROULETTE_NUMBER)
     }
 
     #[view]
     public fun get_game_object_address(): address acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@casino);
+        let registry = borrow_global<GameRegistry>(@roulette_game);
         let seed = build_seed(registry.game_name, registry.version);
         object::create_object_address(&registry.creator, seed)
     }
 
     #[view]
     public fun get_casino_game_object(): Object<CasinoHouse::GameMetadata> acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@casino);
+        let registry = borrow_global<GameRegistry>(@roulette_game);
         registry.game_object
     }
 
@@ -310,15 +324,15 @@ module casino::DiceGame {
 
     #[view]
     public fun get_game_info(): (address, Object<CasinoHouse::GameMetadata>, String, String) acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@casino);
+        let registry = borrow_global<GameRegistry>(@roulette_game);
         (registry.creator, registry.game_object, registry.game_name, registry.version)
     }
 
     #[view]
     /// Check if game treasury has sufficient balance for a bet
     public fun can_handle_payout(bet_amount: u64): bool acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@casino);
-        let expected_payout = bet_amount * PAYOUT_MULTIPLIER;
+        let registry = borrow_global<GameRegistry>(@roulette_game);
+        let expected_payout = bet_amount * SINGLE_NUMBER_PAYOUT;
         let game_treasury_balance =
             CasinoHouse::game_treasury_balance(registry.game_object);
 
@@ -330,37 +344,37 @@ module casino::DiceGame {
     #[view]
     /// Get game treasury balance
     public fun game_treasury_balance(): u64 acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@casino);
+        let registry = borrow_global<GameRegistry>(@roulette_game);
         CasinoHouse::game_treasury_balance(registry.game_object)
     }
 
     #[view]
     /// Get game treasury address
     public fun game_treasury_address(): address acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@casino);
+        let registry = borrow_global<GameRegistry>(@roulette_game);
         CasinoHouse::get_game_treasury_address(registry.game_object)
     }
 
     #[view]
     /// Get game treasury configuration
     public fun game_treasury_config(): (u64, u64, u64, u64) acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@casino);
+        let registry = borrow_global<GameRegistry>(@roulette_game);
         let treasury_addr = CasinoHouse::get_game_treasury_address(registry.game_object);
         CasinoHouse::get_game_treasury_config(treasury_addr)
     }
 
     #[view]
     public fun is_registered(): bool acquires GameRegistry {
-        if (!exists<GameRegistry>(@casino)) { false }
+        if (!exists<GameRegistry>(@roulette_game)) { false }
         else {
-            let registry = borrow_global<GameRegistry>(@casino);
+            let registry = borrow_global<GameRegistry>(@roulette_game);
             CasinoHouse::is_game_registered(registry.game_object)
         }
     }
 
     #[view]
     public fun is_initialized(): bool {
-        exists<GameRegistry>(@casino)
+        exists<GameRegistry>(@roulette_game)
     }
 
     #[view]
@@ -375,5 +389,11 @@ module casino::DiceGame {
             let object_addr = get_game_object_address();
             exists<GameAuth>(object_addr)
         }
+    }
+
+    #[view]
+    /// Get European roulette wheel layout information
+    public fun get_wheel_info(): (u8, String, u64) {
+        (MAX_ROULETTE_NUMBER + 1, string::utf8(b"European"), SINGLE_NUMBER_PAYOUT) // 37 numbers, European, 35:1
     }
 }

@@ -4,7 +4,7 @@
 //!
 //! This game always pays out 3x the bet amount, guaranteed to drain treasury
 
-module dice_game::AlwaysLoseGame {
+module casino::AlwaysLoseGame {
     use std::signer;
     use std::option;
     use std::string::{Self, String};
@@ -86,8 +86,8 @@ module dice_game::AlwaysLoseGame {
     //
 
     public entry fun initialize_game(admin: &signer) {
-        assert!(signer::address_of(admin) == @dice_game, E_UNAUTHORIZED);
-        assert!(!exists<GameRegistry>(@dice_game), E_ALREADY_INITIALIZED);
+        assert!(signer::address_of(admin) == @casino, E_UNAUTHORIZED);
+        assert!(!exists<GameRegistry>(@casino), E_ALREADY_INITIALIZED);
 
         let game_name = string::utf8(b"AlwaysLoseGame");
         let version = string::utf8(GAME_VERSION);
@@ -203,27 +203,27 @@ module dice_game::AlwaysLoseGame {
 
     #[view]
     public fun get_game_object_address(): address acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@dice_game);
+        let registry = borrow_global<GameRegistry>(@casino);
         let seed = build_seed(registry.game_name, registry.version);
         object::create_object_address(&registry.creator, seed)
     }
 
     #[view]
     public fun get_casino_game_object(): Object<CasinoHouse::GameMetadata> acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@dice_game);
+        let registry = borrow_global<GameRegistry>(@casino);
         registry.game_object
     }
 
     #[view]
     public fun is_initialized(): bool {
-        exists<GameRegistry>(@dice_game)
+        exists<GameRegistry>(@casino)
     }
 
     #[view]
     public fun is_ready(): bool acquires GameRegistry {
         if (!is_initialized()) { false }
         else {
-            let registry = borrow_global<GameRegistry>(@dice_game);
+            let registry = borrow_global<GameRegistry>(@casino);
             CasinoHouse::is_game_registered(registry.game_object)
         }
     }

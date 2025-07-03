@@ -6,7 +6,7 @@
 //! to achieve better code coverage while testing dice-specific functionality.
 
 #[test_only]
-module dice_game::DiceGameIntegrationTests {
+module casino::DiceGameIntegrationTests {
     use std::string;
     use std::option;
     use std::vector;
@@ -18,11 +18,11 @@ module dice_game::DiceGameIntegrationTests {
     use aptos_framework::randomness;
     use casino::InvestorToken;
     use casino::CasinoHouse;
-    use dice_game::DiceGame;
+    use casino::DiceGame;
 
     // Test constants
     const CASINO_ADDR: address = @casino;
-    const DICE_ADDR: address = @dice_game;
+    const DICE_ADDR: address = @casino;
     const UNAUTHORIZED_ADDR: address = @0x9999;
     const WHALE_INVESTOR_ADDR: address = @0x1001;
     const PLAYER_ADDR: address = @0x2001;
@@ -95,7 +95,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667 // 16.67% house edge
+            1667, // 16.67% house edge
+            250_000_000 // max_payout
         );
 
         // === PHASE 3: TEST BEFORE INITIALIZATION ===
@@ -201,7 +202,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -340,7 +342,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -352,7 +355,7 @@ module dice_game::DiceGameIntegrationTests {
 
         // Verify limits were updated in casino metadata
         let casino_game_obj = DiceGame::get_casino_game_object();
-        let (_, _, _, min_bet, max_bet, _, _) =
+        let (_, _, _, min_bet, max_bet, _, _payout1, _) =
             CasinoHouse::get_game_metadata(casino_game_obj);
         assert!(min_bet == 2000000, 1);
         assert!(max_bet == 40000000, 2);
@@ -360,7 +363,7 @@ module dice_game::DiceGameIntegrationTests {
         // Test another valid update (further risk reduction)
         DiceGame::request_limit_update(&dice_signer, 5000000, 35000000); // 0.05 APT min, 0.35 APT max
 
-        let (_, _, _, min_bet2, max_bet2, _, _) =
+        let (_, _, _, min_bet2, max_bet2, _, _payout2, _) =
             CasinoHouse::get_game_metadata(casino_game_obj);
         assert!(min_bet2 == 5000000, 3);
         assert!(max_bet2 == 35000000, 4);
@@ -446,7 +449,7 @@ module dice_game::DiceGameIntegrationTests {
         assert!(CasinoHouse::treasury_balance() > 0, 32);
 
         // Verify updated limits are still in effect
-        let (_, _, _, final_min, final_max, _, _) =
+        let (_, _, _, final_min, final_max, _, _final_payout, _) =
             CasinoHouse::get_game_metadata(casino_obj);
         assert!(final_min == 5000000, 33); // Last update value
         assert!(final_max == 35000000, 34); // Last update value
@@ -455,7 +458,7 @@ module dice_game::DiceGameIntegrationTests {
     // === ERROR CONDITION TESTS ===
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_UNAUTHORIZED)]
+    #[expected_failure(abort_code = casino::DiceGame::E_UNAUTHORIZED)]
     fun test_unauthorized_initialization() {
         let (_, casino_signer, _, whale_investor, _, _) = setup_dice_ecosystem();
         let unauthorized = account::create_account_for_test(UNAUTHORIZED_ADDR);
@@ -472,7 +475,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         // Try to initialize with wrong signer - should fail
@@ -480,7 +484,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_ALREADY_INITIALIZED)]
+    #[expected_failure(abort_code = casino::DiceGame::E_ALREADY_INITIALIZED)]
     fun test_double_initialization() {
         let (_, casino_signer, dice_signer, whale_investor, _, _) =
             setup_dice_ecosystem();
@@ -497,7 +501,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -507,7 +512,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_INVALID_GUESS)]
+    #[expected_failure(abort_code = casino::DiceGame::E_INVALID_GUESS)]
     fun test_invalid_guess_too_low() {
         let (_, casino_signer, dice_signer, whale_investor, player, _) =
             setup_dice_ecosystem();
@@ -524,7 +529,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -534,7 +540,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_INVALID_GUESS)]
+    #[expected_failure(abort_code = casino::DiceGame::E_INVALID_GUESS)]
     fun test_invalid_guess_too_high() {
         let (_, casino_signer, dice_signer, whale_investor, player, _) =
             setup_dice_ecosystem();
@@ -551,7 +557,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -561,7 +568,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::DiceGame::E_INVALID_AMOUNT)]
     fun test_bet_amount_too_low() {
         let (_, casino_signer, dice_signer, whale_investor, player, _) =
             setup_dice_ecosystem();
@@ -578,7 +585,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -588,7 +596,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::DiceGame::E_INVALID_AMOUNT)]
     fun test_bet_amount_too_high() {
         let (_, casino_signer, dice_signer, whale_investor, player, _) =
             setup_dice_ecosystem();
@@ -605,7 +613,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -615,7 +624,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_UNAUTHORIZED)]
+    #[expected_failure(abort_code = casino::DiceGame::E_UNAUTHORIZED)]
     fun test_unauthorized_limit_update() {
         let (_, casino_signer, dice_signer, whale_investor, _, _) =
             setup_dice_ecosystem();
@@ -633,7 +642,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -643,7 +653,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::DiceGame::E_INVALID_AMOUNT)]
     fun test_invalid_limit_update_range() {
         let (_, casino_signer, dice_signer, whale_investor, _, _) =
             setup_dice_ecosystem();
@@ -660,7 +670,8 @@ module dice_game::DiceGameIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);

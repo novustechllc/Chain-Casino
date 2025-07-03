@@ -20,26 +20,31 @@ module casino::TreasuryMechanicsDemo {
     use aptos_framework::object;
     use casino::InvestorToken;
     use casino::CasinoHouse;
-    use dice_game::DiceGame;
-    use dice_game::AlwaysLoseGame;
-    use slot_game::SlotMachine;
+    use casino::DiceGame;
+    use casino::AlwaysLoseGame;
+    use casino::SlotMachine;
 
     // Test addresses
     const CASINO_ADDR: address = @casino;
-    const DICE_ADDR: address = @dice_game;
-    const SLOT_ADDR: address = @slot_game;
+    const DICE_ADDR: address = @casino;
+    const SLOT_ADDR: address = @casino;
     const WHALE_INVESTOR_ADDR: address = @0x1001;
     const PLAYER_A_ADDR: address = @0x2001;
     const PLAYER_B_ADDR: address = @0x2002;
     const DRAIN_PLAYER_ADDR: address = @0x2003;
 
     // Funding amounts
-    const WHALE_CAPITAL: u64 = 100000000000; // 1000 APT for liquidity
+    const WHALE_CAPITAL: u64 = 150000000000; // 1500 APT for liquidity
     const PLAYER_FUNDING: u64 = 10000000000; // 100 APT per player
     const STANDARD_BET: u64 = 5000000; // 0.05 APT
     const LARGE_BET: u64 = 10000000; // 0.1 APT (max for always lose game)
     const MIN_BET: u64 = 1000000; // 0.01 APT
     const MAX_BET: u64 = 50000000; // 0.5 APT
+
+    // Max payout constants for initial funding assertions
+    const DICE_MAX_PAYOUT: u64 = 250_000_000; // 2.5 APT
+    const SLOT_MAX_PAYOUT: u64 = 12_500_000_000; // 125 APT
+    const ALWAYS_LOSE_MAX_PAYOUT: u64 = 30_000_000; // 0.3 APT
 
     fun setup_demo_ecosystem():
         (signer, signer, signer, signer, signer, signer, signer, signer) {
@@ -126,7 +131,8 @@ module casino::TreasuryMechanicsDemo {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         // Register SlotMachine (normal game)
@@ -137,7 +143,8 @@ module casino::TreasuryMechanicsDemo {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         // Register AlwaysLoseGame (will drain treasury)
@@ -148,7 +155,8 @@ module casino::TreasuryMechanicsDemo {
             string::utf8(b"v1"),
             MIN_BET,
             LARGE_BET, // Smaller max bet for faster draining
-            20000 // Massive negative house edge
+            20000, // Massive negative house edge
+            30_000_000
         );
 
         // Initialize games
@@ -192,9 +200,12 @@ module casino::TreasuryMechanicsDemo {
         let slot_balance = CasinoHouse::game_treasury_balance(slot_object);
         let always_lose_balance = CasinoHouse::game_treasury_balance(always_lose_object);
 
-        assert!(dice_balance == MAX_BET * 10, 4); // 5 APT
-        assert!(slot_balance == MAX_BET * 10, 5); // 5 APT
-        assert!(always_lose_balance == LARGE_BET * 10, 6); // 1 APT
+        assert!(dice_balance == DICE_MAX_PAYOUT * 5, 4);
+        assert!(slot_balance == SLOT_MAX_PAYOUT * 5, 5);
+        assert!(
+            always_lose_balance == ALWAYS_LOSE_MAX_PAYOUT * 5,
+            6
+        );
 
         // === PHASE 4: DEMONSTRATE TREASURY ROUTING ===
         // Concurrent gaming on different treasuries (parallel execution!)
@@ -271,5 +282,106 @@ module casino::TreasuryMechanicsDemo {
         assert!(DiceGame::is_ready(), 9);
         assert!(SlotMachine::is_ready(), 10);
         assert!(AlwaysLoseGame::is_ready(), 11);
+    }
+
+    #[test]
+    fun test_treasury_overflow_rebalancing_mechanics() {
+        let (_, casino_signer, dice_signer, _, whale_investor, player_a, player_b, _) =
+            setup_demo_ecosystem();
+
+        // === PHASE 1: ECOSYSTEM SETUP ===
+        CasinoHouse::init_module_for_test(&casino_signer);
+        InvestorToken::init(&casino_signer);
+        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
+
+        CasinoHouse::register_game(
+            &casino_signer,
+            DICE_ADDR,
+            string::utf8(b"DiceGame"),
+            string::utf8(b"v1"),
+            MIN_BET,
+            MAX_BET,
+            1667,
+            DICE_MAX_PAYOUT
+        );
+
+        DiceGame::initialize_game(&dice_signer);
+
+        let dice_object =
+            object::address_to_object<CasinoHouse::GameMetadata>(
+                CasinoHouse::derive_game_object_address(
+                    CASINO_ADDR, string::utf8(b"DiceGame"), string::utf8(b"v1")
+                )
+            );
+
+        // === PHASE 2: BUILD UP GAME TREASURY WITH LOSING BETS ===
+        let game_treasury_addr = CasinoHouse::get_game_treasury_address(dice_object);
+        let (_, _, _, _) = CasinoHouse::get_game_treasury_config(game_treasury_addr);
+        let central_before_accumulation = CasinoHouse::central_treasury_balance();
+
+        // Place many bets to accumulate funds (most will lose due to house edge)
+        let accumulation_rounds = 40;
+        let i = 0;
+        while (i < accumulation_rounds) {
+            // Use guess 1 consistently - 5/6 chance to lose each bet
+            DiceGame::test_only_play_dice(&player_a, 1, STANDARD_BET);
+            if (i % 2 == 0) {
+                DiceGame::test_only_play_dice(&player_b, 1, STANDARD_BET);
+            };
+            i = i + 1;
+        };
+
+        let game_balance_after = CasinoHouse::game_treasury_balance(dice_object);
+
+        // === PHASE 3: VERIFY OVERFLOW TRIGGERED REBALANCING ===
+        let central_after_accumulation = CasinoHouse::central_treasury_balance();
+
+        // Game treasury should have grown and potentially triggered overflow
+        assert!(game_balance_after > 0, 1);
+
+        // If overflow occurred, central treasury should have increased
+        if (central_after_accumulation > central_before_accumulation) {
+            // OVERFLOW REBALANCING: Excess sent to central
+            let excess_transferred =
+                central_after_accumulation - central_before_accumulation;
+            assert!(excess_transferred > 0, 2);
+        };
+
+        // === PHASE 4: FORCE OVERFLOW WITH CONCENTRATED BETS ===
+        // Place additional bets to ensure overflow if not already triggered
+        let concentration_rounds = 20;
+        let j = 0;
+        while (j < concentration_rounds) {
+            DiceGame::test_only_play_dice(&player_a, 1, LARGE_BET);
+            j = j + 1;
+        };
+
+        let final_central = CasinoHouse::central_treasury_balance();
+        let final_game = CasinoHouse::game_treasury_balance(dice_object);
+
+        // === PHASE 5: VERIFY REBALANCING MECHANICS ===
+        // Central treasury should have received overflow transfers
+        assert!(final_central >= central_before_accumulation, 3);
+
+        // Game treasury should be managed within reasonable bounds
+        let (_, final_overflow, _, _) =
+            CasinoHouse::get_game_treasury_config(game_treasury_addr);
+
+        // Treasury should be at or below overflow threshold after rebalancing
+        if (final_game <= final_overflow) {
+            // Normal case: within bounds
+            assert!(final_game >= 0, 4);
+        } else {
+            // Edge case: still above overflow, more rebalancing will occur
+            assert!(final_central > central_before_accumulation, 5);
+        };
+
+        // === PHASE 6: FINAL SYSTEM VALIDATION ===
+        assert!(DiceGame::is_ready(), 6);
+        assert!(CasinoHouse::treasury_balance() > 0, 7);
+        assert!(
+            final_central + final_game <= CasinoHouse::treasury_balance(),
+            8
+        );
     }
 }

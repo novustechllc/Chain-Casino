@@ -6,7 +6,7 @@
 //! to achieve better code coverage while testing practical functionality.
 
 #[test_only]
-module slot_game::SlotMachineIntegrationTests {
+module casino::SlotMachineIntegrationTests {
     use std::string;
     use std::option;
     use std::vector;
@@ -19,11 +19,11 @@ module slot_game::SlotMachineIntegrationTests {
     use aptos_framework::object;
     use casino::InvestorToken;
     use casino::CasinoHouse;
-    use slot_game::SlotMachine;
+    use casino::SlotMachine;
 
     // Test constants
     const CASINO_ADDR: address = @casino;
-    const SLOT_ADDR: address = @slot_game;
+    const SLOT_ADDR: address = @casino;
     const UNAUTHORIZED_ADDR: address = @0x9999;
     const WHALE_INVESTOR_ADDR: address = @0x1001;
     const PLAYER_ADDR: address = @0x2001;
@@ -85,7 +85,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550 // 15.5% house edge
+            1550, // 15.5% house edge
+            12_500_000_000
         );
 
         // === PHASE 3: TEST BEFORE INITIALIZATION ===
@@ -171,7 +172,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);
@@ -276,7 +278,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);
@@ -288,7 +291,7 @@ module slot_game::SlotMachineIntegrationTests {
 
         // Verify limits were updated in casino metadata
         let casino_game_obj = SlotMachine::get_casino_game_object();
-        let (_, _, _, min_bet, max_bet, _, _) =
+        let (_, _, _, min_bet, max_bet, _, _slot_payout1, _) =
             CasinoHouse::get_game_metadata(casino_game_obj);
         assert!(min_bet == 2000000, 1);
         assert!(max_bet == 40000000, 2);
@@ -296,7 +299,7 @@ module slot_game::SlotMachineIntegrationTests {
         // Test another valid update (further risk reduction)
         SlotMachine::request_limit_update(&slot_signer, 5000000, 35000000); // 0.05 APT min, 0.35 APT max
 
-        let (_, _, _, min_bet2, max_bet2, _, _) =
+        let (_, _, _, min_bet2, max_bet2, _, _slot_payout2, _) =
             CasinoHouse::get_game_metadata(casino_game_obj);
         assert!(min_bet2 == 5000000, 3);
         assert!(max_bet2 == 35000000, 4);
@@ -369,7 +372,7 @@ module slot_game::SlotMachineIntegrationTests {
     // === ERROR CONDITION TESTS ===
 
     #[test]
-    #[expected_failure(abort_code = slot_game::SlotMachine::E_UNAUTHORIZED)]
+    #[expected_failure(abort_code = casino::SlotMachine::E_UNAUTHORIZED)]
     fun test_unauthorized_initialization() {
         let (_, casino_signer, _, whale_investor, _) = setup_slot_ecosystem();
         let unauthorized = account::create_account_for_test(UNAUTHORIZED_ADDR);
@@ -386,7 +389,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         // Try to initialize with wrong signer - should fail
@@ -394,7 +398,7 @@ module slot_game::SlotMachineIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = slot_game::SlotMachine::E_ALREADY_INITIALIZED)]
+    #[expected_failure(abort_code = casino::SlotMachine::E_ALREADY_INITIALIZED)]
     fun test_double_initialization() {
         let (_, casino_signer, slot_signer, whale_investor, _) = setup_slot_ecosystem();
 
@@ -410,7 +414,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);
@@ -420,7 +425,7 @@ module slot_game::SlotMachineIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = slot_game::SlotMachine::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::SlotMachine::E_INVALID_AMOUNT)]
     fun test_bet_amount_too_low() {
         let (_, casino_signer, slot_signer, whale_investor, player) =
             setup_slot_ecosystem();
@@ -437,7 +442,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);
@@ -447,7 +453,7 @@ module slot_game::SlotMachineIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = slot_game::SlotMachine::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::SlotMachine::E_INVALID_AMOUNT)]
     fun test_bet_amount_too_high() {
         let (_, casino_signer, slot_signer, whale_investor, player) =
             setup_slot_ecosystem();
@@ -464,7 +470,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);
@@ -474,7 +481,7 @@ module slot_game::SlotMachineIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = slot_game::SlotMachine::E_UNAUTHORIZED)]
+    #[expected_failure(abort_code = casino::SlotMachine::E_UNAUTHORIZED)]
     fun test_unauthorized_limit_update() {
         let (_, casino_signer, slot_signer, whale_investor, _) = setup_slot_ecosystem();
         let unauthorized = account::create_account_for_test(UNAUTHORIZED_ADDR);
@@ -491,7 +498,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);
@@ -501,7 +509,7 @@ module slot_game::SlotMachineIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = slot_game::SlotMachine::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::SlotMachine::E_INVALID_AMOUNT)]
     fun test_invalid_limit_update_range() {
         let (_, casino_signer, slot_signer, whale_investor, _) = setup_slot_ecosystem();
 
@@ -517,7 +525,8 @@ module slot_game::SlotMachineIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         SlotMachine::initialize_game(&slot_signer);

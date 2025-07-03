@@ -19,13 +19,13 @@ module casino::CasinoHouseIntegrationTests {
     use aptos_framework::object;
     use casino::CasinoHouse;
     use casino::InvestorToken;
-    use dice_game::DiceGame;
-    use slot_game::SlotMachine;
+    use casino::DiceGame;
+    use casino::SlotMachine;
 
     // Test constants
     const CASINO_ADDR: address = @casino;
-    const DICE_ADDR: address = @dice_game;
-    const SLOT_ADDR: address = @slot_game;
+    const DICE_ADDR: address = @casino;
+    const SLOT_ADDR: address = @casino;
     const UNAUTHORIZED_ADDR: address = @0x9999;
     const FAKE_GAME_ADDR: address = @0x8888;
 
@@ -35,7 +35,7 @@ module casino::CasinoHouseIntegrationTests {
     const ADMIN_ADDR: address = @0x3001;
 
     // Funding amounts
-    const LARGE_FUNDING: u64 = 100000000000; // 1000 APT
+    const LARGE_FUNDING: u64 = 150000000000; // 1500 APT
     const STANDARD_FUNDING: u64 = 10000000000; // 100 APT
     const STANDARD_BET: u64 = 5000000; // 0.05 APT
     const MIN_BET: u64 = 1000000; // 0.01 APT
@@ -109,7 +109,8 @@ module casino::CasinoHouseIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -241,7 +242,8 @@ module casino::CasinoHouseIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1667
+            1667,
+            250_000_000
         );
 
         CasinoHouse::register_game(
@@ -251,7 +253,8 @@ module casino::CasinoHouseIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1550
+            1550,
+            12_500_000_000
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -275,7 +278,7 @@ module casino::CasinoHouseIntegrationTests {
         // Test casino admin updating limits
         CasinoHouse::update_game_limits(&casino_signer, dice_object, 2000000, 40000000); // 0.02 - 0.4 APT
 
-        let (_, _, _, new_min, new_max, _, _) =
+        let (_, _, _, new_min, new_max, _, _dice_payout, _) =
             CasinoHouse::get_game_metadata(dice_object);
         assert!(new_min == 2000000, 1);
         assert!(new_max == 40000000, 2);
@@ -283,7 +286,7 @@ module casino::CasinoHouseIntegrationTests {
         // Test games requesting limit changes (risk reduction only)
         DiceGame::request_limit_update(&dice_signer, 5000000, 35000000); // 0.05 - 0.35 APT
 
-        let (_, _, _, updated_min, updated_max, _, _) =
+        let (_, _, _, updated_min, updated_max, _, _dice_payout2, _) =
             CasinoHouse::get_game_metadata(dice_object);
         assert!(updated_min == 5000000, 3);
         assert!(updated_max == 35000000, 4);
@@ -339,6 +342,7 @@ module casino::CasinoHouseIntegrationTests {
             dice_min_final,
             dice_max_final,
             dice_edge,
+            _dice_max_payout,
             dice_claimed
         ) = CasinoHouse::get_game_metadata(dice_object);
 
@@ -351,7 +355,14 @@ module casino::CasinoHouseIntegrationTests {
         assert!(dice_claimed, 25); // Should be claimed
 
         let (
-            slot_name, slot_version, slot_addr, slot_min, slot_max, slot_edge, slot_claimed
+            slot_name,
+            slot_version,
+            slot_addr,
+            slot_min,
+            slot_max,
+            slot_edge,
+            _slot_max_payout,
+            slot_claimed
         ) = CasinoHouse::get_game_metadata(slot_object);
 
         assert!(slot_name == string::utf8(b"SlotMachine"), 26);
@@ -411,7 +422,8 @@ module casino::CasinoHouseIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            1500
+            1500,
+            100_000_000 // 1 APT max_payout
         );
     }
 
@@ -432,7 +444,133 @@ module casino::CasinoHouseIntegrationTests {
             string::utf8(b"v1"),
             MAX_BET,
             MIN_BET, // max < min
-            1500
+            1500,
+            100_000_000 // 1 APT max_payout
         );
+    }
+
+    #[test]
+    fun test_game_unregistration_and_treasury_cleanup() {
+        let (_, casino_signer, dice_signer, _, investor, _, _) = setup_casino_ecosystem();
+
+        // === PHASE 1: SETUP COMPLETE ECOSYSTEM ===
+        CasinoHouse::init_module_for_test(&casino_signer);
+        InvestorToken::init(&casino_signer);
+        InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
+
+        // Register multiple games to test selective unregistration
+        CasinoHouse::register_game(
+            &casino_signer,
+            DICE_ADDR,
+            string::utf8(b"DiceGame"),
+            string::utf8(b"v1"),
+            MIN_BET,
+            MAX_BET,
+            1667,
+            250_000_000
+        );
+
+        CasinoHouse::register_game(
+            &casino_signer,
+            SLOT_ADDR,
+            string::utf8(b"SlotMachine"),
+            string::utf8(b"v1"),
+            MIN_BET,
+            MAX_BET,
+            1550,
+            12_500_000_000
+        );
+
+        DiceGame::initialize_game(&dice_signer);
+
+        let dice_object =
+            object::address_to_object<CasinoHouse::GameMetadata>(
+                CasinoHouse::derive_game_object_address(
+                    CASINO_ADDR, string::utf8(b"DiceGame"), string::utf8(b"v1")
+                )
+            );
+        let slot_object =
+            object::address_to_object<CasinoHouse::GameMetadata>(
+                CasinoHouse::derive_game_object_address(
+                    CASINO_ADDR, string::utf8(b"SlotMachine"), string::utf8(b"v1")
+                )
+            );
+
+        // === PHASE 2: VERIFY INITIAL STATE ===
+        let initial_games = CasinoHouse::get_registered_games();
+        assert!(vector::length(&initial_games) == 2, 1);
+        assert!(CasinoHouse::is_game_registered(dice_object), 2);
+        assert!(CasinoHouse::is_game_registered(slot_object), 3);
+
+        let initial_central_balance = CasinoHouse::central_treasury_balance();
+        let dice_treasury_balance = CasinoHouse::game_treasury_balance(dice_object);
+
+        assert!(dice_treasury_balance > 0, 4); // Should have initial funding
+
+        // === PHASE 3: UNREGISTER DICE GAME ===
+        CasinoHouse::unregister_game(&casino_signer, dice_object);
+
+        // === PHASE 4: VERIFY GAME REMOVAL ===
+        let updated_games = CasinoHouse::get_registered_games();
+        assert!(vector::length(&updated_games) == 1, 5); // One less game
+        assert!(!CasinoHouse::is_game_registered(dice_object), 6); // Dice removed
+        assert!(CasinoHouse::is_game_registered(slot_object), 7); // Slot remains
+
+        // === PHASE 5: VERIFY TREASURY CLEANUP ===
+        let final_central_balance = CasinoHouse::central_treasury_balance();
+
+        // Central treasury should have increased by withdrawn amount
+        assert!(
+            final_central_balance >= initial_central_balance + dice_treasury_balance,
+            8
+        );
+
+        // Game treasury should no longer be accessible
+        // Note: We expect this to fail at framework level, not app level
+        // But we can't easily test this without creating framework errors
+
+        // === PHASE 6: VERIFY REMAINING GAME STILL WORKS ===
+        assert!(CasinoHouse::is_game_registered(slot_object), 9);
+        let slot_treasury_balance = CasinoHouse::game_treasury_balance(slot_object);
+        assert!(slot_treasury_balance > 0, 10); // Slot treasury unaffected
+
+        // === PHASE 7: VERIFY SYSTEM STABILITY ===
+        assert!(CasinoHouse::treasury_balance() > 0, 11);
+        assert!(vector::length(&CasinoHouse::get_registered_games()) == 1, 12);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = casino::CasinoHouse::E_NOT_ADMIN)]
+    fun test_unregister_game_unauthorized() {
+        let (_, casino_signer, dice_signer, _, investor, _, admin) =
+            setup_casino_ecosystem();
+
+        // Setup
+        CasinoHouse::init_module_for_test(&casino_signer);
+        InvestorToken::init(&casino_signer);
+        InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
+
+        CasinoHouse::register_game(
+            &casino_signer,
+            DICE_ADDR,
+            string::utf8(b"DiceGame"),
+            string::utf8(b"v1"),
+            MIN_BET,
+            MAX_BET,
+            1667,
+            250_000_000
+        );
+
+        DiceGame::initialize_game(&dice_signer);
+
+        let dice_object =
+            object::address_to_object<CasinoHouse::GameMetadata>(
+                CasinoHouse::derive_game_object_address(
+                    CASINO_ADDR, string::utf8(b"DiceGame"), string::utf8(b"v1")
+                )
+            );
+
+        // Try to unregister with non-admin signer - should fail
+        CasinoHouse::unregister_game(&admin, dice_object);
     }
 }

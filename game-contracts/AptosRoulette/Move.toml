@@ -1,0 +1,21 @@
+[package]
+name = "AptosRoulette"
+version = "1.0.0"
+authors = []
+
+[addresses]
+casino = "_"
+roulette_game = "_"
+
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-framework.git"
+rev = "mainnet"
+subdir = "aptos-framework"
+
+[dependencies.ChainCasino]
+git = "https://github.com/PersonaNormale/ChainCasino.git"
+rev = "refactor/casino-improvements"
+
+[dev-dependencies]

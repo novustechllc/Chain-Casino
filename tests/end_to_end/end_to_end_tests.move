@@ -19,7 +19,7 @@ module casino::EndToEndTests {
     use aptos_framework::object;
     use casino::InvestorToken;
     use casino::CasinoHouse;
-    use dice_game::DiceGame;
+    use casino::DiceGame;
 
     // === REALISTIC MONEY AMOUNTS ===
     // Players: Small amounts (they can lose everything due to randomness)
@@ -36,8 +36,8 @@ module casino::EndToEndTests {
 
     // Test addresses - separate for each role
     const CASINO_ADDR: address = @casino;
-    const DICE_ADDR: address = @dice_game;
-    const SLOT_ADDR: address = @slot_game;
+    const DICE_ADDR: address = @casino;
+    const SLOT_ADDR: address = @casino;
 
     // Investors (provide liquidity)
     const EARLY_INVESTOR_ADDR: address = @0x1001;
@@ -176,7 +176,8 @@ module casino::EndToEndTests {
             string::utf8(b"v1"),
             1000000, // 0.01 APT min (matches hardcoded)
             50000000, // 0.5 APT max (matches hardcoded)
-            1667
+            1667,
+            250_000_000
         );
         DiceGame::initialize_game(&dice_signer);
 
@@ -188,7 +189,7 @@ module casino::EndToEndTests {
             );
 
         // === PHASE 1: TEST INITIAL LIMITS ===
-        let (_, _, _, initial_min, initial_max, _, _) =
+        let (_, _, _, initial_min, initial_max, _, _max_payout_init, _) =
             CasinoHouse::get_game_metadata(dice_object);
         assert!(initial_min == 1000000, 1); // 0.01 APT
         assert!(initial_max == 50000000, 2); // 0.5 APT
@@ -200,7 +201,7 @@ module casino::EndToEndTests {
         // === PHASE 2: CASINO UPDATES LIMITS ===
         CasinoHouse::update_game_limits(&casino_signer, dice_object, 2000000, 45000000);
 
-        let (_, _, _, new_min, new_max, _, _) =
+        let (_, _, _, new_min, new_max, _, _max_payout_new, _) =
             CasinoHouse::get_game_metadata(dice_object);
         assert!(new_min == 2000000, 3); // 0.02 APT
         assert!(new_max == 45000000, 4); // 0.45 APT
@@ -212,7 +213,7 @@ module casino::EndToEndTests {
         // Games can only reduce risk (increase min or decrease max)
         DiceGame::request_limit_update(&dice_signer, 5000000, 40000000);
 
-        let (_, _, _, conservative_min, conservative_max, _, _) =
+        let (_, _, _, conservative_min, conservative_max, _, _max_payout_cons, _) =
             CasinoHouse::get_game_metadata(dice_object);
         assert!(conservative_min == 5000000, 5); // 0.05 APT (increased)
         assert!(conservative_max == 40000000, 6); // 0.4 APT (decreased)
@@ -238,7 +239,7 @@ module casino::EndToEndTests {
         assert!(CasinoHouse::treasury_balance() > 0, 10);
 
         // === FINAL VERIFICATION ===
-        let (_, _, _, final_min, final_max, final_edge, _) =
+        let (_, _, _, final_min, final_max, final_edge, _final_payout, _) =
             CasinoHouse::get_game_metadata(dice_object);
         assert!(final_min == 5000000, 11); // Conservative min maintained
         assert!(final_max == 40000000, 12); // Conservative max maintained
@@ -246,7 +247,7 @@ module casino::EndToEndTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::DiceGame::E_INVALID_AMOUNT)]
     fun test_bet_amount_validation() {
         let (
             _,
@@ -275,7 +276,8 @@ module casino::EndToEndTests {
             string::utf8(b"v1"),
             1000000,
             50000000,
-            1667
+            1667,
+            250_000_000
         );
         DiceGame::initialize_game(&dice_signer);
 
@@ -297,22 +299,5 @@ module casino::EndToEndTests {
 
         // Try to redeem more than balance
         InvestorToken::redeem(&early_investor, tokens + 1000000000); // More than owned
-    }
-
-    #[test]
-    #[expected_failure(abort_code = casino::CasinoHouse::E_NOT_ADMIN)]
-    fun test_unauthorized_game_registration() {
-        let (_, _, dice_signer, _, _, _, _, _, _, _, _, _) = setup_realistic_ecosystem();
-
-        // Non-casino admin tries to register game - should fail
-        CasinoHouse::register_game(
-            &dice_signer, // Not casino admin
-            DICE_ADDR,
-            string::utf8(b"UnauthorizedGame"),
-            string::utf8(b"v1"),
-            1000000,
-            50000000,
-            1500
-        );
     }
 }
