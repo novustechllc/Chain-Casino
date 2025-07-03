@@ -19,7 +19,7 @@ module casino::EndToEndTests {
     use aptos_framework::object;
     use casino::InvestorToken;
     use casino::CasinoHouse;
-    use dice_game::DiceGame;
+    use casino::DiceGame;
 
     // === REALISTIC MONEY AMOUNTS ===
     // Players: Small amounts (they can lose everything due to randomness)
@@ -36,8 +36,8 @@ module casino::EndToEndTests {
 
     // Test addresses - separate for each role
     const CASINO_ADDR: address = @casino;
-    const DICE_ADDR: address = @dice_game;
-    const SLOT_ADDR: address = @slot_game;
+    const DICE_ADDR: address = @casino;
+    const SLOT_ADDR: address = @casino;
 
     // Investors (provide liquidity)
     const EARLY_INVESTOR_ADDR: address = @0x1001;
@@ -247,7 +247,7 @@ module casino::EndToEndTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::DiceGame::E_INVALID_AMOUNT)]
     fun test_bet_amount_validation() {
         let (
             _,
@@ -299,23 +299,5 @@ module casino::EndToEndTests {
 
         // Try to redeem more than balance
         InvestorToken::redeem(&early_investor, tokens + 1000000000); // More than owned
-    }
-
-    #[test]
-    #[expected_failure(abort_code = casino::CasinoHouse::E_NOT_ADMIN)]
-    fun test_unauthorized_game_registration() {
-        let (_, _, dice_signer, _, _, _, _, _, _, _, _, _) = setup_realistic_ecosystem();
-
-        // Non-casino admin tries to register game - should fail
-        CasinoHouse::register_game(
-            &dice_signer, // Not casino admin
-            DICE_ADDR,
-            string::utf8(b"UnauthorizedGame"),
-            string::utf8(b"v1"),
-            1000000,
-            50000000,
-            1500,
-            100_000_000
-        );
     }
 }

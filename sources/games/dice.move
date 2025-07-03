@@ -5,7 +5,7 @@
 //! Single die guessing game where players bet on the exact outcome (1-6).
 //! Now uses simplified bet tracking with BetId struct.
 
-module dice_game::DiceGame {
+module casino::DiceGame {
     use aptos_framework::randomness;
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object, ObjectCore, ExtendRef};
@@ -105,8 +105,8 @@ module dice_game::DiceGame {
 
     /// Initialize dice game with named object - claims capability from casino
     public entry fun initialize_game(dice_admin: &signer) {
-        assert!(signer::address_of(dice_admin) == @dice_game, E_UNAUTHORIZED);
-        assert!(!exists<GameRegistry>(@dice_game), E_ALREADY_INITIALIZED);
+        assert!(signer::address_of(dice_admin) == @casino, E_UNAUTHORIZED);
+        assert!(!exists<GameRegistry>(@casino), E_ALREADY_INITIALIZED);
 
         // Derive the game object that casino should have created
         let game_name = string::utf8(b"DiceGame");
@@ -243,7 +243,7 @@ module dice_game::DiceGame {
     public entry fun request_limit_update(
         game_admin: &signer, new_min_bet: u64, new_max_bet: u64
     ) acquires GameRegistry, GameAuth {
-        assert!(signer::address_of(game_admin) == @dice_game, E_UNAUTHORIZED);
+        assert!(signer::address_of(game_admin) == @casino, E_UNAUTHORIZED);
         assert!(new_max_bet >= new_min_bet, E_INVALID_AMOUNT);
 
         let object_addr = get_game_object_address();
@@ -288,14 +288,14 @@ module dice_game::DiceGame {
 
     #[view]
     public fun get_game_object_address(): address acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@dice_game);
+        let registry = borrow_global<GameRegistry>(@casino);
         let seed = build_seed(registry.game_name, registry.version);
         object::create_object_address(&registry.creator, seed)
     }
 
     #[view]
     public fun get_casino_game_object(): Object<CasinoHouse::GameMetadata> acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@dice_game);
+        let registry = borrow_global<GameRegistry>(@casino);
         registry.game_object
     }
 
@@ -310,14 +310,14 @@ module dice_game::DiceGame {
 
     #[view]
     public fun get_game_info(): (address, Object<CasinoHouse::GameMetadata>, String, String) acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@dice_game);
+        let registry = borrow_global<GameRegistry>(@casino);
         (registry.creator, registry.game_object, registry.game_name, registry.version)
     }
 
     #[view]
     /// Check if game treasury has sufficient balance for a bet
     public fun can_handle_payout(bet_amount: u64): bool acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@dice_game);
+        let registry = borrow_global<GameRegistry>(@casino);
         let expected_payout = bet_amount * PAYOUT_MULTIPLIER;
         let game_treasury_balance =
             CasinoHouse::game_treasury_balance(registry.game_object);
@@ -330,37 +330,37 @@ module dice_game::DiceGame {
     #[view]
     /// Get game treasury balance
     public fun game_treasury_balance(): u64 acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@dice_game);
+        let registry = borrow_global<GameRegistry>(@casino);
         CasinoHouse::game_treasury_balance(registry.game_object)
     }
 
     #[view]
     /// Get game treasury address
     public fun game_treasury_address(): address acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@dice_game);
+        let registry = borrow_global<GameRegistry>(@casino);
         CasinoHouse::get_game_treasury_address(registry.game_object)
     }
 
     #[view]
     /// Get game treasury configuration
     public fun game_treasury_config(): (u64, u64, u64, u64) acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@dice_game);
+        let registry = borrow_global<GameRegistry>(@casino);
         let treasury_addr = CasinoHouse::get_game_treasury_address(registry.game_object);
         CasinoHouse::get_game_treasury_config(treasury_addr)
     }
 
     #[view]
     public fun is_registered(): bool acquires GameRegistry {
-        if (!exists<GameRegistry>(@dice_game)) { false }
+        if (!exists<GameRegistry>(@casino)) { false }
         else {
-            let registry = borrow_global<GameRegistry>(@dice_game);
+            let registry = borrow_global<GameRegistry>(@casino);
             CasinoHouse::is_game_registered(registry.game_object)
         }
     }
 
     #[view]
     public fun is_initialized(): bool {
-        exists<GameRegistry>(@dice_game)
+        exists<GameRegistry>(@casino)
     }
 
     #[view]

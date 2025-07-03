@@ -6,7 +6,7 @@
 //! to achieve better code coverage while testing practical functionality.
 
 #[test_only]
-module slot_game::SlotMachineIntegrationTests {
+module casino::SlotMachineIntegrationTests {
     use std::string;
     use std::option;
     use std::vector;
@@ -19,11 +19,11 @@ module slot_game::SlotMachineIntegrationTests {
     use aptos_framework::object;
     use casino::InvestorToken;
     use casino::CasinoHouse;
-    use slot_game::SlotMachine;
+    use casino::SlotMachine;
 
     // Test constants
     const CASINO_ADDR: address = @casino;
-    const SLOT_ADDR: address = @slot_game;
+    const SLOT_ADDR: address = @casino;
     const UNAUTHORIZED_ADDR: address = @0x9999;
     const WHALE_INVESTOR_ADDR: address = @0x1001;
     const PLAYER_ADDR: address = @0x2001;
@@ -372,7 +372,7 @@ module slot_game::SlotMachineIntegrationTests {
     // === ERROR CONDITION TESTS ===
 
     #[test]
-    #[expected_failure(abort_code = slot_game::SlotMachine::E_UNAUTHORIZED)]
+    #[expected_failure(abort_code = casino::SlotMachine::E_UNAUTHORIZED)]
     fun test_unauthorized_initialization() {
         let (_, casino_signer, _, whale_investor, _) = setup_slot_ecosystem();
         let unauthorized = account::create_account_for_test(UNAUTHORIZED_ADDR);
@@ -398,7 +398,7 @@ module slot_game::SlotMachineIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = slot_game::SlotMachine::E_ALREADY_INITIALIZED)]
+    #[expected_failure(abort_code = casino::SlotMachine::E_ALREADY_INITIALIZED)]
     fun test_double_initialization() {
         let (_, casino_signer, slot_signer, whale_investor, _) = setup_slot_ecosystem();
 
@@ -425,7 +425,7 @@ module slot_game::SlotMachineIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = slot_game::SlotMachine::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::SlotMachine::E_INVALID_AMOUNT)]
     fun test_bet_amount_too_low() {
         let (_, casino_signer, slot_signer, whale_investor, player) =
             setup_slot_ecosystem();
@@ -453,7 +453,7 @@ module slot_game::SlotMachineIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = slot_game::SlotMachine::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::SlotMachine::E_INVALID_AMOUNT)]
     fun test_bet_amount_too_high() {
         let (_, casino_signer, slot_signer, whale_investor, player) =
             setup_slot_ecosystem();
@@ -481,7 +481,7 @@ module slot_game::SlotMachineIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = slot_game::SlotMachine::E_UNAUTHORIZED)]
+    #[expected_failure(abort_code = casino::SlotMachine::E_UNAUTHORIZED)]
     fun test_unauthorized_limit_update() {
         let (_, casino_signer, slot_signer, whale_investor, _) = setup_slot_ecosystem();
         let unauthorized = account::create_account_for_test(UNAUTHORIZED_ADDR);
@@ -509,7 +509,7 @@ module slot_game::SlotMachineIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = slot_game::SlotMachine::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::SlotMachine::E_INVALID_AMOUNT)]
     fun test_invalid_limit_update_range() {
         let (_, casino_signer, slot_signer, whale_investor, _) = setup_slot_ecosystem();
 

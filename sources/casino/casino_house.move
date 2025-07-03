@@ -828,7 +828,9 @@ module casino::CasinoHouse {
 
     /// Build seed for deterministic object creation
     fun build_game_seed(name: String, version: String): vector<u8> {
-        let seed = *std::string::bytes(&name);
+        let seed = vector::empty<u8>();
+        vector::append(&mut seed, b"game_metadata_");
+        vector::append(&mut seed, *std::string::bytes(&name));
         vector::append(&mut seed, b"_");
         vector::append(&mut seed, *std::string::bytes(&version));
         seed

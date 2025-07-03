@@ -6,7 +6,7 @@
 //! to achieve better code coverage while testing dice-specific functionality.
 
 #[test_only]
-module dice_game::DiceGameIntegrationTests {
+module casino::DiceGameIntegrationTests {
     use std::string;
     use std::option;
     use std::vector;
@@ -18,11 +18,11 @@ module dice_game::DiceGameIntegrationTests {
     use aptos_framework::randomness;
     use casino::InvestorToken;
     use casino::CasinoHouse;
-    use dice_game::DiceGame;
+    use casino::DiceGame;
 
     // Test constants
     const CASINO_ADDR: address = @casino;
-    const DICE_ADDR: address = @dice_game;
+    const DICE_ADDR: address = @casino;
     const UNAUTHORIZED_ADDR: address = @0x9999;
     const WHALE_INVESTOR_ADDR: address = @0x1001;
     const PLAYER_ADDR: address = @0x2001;
@@ -458,7 +458,7 @@ module dice_game::DiceGameIntegrationTests {
     // === ERROR CONDITION TESTS ===
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_UNAUTHORIZED)]
+    #[expected_failure(abort_code = casino::DiceGame::E_UNAUTHORIZED)]
     fun test_unauthorized_initialization() {
         let (_, casino_signer, _, whale_investor, _, _) = setup_dice_ecosystem();
         let unauthorized = account::create_account_for_test(UNAUTHORIZED_ADDR);
@@ -484,7 +484,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_ALREADY_INITIALIZED)]
+    #[expected_failure(abort_code = casino::DiceGame::E_ALREADY_INITIALIZED)]
     fun test_double_initialization() {
         let (_, casino_signer, dice_signer, whale_investor, _, _) =
             setup_dice_ecosystem();
@@ -512,7 +512,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_INVALID_GUESS)]
+    #[expected_failure(abort_code = casino::DiceGame::E_INVALID_GUESS)]
     fun test_invalid_guess_too_low() {
         let (_, casino_signer, dice_signer, whale_investor, player, _) =
             setup_dice_ecosystem();
@@ -540,7 +540,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_INVALID_GUESS)]
+    #[expected_failure(abort_code = casino::DiceGame::E_INVALID_GUESS)]
     fun test_invalid_guess_too_high() {
         let (_, casino_signer, dice_signer, whale_investor, player, _) =
             setup_dice_ecosystem();
@@ -568,7 +568,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::DiceGame::E_INVALID_AMOUNT)]
     fun test_bet_amount_too_low() {
         let (_, casino_signer, dice_signer, whale_investor, player, _) =
             setup_dice_ecosystem();
@@ -596,7 +596,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::DiceGame::E_INVALID_AMOUNT)]
     fun test_bet_amount_too_high() {
         let (_, casino_signer, dice_signer, whale_investor, player, _) =
             setup_dice_ecosystem();
@@ -624,7 +624,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_UNAUTHORIZED)]
+    #[expected_failure(abort_code = casino::DiceGame::E_UNAUTHORIZED)]
     fun test_unauthorized_limit_update() {
         let (_, casino_signer, dice_signer, whale_investor, _, _) =
             setup_dice_ecosystem();
@@ -653,7 +653,7 @@ module dice_game::DiceGameIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = dice_game::DiceGame::E_INVALID_AMOUNT)]
+    #[expected_failure(abort_code = casino::DiceGame::E_INVALID_AMOUNT)]
     fun test_invalid_limit_update_range() {
         let (_, casino_signer, dice_signer, whale_investor, _, _) =
             setup_dice_ecosystem();

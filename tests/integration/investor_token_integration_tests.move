@@ -18,11 +18,11 @@ module casino::InvestorTokenIntegrationTests {
     use aptos_framework::randomness;
     use casino::InvestorToken;
     use casino::CasinoHouse;
-    use dice_game::DiceGame;
+    use casino::DiceGame;
 
     // Test constants
     const CASINO_ADDR: address = @casino;
-    const DICE_ADDR: address = @dice_game;
+    const DICE_ADDR: address = @casino;
     const UNAUTHORIZED_ADDR: address = @0x9999;
 
     // Investor addresses

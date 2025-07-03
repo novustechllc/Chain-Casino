@@ -19,13 +19,13 @@ module casino::CasinoHouseIntegrationTests {
     use aptos_framework::object;
     use casino::CasinoHouse;
     use casino::InvestorToken;
-    use dice_game::DiceGame;
-    use slot_game::SlotMachine;
+    use casino::DiceGame;
+    use casino::SlotMachine;
 
     // Test constants
     const CASINO_ADDR: address = @casino;
-    const DICE_ADDR: address = @dice_game;
-    const SLOT_ADDR: address = @slot_game;
+    const DICE_ADDR: address = @casino;
+    const SLOT_ADDR: address = @casino;
     const UNAUTHORIZED_ADDR: address = @0x9999;
     const FAKE_GAME_ADDR: address = @0x8888;
 

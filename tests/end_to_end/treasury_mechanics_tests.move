@@ -20,14 +20,14 @@ module casino::TreasuryMechanicsDemo {
     use aptos_framework::object;
     use casino::InvestorToken;
     use casino::CasinoHouse;
-    use dice_game::DiceGame;
-    use dice_game::AlwaysLoseGame;
-    use slot_game::SlotMachine;
+    use casino::DiceGame;
+    use casino::AlwaysLoseGame;
+    use casino::SlotMachine;
 
     // Test addresses
     const CASINO_ADDR: address = @casino;
-    const DICE_ADDR: address = @dice_game;
-    const SLOT_ADDR: address = @slot_game;
+    const DICE_ADDR: address = @casino;
+    const SLOT_ADDR: address = @casino;
     const WHALE_INVESTOR_ADDR: address = @0x1001;
     const PLAYER_A_ADDR: address = @0x2001;
     const PLAYER_B_ADDR: address = @0x2002;
