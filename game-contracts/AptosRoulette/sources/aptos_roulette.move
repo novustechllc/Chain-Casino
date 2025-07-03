@@ -214,9 +214,14 @@ module roulette_game::AptosRoulette {
         if (exists<SpinResult>(player_addr)) {
             let old_result = move_from<SpinResult>(player_addr);
             // Old result properly destructured and dropped
-            let SpinResult { 
-                winning_number: _, bet_number: _, bet_amount: _, payout: _, 
-                timestamp: _, session_id: _, won: _ 
+            let SpinResult {
+                winning_number: _,
+                bet_number: _,
+                bet_amount: _,
+                payout: _,
+                timestamp: _,
+                session_id: _,
+                won: _
             } = old_result;
         };
 
@@ -256,7 +261,7 @@ module roulette_game::AptosRoulette {
 
         // Generate session ID for frontend state management
         let current_time = timestamp::now_seconds();
-        let session_id = account::get_sequence_number(player_addr);  // Unique per user transaction
+        let session_id = account::get_sequence_number(player_addr); // Unique per user transaction
 
         // Store result at user address for immediate frontend access
         let spin_result = SpinResult {
@@ -304,13 +309,18 @@ module roulette_game::AptosRoulette {
         if (exists<SpinResult>(user_addr)) {
             let result = move_from<SpinResult>(user_addr);
             let session_id = result.session_id;
-            
+
             // Properly destructure the resource
-            let SpinResult { 
-                winning_number: _, bet_number: _, bet_amount: _, payout: _, 
-                timestamp: _, session_id: _, won: _ 
+            let SpinResult {
+                winning_number: _,
+                bet_number: _,
+                bet_amount: _,
+                payout: _,
+                timestamp: _,
+                session_id: _,
+                won: _
             } = result;
-            
+
             event::emit(ResultCleanedEvent { player: user_addr, session_id });
         };
     }
@@ -359,9 +369,11 @@ module roulette_game::AptosRoulette {
     #[view]
     /// Get user's latest spin result - PRIMARY FRONTEND FUNCTION
     /// Returns: (winning_number, bet_number, bet_amount, payout, won, timestamp, session_id)
-    public fun get_user_spin_result(player_addr: address): (u8, u8, u64, u64, bool, u64, u64) acquires SpinResult {
+    public fun get_user_spin_result(
+        player_addr: address
+    ): (u8, u8, u64, u64, bool, u64, u64) acquires SpinResult {
         assert!(exists<SpinResult>(player_addr), E_INVALID_AMOUNT);
-        
+
         let result = borrow_global<SpinResult>(player_addr);
         (
             result.winning_number,
@@ -385,7 +397,7 @@ module roulette_game::AptosRoulette {
     /// Returns: (winning_number, won, payout)
     public fun get_quick_result(player_addr: address): (u8, bool, u64) acquires SpinResult {
         assert!(exists<SpinResult>(player_addr), E_INVALID_AMOUNT);
-        
+
         let result = borrow_global<SpinResult>(player_addr);
         (result.winning_number, result.won, result.payout)
     }
@@ -395,7 +407,7 @@ module roulette_game::AptosRoulette {
     /// Returns: (session_id, timestamp)
     public fun get_session_info(player_addr: address): (u64, u64) acquires SpinResult {
         assert!(exists<SpinResult>(player_addr), E_INVALID_AMOUNT);
-        
+
         let result = borrow_global<SpinResult>(player_addr);
         (result.session_id, result.timestamp)
     }
