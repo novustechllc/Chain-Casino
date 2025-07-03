@@ -20,11 +20,12 @@ ChainCasino turns **"The House Always Wins"** into **"The Investor Always Earns.
 ## 🚀 Quick Start
 
 ```bash
-# Compile the project
+# Compile and test
 aptos move compile
-
-# Run tests
 aptos move test
+
+# Deploy
+aptos move publish --named-addresses casino=<YOUR_ADDRESS>
 ```
 
 ---
@@ -166,44 +167,68 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    subgraph "❌ Traditional Sequential Casino"
-        SeqTx1[Player A bets on Dice]
-        SeqTx2[Player B bets on Slots]
-        SeqTx3[Player C bets on Dice]
-        
-        SeqTreasury[Single Treasury Account<br/>@casino_treasury]
-        
-        SeqTx1 --> SeqTreasury
-        SeqTx2 --> SeqTreasury  
-        SeqTx3 --> SeqTreasury
-        
-        SeqTx1 -.->|"❌ BLOCKS"| SeqTx2
-        SeqTx2 -.->|"❌ BLOCKS"| SeqTx3
+    subgraph "💰 Investment Layer"
+        Investor[👤 Investor]
+        CCIT[🪙 CCIT Token<br/>NAV-based FA]
     end
 
-    subgraph "✅ ChainCasino Block-STM Design"
-        ParTx1[Player A bets on Dice]
-        ParTx2[Player B bets on Slots]
-        ParTx3[Player C bets on Dice]
-        
-        DiceTreasury[Dice Treasury<br/>@dice_treasury_addr]
-        SlotTreasury[Slot Treasury<br/>@slot_treasury_addr]
-        
-        ParTx1 --> DiceTreasury
-        ParTx2 --> SlotTreasury
-        ParTx3 --> DiceTreasury
-        
-        ParTx1 -.->|"✅ PARALLEL"| ParTx2
-        ParTx2 -.->|"✅ PARALLEL"| ParTx3
+    subgraph "🏛️ Casino Core"
+        Casino[🏠 CasinoHouse<br/>• Game Registry<br/>• Treasury Router<br/>• Auto-Rebalancing<br/>• Capability Management]
     end
 
-    classDef sequential fill:#ffebee,stroke:#d32f2f,stroke-width:2px
-    classDef parallel fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
-    classDef treasury fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    subgraph "🎮 Game Ecosystem"
+        DiceGame[🎲 DiceGame<br/>• 1-6 Number Guessing<br/>• 5x Payout Multiplier]
+        SlotGame[🎰 SlotMachine<br/>• 3-Reel Mechanics<br/>• Weighted Symbols]
+        RouletteGame[🎯 AptosRoulette<br/>• European Roulette<br/>• External Module]
+    end
 
-    class SeqTx1,SeqTx2,SeqTx3,SeqTreasury sequential
-    class ParTx1,ParTx2,ParTx3,DiceTreasury,SlotTreasury parallel
+    subgraph "💳 Treasury Isolation"
+        Central[🏦 Central Treasury<br/>• Investor Funds<br/>• Large Payouts<br/>• Liquidity Provider]
+        DiceTreasury[💎 Dice Treasury<br/>@unique_address_1]
+        SlotTreasury[🎰 Slot Treasury<br/>@unique_address_2]
+        RouletteTreasury[🎯 Roulette Treasury<br/>@unique_address_3]
+    end
+
+    %% Investment Flow
+    Investor -->|deposit_and_mint| CCIT
+    CCIT -->|Funds Central Treasury| Central
+    CCIT <-->|redeem at current NAV| Investor
+
+    %% Game Operation Flow
+    Casino -->|Route based on balance| DiceTreasury
+    Casino -->|Route based on balance| SlotTreasury
+    Casino -->|Route based on balance| RouletteTreasury
+
+    %% Auto-Rebalancing
+    DiceTreasury -.->|Excess → Central| Central
+    SlotTreasury -.->|Excess → Central| Central
+    Central -.->|Liquidity Injection| DiceTreasury
+    Central -.->|Liquidity Injection| SlotTreasury
+
+    %% NAV Calculation
+    Central -->|Balance Aggregation| CCIT
+    DiceTreasury -->|Balance Aggregation| CCIT
+    SlotTreasury -->|Balance Aggregation| CCIT
+
+    classDef investment fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef casino fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef game fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef treasury fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+
+    class Investor,CCIT investment
+    class Casino casino
+    class DiceGame,SlotGame,RouletteGame game
+    class Central,DiceTreasury,SlotTreasury,RouletteTreasury treasury
 ```
+
+### Treasury Auto-Rebalancing System
+
+The protocol implements sophisticated treasury management with automatic rebalancing based on rolling volume calculations and configurable thresholds.
+
+**Key Metrics:**
+- **Target Reserve:** 7-day rolling volume × 1.5
+- **Overflow Threshold:** Target × 110% (triggers excess transfer to central)
+- **Drain Threshold:** Target × 25% (triggers liquidity injection from central)
 
 **Key Insights:** 
 - Different treasury addresses = No resource conflicts = True parallel execution
@@ -245,63 +270,172 @@ flowchart TD
 
 ---
 
-## 🔧 Modules
+## 🏗️ System Components
 
-### `sources/casino/casino_house.move`
-- Treasury manager
-- Game registry and capability issuer
-- Bet placement and settlement logic
+### 1. CasinoHouse (Core Registry & Treasury Management)
+The central coordination module manages game registration through a capability-based authorization system. Treasury routing operates dynamically between central and game treasuries, while auto-rebalancing maintains optimal liquidity distribution. Risk management features provide configurable betting limits and payout constraints across all registered games.
 
-### `sources/casino/investor_token.move`
-- CCIT minting/redeeming
-- NAV tracking
-- Redemption fee logic
+### 2. InvestorToken (CCIT Fungible Asset)
+The investor token system implements NAV mechanics that enable automatic token appreciation through treasury growth. Mint and redeem operations use proportional token issuance based on current NAV calculations. The fee structure includes a 0.1% redemption fee with a 0.001 APT minimum. Treasury aggregation provides real-time NAV calculation across all connected treasuries.
 
-### `sources/games/dice.move` & `sources/games/slot.move`
-- Example modular games
-- Use randomness for outcome
-- Call CasinoHouse to settle bets
+### 3. Game Modules
+The DiceGame module implements single die guessing mechanics with a 5x payout multiplier. SlotMachine provides three-reel slot functionality with weighted symbol mechanics. AlwaysLoseGame serves as a testing utility for treasury drain scenarios during development and testing phases.
 
----
+### 4. External Game Support
+The AptosRoulette module demonstrates European roulette implementation in a separate package structure. The modular architecture enables independent deployment while maintaining shared treasury access. Capability integration provides seamless authorization through game capabilities across module boundaries.
 
-## 📦 How to Use
+## 🔧 Technical Implementation
 
-1. Deploy modules: `CasinoHouse`, `InvestorToken`, and game contracts
-2. Register games using `CasinoHouse::register_game()` to create game objects
-3. Games initialize and claim capabilities via `CasinoHouse::get_game_capability()`
-4. Fund treasury using `InvestorToken::deposit_and_mint()` to mint CCIT tokens
-5. Players interact through game contracts (`DiceGame::play_dice()`, `SlotMachine::spin_slots()`)
-6. Games settle outcomes using `CasinoHouse::settle_bet()`
-7. Investors redeem profits using `InvestorToken::redeem()`
+### Security Model
+The protocol employs capability-based authorization with unforgeable game registration tokens to prevent unauthorized access. Randomness security measures include production functions that use the `#[randomness]` attribute with `entry` visibility to prevent test-and-abort attacks. Resource safety mechanisms ensure explicit handling of all fungible assets and resources. The linear type system prevents resource duplication and ensures proper lifecycle management throughout all operations.
+
+### Performance Optimizations
+Block-STM compatibility operates through isolated resource addresses that enable true parallel execution without conflicts. Gas efficiency improvements include pre-computed constants and optimized data structures throughout the codebase. Treasury isolation eliminates bottlenecks through a distributed treasury architecture that scales with the number of active games.
+
+### Error Handling
+The system provides comprehensive error codes with detailed abort codes for all failure scenarios. Graceful degradation ensures the system continues operation despite individual game failures. Financial safety guards include treasury validation that prevents over-commitment of funds across all gaming operations.
+
 
 ---
 
-## 📊 House Edge Example (DiceGame)
+## 🔧 Module Structure
 
-- Player chooses number 1–6  
-- Wins if guess is correct  
-- Payout: 5x  
-- House Edge: ~16.67%  
-- Treasury absorbs losses → NAV grows
+```
+sources/
+├── casino/
+│   ├── casino_house.move       # Core registry and treasury management
+│   └── investor_token.move     # CCIT fungible asset implementation
+├── games/
+│   ├── dice.move               # Single die guessing game
+│   ├── slot.move               # Three-reel slot machine
+│   └── always_lose_game.move   # Testing utility
+└── tests/
+    ├── unit/                   # Module-specific unit tests
+    ├── integration/            # Cross-module integration tests
+    └── end_to_end/             # Complete user journey tests
+
+game-contracts/
+└── AptosRoulette/              # External roulette game package
+    ├── sources/
+    │   └── aptos_roulette.move
+    └── tests/
+```
+
+---
+
+## 🚀 Deployment Guide
+
+### Prerequisites
+Deployment requires the Aptos CLI installed and configured with sufficient APT for deployment and initial treasury funding. The deploying account must have appropriate permissions for the target network environment.
+
+### Step-by-Step Deployment
+
+**Initialize Core System**
+```bash
+# Deploy main casino modules
+aptos move publish --named-addresses casino=<CASINO_ADDRESS>
+
+# Initialize InvestorToken
+aptos move run --function-id <CASINO_ADDRESS>::InvestorToken::init
+```
+
+**Fund Initial Treasury**
+```bash
+# Minimum recommended: 1000 APT for production deployment
+aptos move run --function-id <CASINO_ADDRESS>::InvestorToken::deposit_and_mint \
+  --args u64:100000000000  # 1000 APT in octas
+```
+
+**Register Core Games**
+```bash
+# Register DiceGame
+aptos move run --function-id <CASINO_ADDRESS>::CasinoHouse::register_game \
+  --args address:<CASINO_ADDRESS> string:"DiceGame" string:"v1" \
+  u64:1000000 u64:50000000 u64:1667 u64:250000000
+
+# Initialize DiceGame
+aptos move run --function-id <CASINO_ADDRESS>::DiceGame::initialize_game
+```
+
+**Deploy External Games (Optional)**
+```bash
+# Deploy AptosRoulette separately
+cd game-contracts/AptosRoulette
+aptos move publish --named-addresses \
+  casino=<CASINO_ADDRESS> roulette_game=<ROULETTE_ADDRESS>
+```
+
+### Financial Requirements
+
+The system requires initial funding based on the maximum potential payouts across all games. DiceGame requires 250M octas × 5 = 1.25 APT initial funding. SlotMachine requires 12.5B octas × 5 = 625 APT initial funding. The recommended buffer includes 100+ APT for operational liquidity. The total recommended funding amount is 1000+ APT for production deployment scenarios.
+
+## 🎮 Game Integration
+
+### Adding New Games
+
+External developers can integrate games following the established pattern by referencing the Casino module in their dependencies and implementing the required game module structure.
+
+**Reference Casino Module**
+```toml
+[dependencies.ChainCasino]
+git = "https://github.com/PersonaNormale/ChainCasino.git"
+rev = "main"
+```
+
+**Implement Game Module**
+```move
+module external_game::NewGame {
+    use casino::CasinoHouse::{Self, GameCapability};
+    
+    public entry fun initialize_game(admin: &signer) {
+        let capability = CasinoHouse::get_game_capability(admin, game_object);
+        // Store capability and implement game logic
+    }
+}
+```
+
+**Register with Casino**
+```bash
+aptos move run --function-id casino::CasinoHouse::register_game \
+  --args address:<GAME_ADDRESS> string:"NewGame" string:"v1" \
+  <min_bet> <max_bet> <house_edge_bps> <max_payout>
+```
+
+---
+
+## 📊 Economics
+
+### House Edge Examples
+The DiceGame implements a 16.67% house edge through 1/6 chance mechanics with 5x payout structure. SlotMachine operates with a 15.5% house edge using weighted symbols with varied payout multipliers. AptosRoulette maintains a 2.70% house edge following European single-zero roulette standards.
+
+### Investor Returns
+Investor tokens appreciate through NAV growth as the treasury accumulates profits from house edge over time. The system provides transparent, on-chain tracking of treasury performance and automatic profit distribution through token value appreciation rather than traditional dividend mechanisms.
+
+
+---
+
+## 🌟 Key Innovations
+
+The NAV-based investment model enables automatic token appreciation through treasury growth without requiring active management or governance decisions. Block-STM parallel architecture achieves true concurrent execution across isolated treasuries, significantly improving throughput compared to traditional sequential designs. The auto-rebalancing treasury system provides dynamic liquidity management based on volume metrics and configurable thresholds. Modular game framework architecture enables external game integration with shared treasury access while maintaining security isolation. Capability-based security provides unforgeable authorization that prevents common security vulnerabilities found in address-based authorization systems.
+
 
 ---
 
 ## TODO
 
-- Optimize for Transaction Parallelization on Aptos Blockchain
-- Gas Waste Removal
+- Add More External Games
 
 ---
 
-## 🧠 Future Ideas
+## 📈 Future Roadmap
 
-- DAO for treasury governance
-- More games
+Development priorities include DAO governance features for community-driven treasury management and parameter adjustment capabilities. Advanced games will expand the available game types and mechanics beyond the current offerings. Cross-chain integration will enable multi-chain treasury management and broader ecosystem participation. Enhanced analytics will provide detailed performance metrics and reporting capabilities for both operators and investors.
 
----
-
-ChainCasino turns **"The House Always Wins"** into **"The Investor Always Earns."**
 
 ---
 
-MIT License
+**ChainCasino represents the next evolution of decentralized gaming, where transparent treasury management meets innovative investor returns through proven NAV mechanics.**
+
+## 📄 License
+
+MIT License - See [LICENSE.md](LICENSE.md) for details.

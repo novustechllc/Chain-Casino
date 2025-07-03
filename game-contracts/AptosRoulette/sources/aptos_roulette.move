@@ -3,12 +3,13 @@
 //! European Roulette Game for ChainCasino Platform (Block-STM Compatible)
 //!
 //! European roulette with 37 numbers (0-36) and single number betting.
-//! Uses secure randomness and simplified bet flow with BetId struct.
+//! Enhanced with immediate result storage for optimal frontend UX.
 
 module roulette_game::AptosRoulette {
     use aptos_framework::randomness;
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object, ObjectCore, ExtendRef};
+    use aptos_framework::timestamp;
     use std::signer;
     use std::option;
     use std::string::{Self, String};
@@ -17,6 +18,7 @@ module roulette_game::AptosRoulette {
     use aptos_framework::coin;
     use casino::CasinoHouse;
     use casino::CasinoHouse::GameCapability;
+    use aptos_framework::account;
 
     //
     // Error Codes
@@ -69,6 +71,24 @@ module roulette_game::AptosRoulette {
         version: String
     }
 
+    /// User's latest spin result stored at their address for immediate frontend access
+    struct SpinResult has key {
+        /// The number that won (0-36)
+        winning_number: u8,
+        /// The number the player bet on
+        bet_number: u8,
+        /// Amount wagered in octas
+        bet_amount: u64,
+        /// Payout received (0 if lost)
+        payout: u64,
+        /// When the spin occurred
+        timestamp: u64,
+        /// Session identifier for frontend state management
+        session_id: u64,
+        /// Whether player won this spin
+        won: bool
+    }
+
     //
     // Event Specifications
     //
@@ -82,7 +102,8 @@ module roulette_game::AptosRoulette {
         bet_amount: u64,
         won: bool,
         payout: u64,
-        treasury_used: address
+        treasury_used: address,
+        session_id: u64
     }
 
     #[event]
@@ -97,6 +118,13 @@ module roulette_game::AptosRoulette {
         max_bet: u64,
         payout_multiplier: u64,
         house_edge_bps: u64
+    }
+
+    #[event]
+    /// Emitted when user cleans their spin result
+    struct ResultCleanedEvent has drop, store {
+        player: address,
+        session_id: u64
     }
 
     //
@@ -172,15 +200,30 @@ module roulette_game::AptosRoulette {
     //
 
     #[randomness]
-    /// Spin the European roulette wheel - single number betting
+    /// Spin the European roulette wheel - stores result at user address for immediate frontend access
     entry fun spin_roulette(
         player: &signer, bet_number: u8, bet_amount: u64
-    ) acquires GameRegistry, GameAuth {
+    ) acquires GameRegistry, GameAuth, SpinResult {
         assert!(bet_number <= MAX_ROULETTE_NUMBER, E_INVALID_NUMBER);
         assert!(bet_amount >= MIN_BET, E_INVALID_AMOUNT);
         assert!(bet_amount <= MAX_BET, E_INVALID_AMOUNT);
 
         let player_addr = signer::address_of(player);
+
+        // Auto-cleanup: Remove previous result to prevent storage bloat
+        if (exists<SpinResult>(player_addr)) {
+            let old_result = move_from<SpinResult>(player_addr);
+            // Old result properly destructured and dropped
+            let SpinResult {
+                winning_number: _,
+                bet_number: _,
+                bet_amount: _,
+                payout: _,
+                timestamp: _,
+                session_id: _,
+                won: _
+            } = old_result;
+        };
 
         // Withdraw bet as FungibleAsset from player
         let aptos_metadata_option =
@@ -216,7 +259,23 @@ module roulette_game::AptosRoulette {
             treasury_source
         );
 
-        // Game emits own event without bet_id
+        // Generate session ID for frontend state management
+        let current_time = timestamp::now_seconds();
+        let session_id = account::get_sequence_number(player_addr); // Unique per user transaction
+
+        // Store result at user address for immediate frontend access
+        let spin_result = SpinResult {
+            winning_number,
+            bet_number,
+            bet_amount,
+            payout,
+            timestamp: current_time,
+            session_id,
+            won: player_won
+        };
+        move_to(player, spin_result);
+
+        // Emit event for indexing/analytics (traditional event)
         event::emit(
             RouletteSpinEvent {
                 player: player_addr,
@@ -225,7 +284,8 @@ module roulette_game::AptosRoulette {
                 bet_amount,
                 won: player_won,
                 payout,
-                treasury_used: treasury_source
+                treasury_used: treasury_source,
+                session_id
             }
         );
     }
@@ -235,8 +295,34 @@ module roulette_game::AptosRoulette {
     /// Test version allowing unsafe randomness
     public entry fun test_only_spin_roulette(
         player: &signer, bet_number: u8, bet_amount: u64
-    ) acquires GameRegistry, GameAuth {
+    ) acquires GameRegistry, GameAuth, SpinResult {
         spin_roulette(player, bet_number, bet_amount);
+    }
+
+    //
+    // Result Management Interface
+    //
+
+    /// User can manually clear their spin result to clean up storage
+    public entry fun clear_spin_result(user: &signer) acquires SpinResult {
+        let user_addr = signer::address_of(user);
+        if (exists<SpinResult>(user_addr)) {
+            let result = move_from<SpinResult>(user_addr);
+            let session_id = result.session_id;
+
+            // Properly destructure the resource
+            let SpinResult {
+                winning_number: _,
+                bet_number: _,
+                bet_amount: _,
+                payout: _,
+                timestamp: _,
+                session_id: _,
+                won: _
+            } = result;
+
+            event::emit(ResultCleanedEvent { player: user_addr, session_id });
+        };
     }
 
     //
@@ -277,7 +363,57 @@ module roulette_game::AptosRoulette {
     }
 
     //
-    // View Functions
+    // Frontend-Optimized View Functions
+    //
+
+    #[view]
+    /// Get user's latest spin result - PRIMARY FRONTEND FUNCTION
+    /// Returns: (winning_number, bet_number, bet_amount, payout, won, timestamp, session_id)
+    public fun get_user_spin_result(
+        player_addr: address
+    ): (u8, u8, u64, u64, bool, u64, u64) acquires SpinResult {
+        assert!(exists<SpinResult>(player_addr), E_INVALID_AMOUNT);
+
+        let result = borrow_global<SpinResult>(player_addr);
+        (
+            result.winning_number,
+            result.bet_number,
+            result.bet_amount,
+            result.payout,
+            result.won,
+            result.timestamp,
+            result.session_id
+        )
+    }
+
+    #[view]
+    /// Check if user has a spin result available
+    public fun has_spin_result(player_addr: address): bool {
+        exists<SpinResult>(player_addr)
+    }
+
+    #[view]
+    /// Get only the essential result data for quick frontend updates
+    /// Returns: (winning_number, won, payout)
+    public fun get_quick_result(player_addr: address): (u8, bool, u64) acquires SpinResult {
+        assert!(exists<SpinResult>(player_addr), E_INVALID_AMOUNT);
+
+        let result = borrow_global<SpinResult>(player_addr);
+        (result.winning_number, result.won, result.payout)
+    }
+
+    #[view]
+    /// Get session info for frontend state management
+    /// Returns: (session_id, timestamp)
+    public fun get_session_info(player_addr: address): (u64, u64) acquires SpinResult {
+        assert!(exists<SpinResult>(player_addr), E_INVALID_AMOUNT);
+
+        let result = borrow_global<SpinResult>(player_addr);
+        (result.session_id, result.timestamp)
+    }
+
+    //
+    // Standard View Functions
     //
 
     #[view]
