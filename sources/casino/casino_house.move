@@ -118,7 +118,13 @@ module casino::CasinoHouse {
         max_payout: u64,
         created_at: u64,
         capability_claimed: bool,
-        extend_ref: ExtendRef
+        extend_ref: ExtendRef,
+        /// Frontend game website URL
+        website_url: String,
+        /// Game icon/logo URL for dashboard
+        icon_url: String,
+        /// Game description for dashboard cards
+        description: String
     }
 
     /// Registry of authorized casino games (by game object)
@@ -251,7 +257,10 @@ module casino::CasinoHouse {
         min_bet: u64,
         max_bet: u64,
         house_edge_bps: u64,
-        max_payout: u64
+        max_payout: u64,
+        website_url: String, // NEW: Game website URL
+        icon_url: String, // NEW: Game icon URL
+        description: String // NEW: Game description
     ) acquires GameRegistry, TreasuryRegistry {
         assert!(signer::address_of(admin) == @casino, E_NOT_ADMIN);
         assert!(max_bet >= min_bet, E_INVALID_AMOUNT);
@@ -279,7 +288,10 @@ module casino::CasinoHouse {
                 max_payout,
                 created_at: timestamp::now_seconds(),
                 capability_claimed: false,
-                extend_ref
+                extend_ref,
+                website_url, // ADD
+                icon_url, // ADD
+                description // ADD
             }
         );
 
@@ -857,7 +869,7 @@ module casino::CasinoHouse {
     #[view]
     public fun get_game_metadata(
         game_object: Object<GameMetadata>
-    ): (String, String, address, u64, u64, u64, u64, bool) acquires GameMetadata {
+    ): (String, String, address, u64, u64, u64, u64, bool, String, String, String) acquires GameMetadata {
         let object_addr = object::object_address(&game_object);
         let metadata = borrow_global<GameMetadata>(object_addr);
         (
@@ -868,7 +880,10 @@ module casino::CasinoHouse {
             metadata.max_bet,
             metadata.house_edge_bps,
             metadata.max_payout,
-            metadata.capability_claimed
+            metadata.capability_claimed,
+            metadata.website_url,
+            metadata.icon_url,
+            metadata.description
         )
     }
 
@@ -968,5 +983,20 @@ module casino::CasinoHouse {
     public fun game_object_exists(game_object: Object<GameMetadata>): bool {
         let object_addr = object::object_address(&game_object);
         exists<GameMetadata>(object_addr)
+    }
+
+    /// Games can update their own website URLs and metadata
+    public fun update_game_metadata(
+        capability: &GameCapability,
+        website_url: String,
+        icon_url: String,
+        description: String
+    ) acquires GameMetadata {
+        let game_object = capability.game_object;
+        let object_addr = object::object_address(&game_object);
+        let game_metadata = borrow_global_mut<GameMetadata>(object_addr);
+        game_metadata.website_url = website_url;
+        game_metadata.icon_url = icon_url;
+        game_metadata.description = description;
     }
 }

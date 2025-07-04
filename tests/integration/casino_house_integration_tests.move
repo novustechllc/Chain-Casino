@@ -110,7 +110,10 @@ module casino::CasinoHouseIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -243,7 +246,10 @@ module casino::CasinoHouseIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         CasinoHouse::register_game(
@@ -254,7 +260,12 @@ module casino::CasinoHouseIntegrationTests {
             MIN_BET,
             MAX_BET,
             1550,
-            12_500_000_000
+            12_500_000_000,
+            string::utf8(b"https://chaincasino.apt/slots"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/slots.png"), // icon_url
+            string::utf8(
+                b"3-reel slot machine with weighted symbols and up to 100x payouts"
+            ) // description
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -278,15 +289,15 @@ module casino::CasinoHouseIntegrationTests {
         // Test casino admin updating limits
         CasinoHouse::update_game_limits(&casino_signer, dice_object, 2000000, 40000000); // 0.02 - 0.4 APT
 
-        let (_, _, _, new_min, new_max, _, _dice_payout, _) =
+        let (_, _, _, min_bet, max_bet, _, _max_payout, _, _, _, _) =
             CasinoHouse::get_game_metadata(dice_object);
-        assert!(new_min == 2000000, 1);
-        assert!(new_max == 40000000, 2);
+        assert!(min_bet == 2000000, 1);
+        assert!(max_bet == 40000000, 2);
 
         // Test games requesting limit changes (risk reduction only)
         DiceGame::request_limit_update(&dice_signer, 5000000, 35000000); // 0.05 - 0.35 APT
 
-        let (_, _, _, updated_min, updated_max, _, _dice_payout2, _) =
+        let (_, _, _, updated_min, updated_max, _, _dice_payout2, _, _, _, _) =
             CasinoHouse::get_game_metadata(dice_object);
         assert!(updated_min == 5000000, 3);
         assert!(updated_max == 35000000, 4);
@@ -343,7 +354,10 @@ module casino::CasinoHouseIntegrationTests {
             dice_max_final,
             dice_edge,
             _dice_max_payout,
-            dice_claimed
+            dice_claimed,
+            _, // website_url (ignored)
+            _, // icon_url (ignored)
+            _ // description (ignored)
         ) = CasinoHouse::get_game_metadata(dice_object);
 
         assert!(dice_name == string::utf8(b"DiceGame"), 19);
@@ -362,7 +376,10 @@ module casino::CasinoHouseIntegrationTests {
             slot_max,
             slot_edge,
             _slot_max_payout,
-            slot_claimed
+            slot_claimed,
+            _, // website_url (ignored)
+            _, // icon_url (ignored)
+            _ // description (ignored)
         ) = CasinoHouse::get_game_metadata(slot_object);
 
         assert!(slot_name == string::utf8(b"SlotMachine"), 26);
@@ -423,7 +440,10 @@ module casino::CasinoHouseIntegrationTests {
             MIN_BET,
             MAX_BET,
             1500,
-            100_000_000 // 1 APT max_payout
+            100_000_000, // 1 APT max_payout
+            string::utf8(b"https://chaincasino.apt/test"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/test.png"), // icon_url
+            string::utf8(b"Testing utility game that always pays out 3x bet amount") // description
         );
     }
 
@@ -445,7 +465,10 @@ module casino::CasinoHouseIntegrationTests {
             MAX_BET,
             MIN_BET, // max < min
             1500,
-            100_000_000 // 1 APT max_payout
+            100_000_000, // 1 APT max_payout
+            string::utf8(b"https://chaincasino.apt/test"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/test.png"), // icon_url
+            string::utf8(b"Testing utility game that always pays out 3x bet amount") // description
         );
     }
 
@@ -467,7 +490,10 @@ module casino::CasinoHouseIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         CasinoHouse::register_game(
@@ -478,7 +504,12 @@ module casino::CasinoHouseIntegrationTests {
             MIN_BET,
             MAX_BET,
             1550,
-            12_500_000_000
+            12_500_000_000,
+            string::utf8(b"https://chaincasino.apt/slots"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/slots.png"), // icon_url
+            string::utf8(
+                b"3-reel slot machine with weighted symbols and up to 100x payouts"
+            ) // description
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -558,7 +589,10 @@ module casino::CasinoHouseIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         DiceGame::initialize_game(&dice_signer);

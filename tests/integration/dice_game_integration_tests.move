@@ -96,7 +96,10 @@ module casino::DiceGameIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667, // 16.67% house edge
-            250_000_000 // max_payout
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         // === PHASE 3: TEST BEFORE INITIALIZATION ===
@@ -203,7 +206,10 @@ module casino::DiceGameIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -343,7 +349,10 @@ module casino::DiceGameIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -355,7 +364,7 @@ module casino::DiceGameIntegrationTests {
 
         // Verify limits were updated in casino metadata
         let casino_game_obj = DiceGame::get_casino_game_object();
-        let (_, _, _, min_bet, max_bet, _, _payout1, _) =
+        let (_, _, _, min_bet, max_bet, _, _max_payout, _, _, _, _) =
             CasinoHouse::get_game_metadata(casino_game_obj);
         assert!(min_bet == 2000000, 1);
         assert!(max_bet == 40000000, 2);
@@ -363,7 +372,7 @@ module casino::DiceGameIntegrationTests {
         // Test another valid update (further risk reduction)
         DiceGame::request_limit_update(&dice_signer, 5000000, 35000000); // 0.05 APT min, 0.35 APT max
 
-        let (_, _, _, min_bet2, max_bet2, _, _payout2, _) =
+        let (_, _, _, min_bet2, max_bet2, _, _max_payout2, _, _, _, _) =
             CasinoHouse::get_game_metadata(casino_game_obj);
         assert!(min_bet2 == 5000000, 3);
         assert!(max_bet2 == 35000000, 4);
@@ -449,7 +458,7 @@ module casino::DiceGameIntegrationTests {
         assert!(CasinoHouse::treasury_balance() > 0, 32);
 
         // Verify updated limits are still in effect
-        let (_, _, _, final_min, final_max, _, _final_payout, _) =
+        let (_, _, _, final_min, final_max, _, _final_max_payout, _, _, _, _) =
             CasinoHouse::get_game_metadata(casino_obj);
         assert!(final_min == 5000000, 33); // Last update value
         assert!(final_max == 35000000, 34); // Last update value
@@ -476,7 +485,10 @@ module casino::DiceGameIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         // Try to initialize with wrong signer - should fail
@@ -502,7 +514,10 @@ module casino::DiceGameIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -530,7 +545,10 @@ module casino::DiceGameIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -558,7 +576,10 @@ module casino::DiceGameIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -586,7 +607,10 @@ module casino::DiceGameIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -614,7 +638,10 @@ module casino::DiceGameIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -643,7 +670,10 @@ module casino::DiceGameIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         DiceGame::initialize_game(&dice_signer);
@@ -671,7 +701,10 @@ module casino::DiceGameIntegrationTests {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
 
         DiceGame::initialize_game(&dice_signer);
