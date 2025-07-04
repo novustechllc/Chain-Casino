@@ -84,7 +84,14 @@ module roulette_game::RouletteIntegrationTests {
             MIN_BET,
             MAX_BET,
             270, // 2.70% house edge
-            1_050_000_000 // max_payout: 35x max_bet = 35 * 30M = 1.05B
+            1_050_000_000, // max_payout: 35x max_bet = 35 * 30M = 1.05B1000000
+            string::utf8(b"https://chaincasino.apt/roulette"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/roulette.png"
+            ),
+            string::utf8(
+                b"European roulette with 37 numbers and 35:1 single number payouts"
+            )
         );
 
         // === PHASE 3: GAME INITIALIZATION ===
@@ -187,8 +194,15 @@ module roulette_game::RouletteIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            270,
-            1_050_000_000
+            270, // 2.70% house edge
+            1_050_000_000, // max_payout: 35x max_bet = 35 * 30M = 1.05B1000000
+            string::utf8(b"https://chaincasino.apt/roulette"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/roulette.png"
+            ),
+            string::utf8(
+                b"European roulette with 37 numbers and 35:1 single number payouts"
+            )
         );
 
         AptosRoulette::initialize_game(&roulette_signer);
@@ -215,8 +229,15 @@ module roulette_game::RouletteIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            270,
-            1_050_000_000
+            270, // 2.70% house edge
+            1_050_000_000, // max_payout: 35x max_bet = 35 * 30M = 1.05B1000000
+            string::utf8(b"https://chaincasino.apt/roulette"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/roulette.png"
+            ),
+            string::utf8(
+                b"European roulette with 37 numbers and 35:1 single number payouts"
+            )
         );
 
         AptosRoulette::initialize_game(&roulette_signer);
@@ -243,8 +264,15 @@ module roulette_game::RouletteIntegrationTests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            270,
-            1_050_000_000
+            270, // 2.70% house edge
+            1_050_000_000, // max_payout: 35x max_bet = 35 * 30M = 1.05B1000000
+            string::utf8(b"https://chaincasino.apt/roulette"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/roulette.png"
+            ),
+            string::utf8(
+                b"European roulette with 37 numbers and 35:1 single number payouts"
+            )
         );
 
         AptosRoulette::initialize_game(&roulette_signer);

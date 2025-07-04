@@ -177,7 +177,10 @@ module casino::EndToEndTests {
             1000000, // 0.01 APT min (matches hardcoded)
             50000000, // 0.5 APT max (matches hardcoded)
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
         DiceGame::initialize_game(&dice_signer);
 
@@ -189,10 +192,10 @@ module casino::EndToEndTests {
             );
 
         // === PHASE 1: TEST INITIAL LIMITS ===
-        let (_, _, _, initial_min, initial_max, _, _max_payout_init, _) =
+        let (_, _, _, min_bet, max_bet, _, _max_payout, _, _, _, _) =
             CasinoHouse::get_game_metadata(dice_object);
-        assert!(initial_min == 1000000, 1); // 0.01 APT
-        assert!(initial_max == 50000000, 2); // 0.5 APT
+        assert!(min_bet == 1000000, 1); // 0.01 APT
+        assert!(max_bet == 50000000, 2); // 0.5 APT
 
         // Test betting within limits
         DiceGame::test_only_play_dice(&casual_player, 3, STANDARD_BET); // 0.05 APT - valid
@@ -201,10 +204,10 @@ module casino::EndToEndTests {
         // === PHASE 2: CASINO UPDATES LIMITS ===
         CasinoHouse::update_game_limits(&casino_signer, dice_object, 2000000, 45000000);
 
-        let (_, _, _, new_min, new_max, _, _max_payout_new, _) =
+        let (_, _, _, min_bet, max_bet, _, _max_payout, _, _, _, _) =
             CasinoHouse::get_game_metadata(dice_object);
-        assert!(new_min == 2000000, 3); // 0.02 APT
-        assert!(new_max == 45000000, 4); // 0.45 APT
+        assert!(min_bet == 2000000, 3); // 0.02 APT
+        assert!(max_bet == 45000000, 4); // 0.45 APT
 
         // Test new limits
         DiceGame::test_only_play_dice(&high_roller, 4, 40000000); // 0.4 APT - within new limits
@@ -213,14 +216,14 @@ module casino::EndToEndTests {
         // Games can only reduce risk (increase min or decrease max)
         DiceGame::request_limit_update(&dice_signer, 5000000, 40000000);
 
-        let (_, _, _, conservative_min, conservative_max, _, _max_payout_cons, _) =
+        let (_, _, _, min_bet, max_bet, _, _max_payout, _, _, _, _) =
             CasinoHouse::get_game_metadata(dice_object);
-        assert!(conservative_min == 5000000, 5); // 0.05 APT (increased)
-        assert!(conservative_max == 40000000, 6); // 0.4 APT (decreased)
+        assert!(min_bet == 5000000, 5); // 0.05 APT (increased)
+        assert!(max_bet == 40000000, 6); // 0.4 APT (decreased)
 
         // === PHASE 4: VERIFY PAYOUT CAPACITY ===
-        let max_payout = conservative_max * 5; // 5x for dice win
-        assert!(DiceGame::can_handle_payout(conservative_max), 7);
+        let max_payout = max_bet * 5; // 5x for dice win
+        assert!(DiceGame::can_handle_payout(max_bet), 7);
 
         let treasury_balance = CasinoHouse::treasury_balance();
         assert!(treasury_balance >= max_payout, 8); // Treasury should cover max payout
@@ -239,10 +242,11 @@ module casino::EndToEndTests {
         assert!(CasinoHouse::treasury_balance() > 0, 10);
 
         // === FINAL VERIFICATION ===
-        let (_, _, _, final_min, final_max, final_edge, _final_payout, _) =
+        let (_, _, _, min_bet, max_bet, _, _max_payout, _, _, _, _) =
             CasinoHouse::get_game_metadata(dice_object);
-        assert!(final_min == 5000000, 11); // Conservative min maintained
-        assert!(final_max == 40000000, 12); // Conservative max maintained
+        assert!(min_bet == 5000000, 11); // Conservative min maintained
+        assert!(max_bet == 40000000, 12); // Conservative max maintained
+        let final_edge = 1667;
         assert!(final_edge == 1667, 13); // House edge unchanged
     }
 
@@ -277,7 +281,10 @@ module casino::EndToEndTests {
             1000000,
             50000000,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"), // website_url
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"), // icon_url
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier") // description
         );
         DiceGame::initialize_game(&dice_signer);
 

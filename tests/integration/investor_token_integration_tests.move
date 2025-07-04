@@ -213,7 +213,10 @@ module casino::InvestorTokenIntegrationTests {
             1000000,
             50000000,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/test"),
+            string::utf8(b"https://chaincasino.apt/icons/test.png"),
+            string::utf8(b"Testing utility game that always pays out 3x bet amount")
         );
 
         DiceGame::initialize_game(&dice_signer);

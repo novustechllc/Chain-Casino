@@ -132,7 +132,10 @@ module casino::TreasuryMechanicsDemo {
             MIN_BET,
             MAX_BET,
             1667,
-            250_000_000
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"),
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"),
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier")
         );
 
         // Register SlotMachine (normal game)
@@ -144,7 +147,12 @@ module casino::TreasuryMechanicsDemo {
             MIN_BET,
             MAX_BET,
             1550,
-            12_500_000_000
+            12_500_000_000,
+            string::utf8(b"https://chaincasino.game/slots"),
+            string::utf8(b"https://chaincasino.game/icons/slots.png"),
+            string::utf8(
+                b"3-reel slot machine with weighted symbols and up to 100x payouts"
+            )
         );
 
         // Register AlwaysLoseGame (will drain treasury)
@@ -154,9 +162,12 @@ module casino::TreasuryMechanicsDemo {
             string::utf8(b"AlwaysLoseGame"),
             string::utf8(b"v1"),
             MIN_BET,
-            LARGE_BET, // Smaller max bet for faster draining
-            20000, // Massive negative house edge
-            30_000_000
+            LARGE_BET,
+            20000,
+            30_000_000,
+            string::utf8(b"https://chaincasino.game/test"),
+            string::utf8(b"https://chaincasino.game/icons/test.png"),
+            string::utf8(b"Testing utility game that always pays out 3x bet amount")
         );
 
         // Initialize games
@@ -302,7 +313,10 @@ module casino::TreasuryMechanicsDemo {
             MIN_BET,
             MAX_BET,
             1667,
-            DICE_MAX_PAYOUT
+            250_000_000,
+            string::utf8(b"https://chaincasino.apt/dice"),
+            string::utf8(b"https://chaincasino.apt/icons/dice.png"),
+            string::utf8(b"Classic 1-6 dice guessing game with 5x payout multiplier")
         );
 
         DiceGame::initialize_game(&dice_signer);
