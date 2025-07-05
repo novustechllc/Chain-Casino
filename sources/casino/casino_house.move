@@ -1,8 +1,8 @@
 //! MIT License
 //!
-//! Casino treasury and game registry management (Block-STM Optimized)
+//! Casino treasury and game registry management
 //!
-//! FIXED: Treasury signer mismatch - now uses SignerCapability for resource accounts
+//! Central treasury and game registry management for the ChainCasino platform.
 
 module casino::CasinoHouse {
     use std::string::{String};

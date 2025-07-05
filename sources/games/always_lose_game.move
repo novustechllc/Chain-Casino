@@ -1,8 +1,8 @@
 //! MIT License
 //!
-//! Always Lose Game - Mock game for testing treasury drainage scenarios
+//! Always Lose Game for ChainCasino Platform
 //!
-//! This game always pays out 3x the bet amount, guaranteed to drain treasury
+//! Testing utility game for treasury mechanics validation.
 
 #[test_only]
 module casino::AlwaysLoseGame {
