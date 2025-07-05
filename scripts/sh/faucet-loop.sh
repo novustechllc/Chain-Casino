@@ -1,19 +1,19 @@
 #!/bin/bash
 
 # ChainCasino Faucet Loop Script
-# Iterates 1100 times to fund casino address via Aptos devnet faucet
+# Iterates 90 times to fund casino address via Aptos devnet faucet
 
 set -e
 
 # Configuration
-ITERATIONS=1100
+ITERATIONS=90
 AMOUNT=100000000  # 1 APT in octas
 FAUCET_URL="https://faucet.devnet.aptoslabs.com/mint"
 
-# Validate CASINO_ADDR environment variable
+# Get casino address from profile
+CASINO_ADDR=$(aptos config show-profiles --profile casino | grep '"account"' | cut -d'"' -f4)
 if [ -z "$CASINO_ADDR" ]; then
-    echo "Error: CASINO_ADDR environment variable is not set"
-    echo "Usage: export CASINO_ADDR=0x... && ./faucet-loop.sh"
+    echo "Error: Casino profile not found. Run 'aptos init --profile casino --network devnet --skip-faucet' first"
     exit 1
 fi
 
