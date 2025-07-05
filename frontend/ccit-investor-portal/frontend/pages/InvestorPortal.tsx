@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { aptosClient } from '@/utils/aptosClient';
 import { 
@@ -12,14 +8,9 @@ import {
   CCIT_DECIMALS,
   APT_DECIMALS,
   NAV_SCALE,
-  formatAPT,
-  formatCCIT,
-  formatNAV,
-  formatPercentage,
   ERROR_MESSAGES,
   SUCCESS_MESSAGES
 } from '@/constants/chaincasino';
-// Remove this import since we'll create transactions directly
 
 interface PortalData {
   // Portfolio data
@@ -61,6 +52,14 @@ const InvestorPortal: React.FC = () => {
   const [depositAmount, setDepositAmount] = useState<string>('');
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
   const [transactionLoading, setTransactionLoading] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  // Format numbers for display
+  const formatAPT = (amount: number): string => amount.toFixed(4);
+  const formatCCIT = (amount: number): string => amount.toFixed(3);
+  const formatPercentage = (value: number): string => `${value.toFixed(2)}%`;
 
   // Fetch portfolio data for connected user
   const fetchPortfolioData = async () => {
@@ -68,7 +67,6 @@ const InvestorPortal: React.FC = () => {
     
     try {
       const userAddress = account.address.toStringLong();
-      console.log('Fetching portfolio data for address:', userAddress);
       
       // Fetch CCIT balance
       const ccitBalanceResponse = await aptosClient().view({
@@ -91,22 +89,13 @@ const InvestorPortal: React.FC = () => {
         accountAddress: userAddress
       });
       
-      // Convert from on-chain format
+      // Convert from on-chain format - NAV is already scaled by NAV_SCALE
       const ccitBalance = Number(ccitBalanceResponse[0]) / Math.pow(10, CCIT_DECIMALS);
       const navRaw = Number(navResponse[0]);
-      const navScale = Math.pow(10, 8); // NAV_SCALE is 10^8
-      const nav = navRaw / navScale; // NAV is scaled by NAV_SCALE
+      // NAV starts at 1,000,000 (which represents 1.0 when divided by NAV_SCALE)
+      const nav = navRaw / NAV_SCALE;
       const portfolioValue = ccitBalance * nav;
       const aptBalance = Number(aptBalanceResponse) / Math.pow(10, APT_DECIMALS);
-      
-      console.log('Portfolio data:', {
-        ccitBalance,
-        navRaw,
-        navScale,
-        nav,
-        portfolioValue,
-        aptBalance
-      });
       
       setData(prev => ({
         ...prev,
@@ -128,8 +117,6 @@ const InvestorPortal: React.FC = () => {
   // Fetch treasury data
   const fetchTreasuryData = async () => {
     try {
-      console.log('Fetching treasury data...');
-      
       // Fetch central treasury balance
       const centralTreasuryResponse = await aptosClient().view({
         payload: {
@@ -160,423 +147,530 @@ const InvestorPortal: React.FC = () => {
       const gameReserves = totalTreasury - centralTreasury;
       const totalSupply = Number(totalSupplyResponse[0]) / Math.pow(10, CCIT_DECIMALS);
       
-      console.log('Treasury data:', {
+      setData(prev => ({
+        ...prev,
         centralTreasury,
         totalTreasury,
         gameReserves,
         totalSupply
-      });
-      
-      setData(prev => ({
-        ...prev,
-        centralTreasury,
-        gameReserves,
-        totalTreasury,
-        totalSupply,
-        loading: false
       }));
       
     } catch (error) {
       console.error('Error fetching treasury data:', error);
       setData(prev => ({
         ...prev,
-        error: `Failed to fetch treasury data: ${error}`,
-        loading: false
+        error: `Failed to fetch treasury data: ${error}`
       }));
     }
   };
 
-  // Fetch all data when wallet connects
-  useEffect(() => {
-    if (connected && account) {
-      console.log('Wallet connected, fetching data...');
-      setData(prev => ({ ...prev, loading: true, error: null }));
-      
-      // Fetch data with small delay to ensure wallet is ready
-      const timer = setTimeout(() => {
-        fetchPortfolioData();
-        fetchTreasuryData();
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    } else {
-      // Reset data when wallet disconnects
-      setData(prev => ({
-        ...prev,
-        ccitBalance: 0,
-        nav: 0,
-        portfolioValue: 0,
-        aptBalance: 0,
-        loading: false,
-        error: null
-      }));
+  // Fetch all data with better loading states
+  const fetchAllData = async () => {
+    setDataLoading(true);
+    try {
+      await Promise.all([
+        fetchPortfolioData(),
+        fetchTreasuryData()
+      ]);
+    } finally {
+      setDataLoading(false);
     }
-  }, [connected, account]);
+  };
 
-  // Handle deposit and mint
+  // Handle deposit
   const handleDeposit = async () => {
-    if (!depositAmount || !account) return;
-    
+    if (!connected || !account) {
+      toast({
+        title: "Wallet not connected",
+        description: ERROR_MESSAGES.WALLET_NOT_CONNECTED,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const amount = parseFloat(depositAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: ERROR_MESSAGES.INVALID_AMOUNT,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (amount > data.aptBalance) {
+      toast({
+        title: "Insufficient balance",
+        description: ERROR_MESSAGES.INSUFFICIENT_BALANCE,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setTransactionLoading(true);
     try {
-      const amount = parseFloat(depositAmount);
-      if (isNaN(amount) || amount <= 0) {
-        throw new Error(ERROR_MESSAGES.INVALID_AMOUNT);
-      }
-      
-      if (amount > data.aptBalance) {
-        throw new Error(ERROR_MESSAGES.INSUFFICIENT_BALANCE);
-      }
-      
-      // Convert to on-chain format (APT has 8 decimals)
       const amountInOctas = Math.floor(amount * Math.pow(10, APT_DECIMALS));
       
-      console.log('Submitting deposit transaction:', {
-        amount,
-        amountInOctas
-      });
-      
-      const transaction = {
+      const transaction = await signAndSubmitTransaction({
         data: {
           function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::deposit_and_mint`,
-          functionArguments: [amountInOctas.toString()]
-        }
-      };
-      
-      const response = await signAndSubmitTransaction(transaction);
-      
-      console.log('Transaction submitted:', response);
-      
-      // Wait for transaction confirmation
+          functionArguments: [amountInOctas.toString()],
+        },
+      });
+
       await aptosClient().waitForTransaction({
-        transactionHash: response.hash
+        transactionHash: transaction.hash,
       });
-      
+
       toast({
-        title: "Success",
-        description: SUCCESS_MESSAGES.DEPOSIT_SUCCESS
+        title: "Success!",
+        description: SUCCESS_MESSAGES.DEPOSIT_SUCCESS,
       });
-      
+
       setDepositAmount('');
-      
-      // Refresh data
-      await fetchPortfolioData();
-      await fetchTreasuryData();
-      
-    } catch (error: any) {
+      setShowDepositModal(false);
+      await fetchAllData();
+    } catch (error) {
       console.error('Deposit error:', error);
       toast({
+        title: "Transaction failed",
+        description: ERROR_MESSAGES.TRANSACTION_FAILED,
         variant: "destructive",
-        title: "Error",
-        description: error.message || ERROR_MESSAGES.TRANSACTION_FAILED
       });
     } finally {
       setTransactionLoading(false);
     }
   };
 
-  // Handle redeem
-  const handleRedeem = async () => {
-    if (!withdrawAmount || !account) return;
-    
+  // Handle withdraw
+  const handleWithdraw = async () => {
+    if (!connected || !account) {
+      toast({
+        title: "Wallet not connected",
+        description: ERROR_MESSAGES.WALLET_NOT_CONNECTED,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const amount = parseFloat(withdrawAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: ERROR_MESSAGES.INVALID_AMOUNT,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (amount > data.ccitBalance) {
+      toast({
+        title: "Insufficient balance",
+        description: ERROR_MESSAGES.INSUFFICIENT_BALANCE,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setTransactionLoading(true);
     try {
-      const amount = parseFloat(withdrawAmount);
-      if (isNaN(amount) || amount <= 0) {
-        throw new Error(ERROR_MESSAGES.INVALID_AMOUNT);
-      }
+      const amountInCCIT = Math.floor(amount * Math.pow(10, CCIT_DECIMALS));
       
-      if (amount > data.ccitBalance) {
-        throw new Error(ERROR_MESSAGES.INSUFFICIENT_BALANCE);
-      }
-      
-      // Convert to on-chain format (CCIT has 8 decimals)
-      const amountInTokens = Math.floor(amount * Math.pow(10, CCIT_DECIMALS));
-      
-      console.log('Submitting redeem transaction:', {
-        amount,
-        amountInTokens
-      });
-      
-      const transaction = {
+      const transaction = await signAndSubmitTransaction({
         data: {
           function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::redeem`,
-          functionArguments: [amountInTokens.toString()]
-        }
-      };
-      
-      const response = await signAndSubmitTransaction(transaction);
-      
-      console.log('Transaction submitted:', response);
-      
-      // Wait for transaction confirmation
+          functionArguments: [amountInCCIT.toString()],
+        },
+      });
+
       await aptosClient().waitForTransaction({
-        transactionHash: response.hash
+        transactionHash: transaction.hash,
       });
-      
+
       toast({
-        title: "Success",
-        description: SUCCESS_MESSAGES.REDEEM_SUCCESS
+        title: "Success!",
+        description: SUCCESS_MESSAGES.REDEEM_SUCCESS,
       });
-      
+
       setWithdrawAmount('');
-      
-      // Refresh data
-      await fetchPortfolioData();
-      await fetchTreasuryData();
-      
-    } catch (error: any) {
-      console.error('Redeem error:', error);
+      setShowWithdrawModal(false);
+      await fetchAllData();
+    } catch (error) {
+      console.error('Withdraw error:', error);
       toast({
+        title: "Transaction failed",
+        description: ERROR_MESSAGES.TRANSACTION_FAILED,
         variant: "destructive",
-        title: "Error",
-        description: error.message || ERROR_MESSAGES.TRANSACTION_FAILED
       });
     } finally {
       setTransactionLoading(false);
     }
   };
 
-  // Render loading state
-  if (data.loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-lg">Loading investor data...</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Auto-refresh data
+  useEffect(() => {
+    if (connected) {
+      fetchAllData();
+      const interval = setInterval(() => {
+        // Don't show loading spinner for background refreshes
+        setDataLoading(false);
+        fetchAllData();
+      }, 10000); // Refresh every 10 seconds
+      return () => clearInterval(interval);
+    }
+  }, [connected]);
 
-  // Render error state
-  if (data.error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-8 text-center">
-            <div className="text-red-500 mb-4">
-              <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            </div>
-            <p className="text-lg mb-4">Error loading data</p>
-            <p className="text-sm text-gray-400 mb-4">{data.error}</p>
-            <Button onClick={() => window.location.reload()}>
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Render wallet connection prompt
+  // Initial loading state - only show if we haven't loaded any data yet
   if (!connected) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-8 text-center">
-            <div className="text-purple-400 mb-4">
-              <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
+      <div className="retro-body">
+        <div className="retro-scanlines"></div>
+        <div className="retro-pixel-grid"></div>
+        <div className="retro-flex-center min-h-screen">
+          <div className="retro-card">
+            <div className="retro-terminal-header">/// WALLET CONNECTION REQUIRED ///</div>
+            <div className="text-center">
+              <div className="retro-neon-text text-2xl mb-4">🎰 CHAINCASINO</div>
+              <p className="retro-text-primary mb-4">
+                Please connect your wallet to access the investor portal
+              </p>
+              <p className="retro-text-muted">
+                {ERROR_MESSAGES.WALLET_NOT_CONNECTED}
+              </p>
             </div>
-            <h2 className="text-2xl font-bold mb-4 text-white">🎰 ChainCasino Investor Portal</h2>
-            <p className="text-gray-300 mb-6">
-              Connect your wallet to start investing in the casino treasury and earn yield through rising NAV.
-            </p>
-            <p className="text-sm text-gray-400">
-              {ERROR_MESSAGES.WALLET_NOT_CONNECTED}
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
 
-  // Debug logging
-  console.log('Current data state:', data);
-  
+  // Calculate 24h change (mock for now)
+  const navChange = 3.2;
+  const profitToday = data.totalTreasury * 0.02; // Mock 2% daily profit
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
-      <div className="max-w-6xl mx-auto">
+    <div className="retro-body">
+      <div className="retro-scanlines"></div>
+      <div className="retro-pixel-grid"></div>
+      
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">🎰 ChainCasino Investor Portal</h1>
-          <p className="text-xl text-gray-300">
-            Invest in the casino treasury and earn yield through rising NAV
-          </p>
-          <p className="text-sm text-gray-400 mt-2">
+        <header className="text-center mb-8 p-6 border-b-4 border-yellow-400">
+          <div className="retro-neon-text text-4xl mb-4">🎰 CHAINCASINO</div>
+          <div className="retro-text-primary text-xl uppercase tracking-widest">
+            INVESTOR TERMINAL
+          </div>
+          <div className="flex justify-center items-center gap-4 mt-4">
+            <span className="retro-text-accent text-lg">🍒</span>
+            <span className="retro-text-accent text-lg">💎</span>
+            <span className="retro-text-accent text-lg">🎲</span>
+            <span className="retro-text-accent text-lg">⭐</span>
+            <span className="retro-text-accent text-lg">💰</span>
+          </div>
+          <p className="retro-text-muted mt-2">
             Connected: {account?.address?.toStringLong().slice(0, 6)}...{account?.address?.toStringLong().slice(-4)}
           </p>
-        </div>
+        </header>
 
-        {/* Portfolio Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="bg-gradient-to-r from-green-600 to-green-700 text-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Portfolio Value</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{data.portfolioValue.toFixed(4)} APT</div>
-              <p className="text-xs text-green-100">
-                {data.ccitBalance.toFixed(3)} CCIT × {data.nav.toFixed(4)} NAV
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Current NAV</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{data.nav.toFixed(4)} APT</div>
-              <p className="text-xs text-blue-100">
-                Per CCIT Token
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">APT Balance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{data.aptBalance.toFixed(2)} APT</div>
-              <p className="text-xs text-purple-100">
-                Available for investment
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Treasury Statistics */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="text-xl">🏦 Treasury Overview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {data.totalTreasury.toFixed(2)} APT
-                </div>
-                <p className="text-sm text-gray-600">Total Treasury</p>
+        {/* Main Grid */}
+        <div className="retro-grid-2 mb-8">
+          {/* Portfolio Panel */}
+          <div className="retro-card">
+            <div className="retro-pixel-font text-sm text-purple-300 mb-6 flex items-center gap-2">
+              <div className="w-4 h-4 bg-purple-400"></div>
+              PORTFOLIO & NAV
+            </div>
+            
+            <div className="retro-display mb-4">
+              <div className="retro-display-value">
+                {dataLoading ? <span className="retro-loading"></span> : `${formatAPT(data.portfolioValue)}`}
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {data.centralTreasury.toFixed(2)} APT
-                </div>
-                <p className="text-sm text-gray-600">Central Treasury</p>
+              <div className="retro-display-label">PORTFOLIO VALUE</div>
+            </div>
+
+            <div className="retro-stats">
+              <div className="retro-stat-line">
+                <span className="retro-stat-name">CURRENT NAV:</span>
+                <span className="retro-stat-value">
+                  {dataLoading ? <span className="retro-loading"></span> : formatAPT(data.nav)}
+                </span>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">
-                  {data.gameReserves.toFixed(2)} APT
-                </div>
-                <p className="text-sm text-gray-600">Game Reserves</p>
+              <div className="retro-stat-line">
+                <span className="retro-stat-name">24H CHANGE:</span>
+                <span className="retro-stat-value text-green-400">+{formatPercentage(navChange)}</span>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">
-                  {data.totalSupply.toFixed(2)} CCIT
-                </div>
-                <p className="text-sm text-gray-600">Total Supply</p>
+              <div className="retro-stat-line">
+                <span className="retro-stat-name">CCIT BALANCE:</span>
+                <span className="retro-stat-value">
+                  {dataLoading ? <span className="retro-loading"></span> : formatCCIT(data.ccitBalance)}
+                </span>
+              </div>
+              <div className="retro-stat-line">
+                <span className="retro-stat-name">APT BALANCE:</span>
+                <span className="retro-stat-value">
+                  {dataLoading ? <span className="retro-loading"></span> : formatAPT(data.aptBalance)}
+                </span>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Investment Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Deposit & Mint */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl text-green-600">💰 Deposit & Mint CCIT</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="deposit-amount" className="text-sm font-medium">
-                  Deposit Amount (APT)
-                </Label>
-                <Input
-                  id="deposit-amount"
-                  type="number"
-                  placeholder="0.00"
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                  className="mt-1"
-                  min="0"
-                  step="0.01"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Available: {data.aptBalance.toFixed(2)} APT
-                </p>
-              </div>
-              
-              {depositAmount && (
-                <div className="bg-green-50 p-3 rounded-md">
-                  <p className="text-sm text-green-800">
-                    You will receive: ~{(parseFloat(depositAmount) / data.nav).toFixed(3)} CCIT
-                  </p>
-                </div>
-              )}
-              
-              <Button
-                onClick={handleDeposit}
-                disabled={!depositAmount || transactionLoading || parseFloat(depositAmount) <= 0}
-                className="w-full bg-green-600 hover:bg-green-700"
+            
+            <div className="flex gap-3 mt-6">
+              <button 
+                className="retro-button flex-1"
+                onClick={() => setShowDepositModal(true)}
               >
-                {transactionLoading ? 'Processing...' : 'Deposit APT & Mint CCIT'}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Redeem */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl text-red-600">🔄 Redeem CCIT</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="withdraw-amount" className="text-sm font-medium">
-                  Redeem Amount (CCIT)
-                </Label>
-                <Input
-                  id="withdraw-amount"
-                  type="number"
-                  placeholder="0.00"
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="mt-1"
-                  min="0"
-                  step="0.01"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Available: {data.ccitBalance.toFixed(3)} CCIT
-                </p>
-              </div>
-              
-              {withdrawAmount && (
-                <div className="bg-red-50 p-3 rounded-md">
-                  <p className="text-sm text-red-800">
-                    You will receive: ~{(parseFloat(withdrawAmount) * data.nav).toFixed(4)} APT
-                  </p>
-                </div>
-              )}
-              
-              <Button
-                onClick={handleRedeem}
-                disabled={!withdrawAmount || transactionLoading || parseFloat(withdrawAmount) <= 0}
-                className="w-full bg-red-600 hover:bg-red-700"
-                variant="destructive"
+                INSERT COIN
+              </button>
+              <button 
+                className="retro-button-secondary flex-1"
+                onClick={() => setShowWithdrawModal(true)}
               >
-                {transactionLoading ? 'Processing...' : 'Redeem CCIT for APT'}
-              </Button>
-            </CardContent>
-          </Card>
+                CASH OUT
+              </button>
+            </div>
+          </div>
+
+          {/* Treasury Panel */}
+          <div className="retro-card">
+            <div className="retro-pixel-font text-sm text-cyan-300 mb-6 flex items-center gap-2">
+              <div className="w-4 h-4 bg-cyan-400"></div>
+              CASINO TREASURY
+            </div>
+            
+            <div className="retro-pixel-chart mb-4">
+              <div className="retro-chart-bar" style={{'--height': '70%', left: '20px'} as React.CSSProperties}></div>
+              <div className="retro-chart-bar" style={{'--height': '50%', left: '50px'} as React.CSSProperties}></div>
+              <div className="retro-chart-bar" style={{'--height': '85%', left: '80px'} as React.CSSProperties}></div>
+              <div className="retro-chart-bar" style={{'--height': '40%', left: '110px'} as React.CSSProperties}></div>
+              <div className="retro-chart-bar" style={{'--height': '60%', left: '140px'} as React.CSSProperties}></div>
+              <div className="retro-chart-bar" style={{'--height': '75%', left: '170px'} as React.CSSProperties}></div>
+            </div>
+
+            <div className="retro-stats">
+              <div className="retro-stat-line">
+                <span className="retro-stat-name">CENTRAL VAULT:</span>
+                <span className="retro-stat-value">
+                  {dataLoading ? <span className="retro-loading"></span> : `${formatAPT(data.centralTreasury)} APT`}
+                </span>
+              </div>
+              <div className="retro-stat-line">
+                <span className="retro-stat-name">GAME VAULTS:</span>
+                <span className="retro-stat-value">
+                  {dataLoading ? <span className="retro-loading"></span> : `${formatAPT(data.gameReserves)} APT`}
+                </span>
+              </div>
+              <div className="retro-stat-line">
+                <span className="retro-stat-name">TOTAL TREASURY:</span>
+                <span className="retro-stat-value">
+                  {dataLoading ? <span className="retro-loading"></span> : `${formatAPT(data.totalTreasury)} APT`}
+                </span>
+              </div>
+              <div className="retro-stat-line">
+                <span className="retro-stat-name">PROFIT TODAY:</span>
+                <span className="retro-stat-value text-green-400">+{formatAPT(profitToday)} APT</span>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Deposit Modal */}
+        {showDepositModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+            <div className="retro-card max-w-md w-full mx-4">
+              <div className="retro-pixel-font text-sm text-green-300 mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-400"></div>
+                  INSERT COIN - DEPOSIT APT
+                </div>
+                <button 
+                  onClick={() => setShowDepositModal(false)}
+                  className="retro-text-primary text-xl"
+                >
+                  &times;
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="retro-text-secondary text-sm block mb-2">Amount (APT)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value)}
+                      placeholder="Enter APT amount"
+                      className="retro-input flex-1"
+                      step="0.0001"
+                      min="0"
+                    />
+                    <button
+                      onClick={() => setDepositAmount(data.aptBalance.toString())}
+                      className="retro-button-secondary px-3 text-xs"
+                    >
+                      MAX
+                    </button>
+                  </div>
+                </div>
+                
+                {depositAmount && (
+                  <div className="retro-stats">
+                    <div className="retro-stat-line">
+                      <span className="retro-stat-name">YOU WILL RECEIVE:</span>
+                      <span className="retro-stat-value">
+                        {formatCCIT(parseFloat(depositAmount) / data.nav)} CCIT
+                      </span>
+                    </div>
+                    <div className="retro-stat-line">
+                      <span className="retro-stat-name">EXCHANGE RATE:</span>
+                      <span className="retro-stat-value">1 APT = {formatCCIT(1 / data.nav)} CCIT</span>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowDepositModal(false)}
+                    className="retro-button-secondary flex-1"
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    onClick={handleDeposit}
+                    disabled={transactionLoading || !depositAmount}
+                    className="retro-button-success flex-1"
+                  >
+                    {transactionLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="retro-loading"></span>
+                        PROCESSING...
+                      </span>
+                    ) : (
+                      '💰 DEPOSIT'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Withdraw Modal */}
+        {showWithdrawModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+            <div className="retro-card max-w-md w-full mx-4">
+              <div className="retro-pixel-font text-sm text-red-300 mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-400"></div>
+                  CASH OUT - REDEEM CCIT
+                </div>
+                <button 
+                  onClick={() => setShowWithdrawModal(false)}
+                  className="retro-text-primary text-xl"
+                >
+                  &times;
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="retro-text-secondary text-sm block mb-2">Amount (CCIT)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={withdrawAmount}
+                      onChange={(e) => setWithdrawAmount(e.target.value)}
+                      placeholder="Enter CCIT amount"
+                      className="retro-input flex-1"
+                      step="0.001"
+                      min="0"
+                    />
+                    <button
+                      onClick={() => setWithdrawAmount(data.ccitBalance.toString())}
+                      className="retro-button-secondary px-3 text-xs"
+                    >
+                      MAX
+                    </button>
+                  </div>
+                </div>
+                
+                {withdrawAmount && (
+                  <div className="retro-stats">
+                    <div className="retro-stat-line">
+                      <span className="retro-stat-name">YOU WILL RECEIVE:</span>
+                      <span className="retro-stat-value">
+                        {formatAPT(parseFloat(withdrawAmount) * data.nav)} APT
+                      </span>
+                    </div>
+                    <div className="retro-stat-line">
+                      <span className="retro-stat-name">EXCHANGE RATE:</span>
+                      <span className="retro-stat-value">1 CCIT = {formatAPT(data.nav)} APT</span>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowWithdrawModal(false)}
+                    className="retro-button-secondary flex-1"
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    onClick={handleWithdraw}
+                    disabled={transactionLoading || !withdrawAmount}
+                    className="retro-button-danger flex-1"
+                  >
+                    {transactionLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="retro-loading"></span>
+                        PROCESSING...
+                      </span>
+                    ) : (
+                      '💸 REDEEM'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Terminal Status */}
+        <div className="retro-terminal mb-8">
+          <div className="retro-terminal-header">/// INVESTOR TERMINAL STATUS ///</div>
+          <div className="retro-terminal-line">
+            <span className="retro-terminal-prompt">CCIT:\&gt;</span>
+            <span>TREASURY AUTO-REBALANCING: ACTIVE</span>
+          </div>
+          <div className="retro-terminal-line">
+            <span className="retro-terminal-prompt">CCIT:\&gt;</span>
+            <span>FUNGIBLE ASSET STANDARD: ONLINE</span>
+          </div>
+          <div className="retro-terminal-line">
+            <span className="retro-terminal-prompt">CCIT:\&gt;</span>
+            <span>TOTAL SUPPLY: {dataLoading ? <span className="retro-loading"></span> : `${formatCCIT(data.totalSupply)} CCIT`}</span>
+          </div>
+          <div className="retro-terminal-line">
+            <span className="retro-terminal-prompt">CCIT:\&gt;</span>
+            <span>LATEST: NAV APPRECIATION +{formatPercentage(navChange)} &rarr; INVESTORS</span>
+          </div>
+          <div className="retro-terminal-line">
+            <span className="retro-terminal-prompt">CCIT:\&gt;</span>
+            <span>SYSTEM OPERATIONAL - TREASURY GROWS</span>
+          </div>
+          <div className="retro-terminal-line">
+            <span className="retro-terminal-prompt">CCIT:\&gt;</span>
+            <span className="retro-terminal-cursor">█</span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <footer className="text-center p-6 border-t-4 border-yellow-400">
+          <div className="retro-pixel-font text-sm text-cyan-400 leading-relaxed">
+            🎰 CHAINCASINO.APT &times; INVESTOR TERMINAL 🎰<br />
+            POWERED BY APTOS MOVE 2 • FUNGIBLE ASSET STANDARD<br />
+            EST. 2024 • WHERE DEFI MEETS RETRO GAMING
+          </div>
+        </footer>
       </div>
     </div>
   );

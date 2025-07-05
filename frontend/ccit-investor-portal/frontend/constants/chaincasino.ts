@@ -19,7 +19,7 @@ export const APTOS_API_KEY = import.meta.env.VITE_APTOS_API_KEY;
 
 // ChainCasino Specific Constants
 export const CCIT_DECIMALS = 8;
-export const NAV_SCALE = 100000000; // 10^8 for NAV calculations
+export const NAV_SCALE = 1000000; // 10^6 for NAV calculations
 export const APT_DECIMALS = 8;
 
 // Game Constants
@@ -27,7 +27,7 @@ export const SEVEN_OUT_MIN_BET = 50000000; // 0.5 APT (50M octas)
 export const SEVEN_OUT_MAX_BET = 4000000000; // 40 APT (4B octas)
 
 // UI Constants
-export const REFRESH_INTERVAL = 10000; // 10 seconds
+export const REFRESH_INTERVAL = 30000; // 10 seconds
 export const ANIMATION_DURATION = 300; // 300ms
 
 // Retro Arcade Theme
