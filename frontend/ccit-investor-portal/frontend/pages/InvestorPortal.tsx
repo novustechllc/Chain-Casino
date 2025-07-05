@@ -54,131 +54,168 @@ const InvestorPortal: React.FC = () => {
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
   const [transactionLoading, setTransactionLoading] = useState(false);
 
-  // Fetch portfolio data
-  const fetchPortfolioData = async () => {
-    if (!account || !connected) return;
+
+const fetchPortfolioData = async () => {
+  if (!account || !connected) return;
+  
+  try {
+    const userAddress = account.address.toStringLong();
+    console.log('Making API call with address:', userAddress);
     
-    try {
-      const userAddress = account.address.toString();
-      console.log('Fetching portfolio data for:', userAddress);
-      
-      // Validate address exists
-      if (!userAddress || userAddress === 'undefined') {
-        throw new Error('Invalid user address');
+    // ✅ FIXED: Use "functionArguments" instead of "arguments"
+    const ccitBalanceResponse = await aptosClient().view({
+      payload: {
+        function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::user_balance`,
+        functionArguments: [userAddress]  // ← CHANGED FROM "arguments"
       }
-      
-      console.log('Calling user_balance with address:', userAddress);
-      
-      // Get user's CCIT balance - needs user address parameter
-      const ccitBalanceResponse = await aptosClient().view({
-        payload: {
-          function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::user_balance`,
-          arguments: [userAddress]
-        }
-      });
-      
-      console.log('CCIT balance response:', ccitBalanceResponse);
-      
-      // Get NAV (Net Asset Value) - no parameters
-      const navResponse = await aptosClient().view({
-        payload: {
-          function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::nav`,
-          arguments: []
-        }
-      });
-      
-      console.log('NAV response:', navResponse);
-      
-      // Get total supply - no parameters
-      const totalSupplyResponse = await aptosClient().view({
-        payload: {
-          function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::total_supply`,
-          arguments: []
-        }
-      });
-      
-      console.log('Total supply response:', totalSupplyResponse);
-      
-      // Convert from on-chain format (NAV is already scaled, balance is in token units)
-      const ccitBalance = Number(ccitBalanceResponse[0]) / Math.pow(10, CCIT_DECIMALS);
-      const nav = Number(navResponse[0]) / Math.pow(10, APT_DECIMALS);
-      const portfolioValue = ccitBalance * nav;
-      
-      console.log('Calculated values:', {
-        ccitBalance,
-        nav,
-        portfolioValue
-      });
-      
-      setData(prev => ({
-        ...prev,
-        ccitBalance,
-        nav,
-        portfolioValue,
-        loading: false
-      }));
-      
-    } catch (error) {
-      console.error('Error fetching portfolio data:', error);
-      setData(prev => ({
-        ...prev,
-        error: `Failed to fetch portfolio data: ${error}`,
-        loading: false
-      }));
-    }
-  };
+    });
+    
+    console.log('CCIT balance response:', ccitBalanceResponse);
+    
+    // ✅ FIXED: Use "functionArguments" instead of "arguments"
+    const navResponse = await aptosClient().view({
+      payload: {
+        function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::nav`,
+        functionArguments: []  // ← CHANGED FROM "arguments"
+      }
+    });
+    
+    console.log('NAV response:', navResponse);
+    
+    // ✅ FIXED: Use "functionArguments" instead of "arguments"
+    const totalSupplyResponse = await aptosClient().view({
+      payload: {
+        function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::total_supply`,
+        functionArguments: []  // ← CHANGED FROM "arguments"
+      }
+    });
+    
+    console.log('Total supply response:', totalSupplyResponse);
+    
+    // Convert from on-chain format
+    const ccitBalance = Number(ccitBalanceResponse[0]) / Math.pow(10, CCIT_DECIMALS);
+    const nav = Number(navResponse[0]) / Math.pow(10, APT_DECIMALS);
+    const portfolioValue = ccitBalance * nav;
+    
+    console.log('Calculated values:', {
+      ccitBalance,
+      nav,
+      portfolioValue
+    });
+    
+    setData(prev => ({
+      ...prev,
+      ccitBalance,
+      nav,
+      portfolioValue,
+      loading: false
+    }));
+    
+  } catch (error) {
+    console.error('Error fetching portfolio data:', error);
+    setData(prev => ({
+      ...prev,
+      error: `Failed to fetch portfolio data: ${error}`,
+      loading: false
+    }));
+  }
+};
+
+// Enhanced useEffect with additional debugging
+useEffect(() => {
+  console.log('useEffect triggered - connected:', connected, 'account:', account);
+  
+  if (connected && account) {
+    console.log('Wallet connected, fetching data...');
+    setData(prev => ({ ...prev, loading: true, error: null }));
+    
+    // Add small delay to ensure wallet is fully connected
+    setTimeout(() => {
+      fetchPortfolioData();
+      fetchTreasuryData();
+    }, 100);
+  } else {
+    console.log('Wallet not connected, clearing data');
+    setData(prev => ({
+      ...prev,
+      ccitBalance: 0,
+      nav: 0,
+      portfolioValue: 0,
+      loading: false,
+      error: null
+    }));
+  }
+}, [connected, account]);
+
+// Add this debug function to help troubleshoot
+const debugWalletState = () => {
+  console.log('=== WALLET DEBUG INFO ===');
+  console.log('Connected:', connected);
+  console.log('Account:', account);
+  console.log('Account address:', account?.address);
+  console.log('Account address toString:', account?.address?.toString());
+  console.log('Account address toStringLong:', account?.address?.toStringLong());
+  console.log('========================');
+};
+
+// Add this button to your JSX for debugging (temporary)
+{process.env.NODE_ENV === 'development' && (
+  <Button onClick={debugWalletState} className="mb-4">
+    Debug Wallet State
+  </Button>
+)}
 
   // Fetch treasury data with correct function signatures
-  const fetchTreasuryData = async () => {
-    try {
-      console.log('Fetching treasury data...');
-      
-      // Step 1: Get central treasury balance (no parameters needed)
-      const centralTreasuryResponse = await aptosClient().view({
-        payload: {
-          function: `${CASINO_HOUSE_ADDRESS}::CasinoHouse::central_treasury_balance`,
-          arguments: []
-        }
-      });
-      
-      console.log('Central treasury response:', centralTreasuryResponse);
-      
-      // Step 2: Get total treasury balance (central + all games)
-      const totalTreasuryResponse = await aptosClient().view({
-        payload: {
-          function: `${CASINO_HOUSE_ADDRESS}::CasinoHouse::treasury_balance`,
-          arguments: []
-        }
-      });
-      
-      console.log('Total treasury response:', totalTreasuryResponse);
-      
-      // Calculate game reserves as difference
-      const centralTreasury = Number(centralTreasuryResponse[0]) / Math.pow(10, APT_DECIMALS);
-      const totalTreasury = Number(totalTreasuryResponse[0]) / Math.pow(10, APT_DECIMALS);
-      const gameReserves = totalTreasury - centralTreasury;
-      
-      console.log('Treasury calculation:', {
-        central: centralTreasury,
-        total: totalTreasury,
-        games: gameReserves
-      });
-      
-      setData(prev => ({
-        ...prev,
-        centralTreasury,
-        gameReserves,
-        totalTreasury
-      }));
-      
-    } catch (error) {
-      console.error('Error fetching treasury data:', error);
-      setData(prev => ({
-        ...prev,
-        error: `Failed to fetch treasury data: ${error}`
-      }));
-    }
-  };
+const fetchTreasuryData = async () => {
+  try {
+    console.log('Fetching treasury data...');
+    
+    // ✅ FIXED: Use "functionArguments" instead of "arguments"
+    const centralTreasuryResponse = await aptosClient().view({
+      payload: {
+        function: `${CASINO_HOUSE_ADDRESS}::CasinoHouse::central_treasury_balance`,
+        functionArguments: []  // ← CHANGED FROM "arguments"
+      }
+    });
+    
+    console.log('Central treasury response:', centralTreasuryResponse);
+    
+    // ✅ FIXED: Use "functionArguments" instead of "arguments"
+    const totalTreasuryResponse = await aptosClient().view({
+      payload: {
+        function: `${CASINO_HOUSE_ADDRESS}::CasinoHouse::treasury_balance`,
+        functionArguments: []  // ← CHANGED FROM "arguments"
+      }
+    });
+    
+    console.log('Total treasury response:', totalTreasuryResponse);
+    
+    // Calculate game reserves as difference
+    const centralTreasury = Number(centralTreasuryResponse[0]) / Math.pow(10, APT_DECIMALS);
+    const totalTreasury = Number(totalTreasuryResponse[0]) / Math.pow(10, APT_DECIMALS);
+    const gameReserves = totalTreasury - centralTreasury;
+    
+    console.log('Treasury calculation:', {
+      central: centralTreasury,
+      total: totalTreasury,
+      games: gameReserves
+    });
+    
+    setData(prev => ({
+      ...prev,
+      centralTreasury,
+      gameReserves,
+      totalTreasury
+    }));
+    
+  } catch (error) {
+    console.error('Error fetching treasury data:', error);
+    setData(prev => ({
+      ...prev,
+      error: `Failed to fetch treasury data: ${error}`
+    }));
+  }
+};
 
   // Fetch all data on component mount and wallet connection
   useEffect(() => {
