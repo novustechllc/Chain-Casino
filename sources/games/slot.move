@@ -5,6 +5,7 @@
 //! 3-reel slot machine with weighted symbols and secure randomness.
 //! Uses simplified bet flow with BetId struct.
 
+#[test_only]
 module casino::SlotMachine {
     use aptos_framework::randomness;
     use aptos_framework::event;

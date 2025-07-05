@@ -5,6 +5,7 @@
 //! Single die guessing game where players bet on the exact outcome (1-6).
 //! Now uses simplified bet tracking with BetId struct.
 
+#[test_only]
 module casino::DiceGame {
     use aptos_framework::randomness;
     use aptos_framework::event;

@@ -4,6 +4,7 @@
 //!
 //! This game always pays out 3x the bet amount, guaranteed to drain treasury
 
+#[test_only]
 module casino::AlwaysLoseGame {
     use std::signer;
     use std::option;
