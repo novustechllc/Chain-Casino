@@ -1,0 +1,24 @@
+[package]
+name = "AptosFortune"
+version = "1.0.0"
+authors = ["Persona Normale"]
+license = "MIT"
+
+[addresses]
+aptos_fortune = "_"
+casino = "_"
+
+[dev-addresses]
+aptos_fortune = "0xF0A7"
+casino = "0xCC"
+
+[dependencies.ChainCasino]
+git = "https://github.com/PersonaNormale/ChainCasino.git"
+rev = "feature/dashboard-frontend"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]
