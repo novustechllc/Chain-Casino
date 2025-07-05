@@ -3,15 +3,23 @@ import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { aptosClient } from '@/utils/aptosClient';
 import { 
   CASINO_HOUSE_ADDRESS, 
   INVESTOR_TOKEN_ADDRESS, 
-  SEVEN_OUT_ADDRESS,
   CCIT_DECIMALS,
-  APT_DECIMALS 
+  APT_DECIMALS,
+  NAV_SCALE,
+  formatAPT,
+  formatCCIT,
+  formatNAV,
+  formatPercentage,
+  ERROR_MESSAGES,
+  SUCCESS_MESSAGES
 } from '@/constants/chaincasino';
+// Remove this import since we'll create transactions directly
 
 interface PortalData {
   // Portfolio data
@@ -23,11 +31,10 @@ interface PortalData {
   centralTreasury: number;
   gameReserves: number;
   totalTreasury: number;
+  totalSupply: number;
   
-  // Game stats
-  gamesToday: number;
-  volumeToday: number;
-  houseEdge: number;
+  // APT balance
+  aptBalance: number;
   
   // Loading states
   loading: boolean;
@@ -37,6 +44,7 @@ interface PortalData {
 const InvestorPortal: React.FC = () => {
   const { account, connected, signAndSubmitTransaction } = useWallet();
   const { toast } = useToast();
+  
   const [data, setData] = useState<PortalData>({
     ccitBalance: 0,
     nav: 0,
@@ -44,189 +52,168 @@ const InvestorPortal: React.FC = () => {
     centralTreasury: 0,
     gameReserves: 0,
     totalTreasury: 0,
-    gamesToday: 0,
-    volumeToday: 0,
-    houseEdge: 2.8,
+    totalSupply: 0,
+    aptBalance: 0,
     loading: true,
     error: null
   });
+  
   const [depositAmount, setDepositAmount] = useState<string>('');
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
   const [transactionLoading, setTransactionLoading] = useState(false);
 
+  // Fetch portfolio data for connected user
+  const fetchPortfolioData = async () => {
+    if (!account || !connected) return;
+    
+    try {
+      const userAddress = account.address.toStringLong();
+      console.log('Fetching portfolio data for address:', userAddress);
+      
+      // Fetch CCIT balance
+      const ccitBalanceResponse = await aptosClient().view({
+        payload: {
+          function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::user_balance`,
+          functionArguments: [userAddress]
+        }
+      });
+      
+      // Fetch NAV
+      const navResponse = await aptosClient().view({
+        payload: {
+          function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::nav`,
+          functionArguments: []
+        }
+      });
+      
+      // Fetch APT balance
+      const aptBalanceResponse = await aptosClient().getAccountAPTAmount({
+        accountAddress: userAddress
+      });
+      
+      // Convert from on-chain format
+      const ccitBalance = Number(ccitBalanceResponse[0]) / Math.pow(10, CCIT_DECIMALS);
+      const navRaw = Number(navResponse[0]);
+      const navScale = Math.pow(10, 8); // NAV_SCALE is 10^8
+      const nav = navRaw / navScale; // NAV is scaled by NAV_SCALE
+      const portfolioValue = ccitBalance * nav;
+      const aptBalance = Number(aptBalanceResponse) / Math.pow(10, APT_DECIMALS);
+      
+      console.log('Portfolio data:', {
+        ccitBalance,
+        navRaw,
+        navScale,
+        nav,
+        portfolioValue,
+        aptBalance
+      });
+      
+      setData(prev => ({
+        ...prev,
+        ccitBalance,
+        nav,
+        portfolioValue,
+        aptBalance
+      }));
+      
+    } catch (error) {
+      console.error('Error fetching portfolio data:', error);
+      setData(prev => ({
+        ...prev,
+        error: `Failed to fetch portfolio data: ${error}`
+      }));
+    }
+  };
 
-const fetchPortfolioData = async () => {
-  if (!account || !connected) return;
-  
-  try {
-    const userAddress = account.address.toStringLong();
-    console.log('Making API call with address:', userAddress);
-    
-    // ✅ FIXED: Use "functionArguments" instead of "arguments"
-    const ccitBalanceResponse = await aptosClient().view({
-      payload: {
-        function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::user_balance`,
-        functionArguments: [userAddress]  // ← CHANGED FROM "arguments"
-      }
-    });
-    
-    console.log('CCIT balance response:', ccitBalanceResponse);
-    
-    // ✅ FIXED: Use "functionArguments" instead of "arguments"
-    const navResponse = await aptosClient().view({
-      payload: {
-        function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::nav`,
-        functionArguments: []  // ← CHANGED FROM "arguments"
-      }
-    });
-    
-    console.log('NAV response:', navResponse);
-    
-    // ✅ FIXED: Use "functionArguments" instead of "arguments"
-    const totalSupplyResponse = await aptosClient().view({
-      payload: {
-        function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::total_supply`,
-        functionArguments: []  // ← CHANGED FROM "arguments"
-      }
-    });
-    
-    console.log('Total supply response:', totalSupplyResponse);
-    
-    // Convert from on-chain format
-    const ccitBalance = Number(ccitBalanceResponse[0]) / Math.pow(10, CCIT_DECIMALS);
-    const nav = Number(navResponse[0]) / Math.pow(10, APT_DECIMALS);
-    const portfolioValue = ccitBalance * nav;
-    
-    console.log('Calculated values:', {
-      ccitBalance,
-      nav,
-      portfolioValue
-    });
-    
-    setData(prev => ({
-      ...prev,
-      ccitBalance,
-      nav,
-      portfolioValue,
-      loading: false
-    }));
-    
-  } catch (error) {
-    console.error('Error fetching portfolio data:', error);
-    setData(prev => ({
-      ...prev,
-      error: `Failed to fetch portfolio data: ${error}`,
-      loading: false
-    }));
-  }
-};
+  // Fetch treasury data
+  const fetchTreasuryData = async () => {
+    try {
+      console.log('Fetching treasury data...');
+      
+      // Fetch central treasury balance
+      const centralTreasuryResponse = await aptosClient().view({
+        payload: {
+          function: `${CASINO_HOUSE_ADDRESS}::CasinoHouse::central_treasury_balance`,
+          functionArguments: []
+        }
+      });
+      
+      // Fetch total treasury balance
+      const totalTreasuryResponse = await aptosClient().view({
+        payload: {
+          function: `${CASINO_HOUSE_ADDRESS}::CasinoHouse::treasury_balance`,
+          functionArguments: []
+        }
+      });
+      
+      // Fetch total supply
+      const totalSupplyResponse = await aptosClient().view({
+        payload: {
+          function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::total_supply`,
+          functionArguments: []
+        }
+      });
+      
+      // Calculate values
+      const centralTreasury = Number(centralTreasuryResponse[0]) / Math.pow(10, APT_DECIMALS);
+      const totalTreasury = Number(totalTreasuryResponse[0]) / Math.pow(10, APT_DECIMALS);
+      const gameReserves = totalTreasury - centralTreasury;
+      const totalSupply = Number(totalSupplyResponse[0]) / Math.pow(10, CCIT_DECIMALS);
+      
+      console.log('Treasury data:', {
+        centralTreasury,
+        totalTreasury,
+        gameReserves,
+        totalSupply
+      });
+      
+      setData(prev => ({
+        ...prev,
+        centralTreasury,
+        gameReserves,
+        totalTreasury,
+        totalSupply,
+        loading: false
+      }));
+      
+    } catch (error) {
+      console.error('Error fetching treasury data:', error);
+      setData(prev => ({
+        ...prev,
+        error: `Failed to fetch treasury data: ${error}`,
+        loading: false
+      }));
+    }
+  };
 
-// Enhanced useEffect with additional debugging
-useEffect(() => {
-  console.log('useEffect triggered - connected:', connected, 'account:', account);
-  
-  if (connected && account) {
-    console.log('Wallet connected, fetching data...');
-    setData(prev => ({ ...prev, loading: true, error: null }));
-    
-    // Add small delay to ensure wallet is fully connected
-    setTimeout(() => {
-      fetchPortfolioData();
-      fetchTreasuryData();
-    }, 100);
-  } else {
-    console.log('Wallet not connected, clearing data');
-    setData(prev => ({
-      ...prev,
-      ccitBalance: 0,
-      nav: 0,
-      portfolioValue: 0,
-      loading: false,
-      error: null
-    }));
-  }
-}, [connected, account]);
-
-// Add this debug function to help troubleshoot
-const debugWalletState = () => {
-  console.log('=== WALLET DEBUG INFO ===');
-  console.log('Connected:', connected);
-  console.log('Account:', account);
-  console.log('Account address:', account?.address);
-  console.log('Account address toString:', account?.address?.toString());
-  console.log('Account address toStringLong:', account?.address?.toStringLong());
-  console.log('========================');
-};
-
-// Add this button to your JSX for debugging (temporary)
-{process.env.NODE_ENV === 'development' && (
-  <Button onClick={debugWalletState} className="mb-4">
-    Debug Wallet State
-  </Button>
-)}
-
-  // Fetch treasury data with correct function signatures
-const fetchTreasuryData = async () => {
-  try {
-    console.log('Fetching treasury data...');
-    
-    // ✅ FIXED: Use "functionArguments" instead of "arguments"
-    const centralTreasuryResponse = await aptosClient().view({
-      payload: {
-        function: `${CASINO_HOUSE_ADDRESS}::CasinoHouse::central_treasury_balance`,
-        functionArguments: []  // ← CHANGED FROM "arguments"
-      }
-    });
-    
-    console.log('Central treasury response:', centralTreasuryResponse);
-    
-    // ✅ FIXED: Use "functionArguments" instead of "arguments"
-    const totalTreasuryResponse = await aptosClient().view({
-      payload: {
-        function: `${CASINO_HOUSE_ADDRESS}::CasinoHouse::treasury_balance`,
-        functionArguments: []  // ← CHANGED FROM "arguments"
-      }
-    });
-    
-    console.log('Total treasury response:', totalTreasuryResponse);
-    
-    // Calculate game reserves as difference
-    const centralTreasury = Number(centralTreasuryResponse[0]) / Math.pow(10, APT_DECIMALS);
-    const totalTreasury = Number(totalTreasuryResponse[0]) / Math.pow(10, APT_DECIMALS);
-    const gameReserves = totalTreasury - centralTreasury;
-    
-    console.log('Treasury calculation:', {
-      central: centralTreasury,
-      total: totalTreasury,
-      games: gameReserves
-    });
-    
-    setData(prev => ({
-      ...prev,
-      centralTreasury,
-      gameReserves,
-      totalTreasury
-    }));
-    
-  } catch (error) {
-    console.error('Error fetching treasury data:', error);
-    setData(prev => ({
-      ...prev,
-      error: `Failed to fetch treasury data: ${error}`
-    }));
-  }
-};
-
-  // Fetch all data on component mount and wallet connection
+  // Fetch all data when wallet connects
   useEffect(() => {
     if (connected && account) {
+      console.log('Wallet connected, fetching data...');
       setData(prev => ({ ...prev, loading: true, error: null }));
-      fetchPortfolioData();
-      fetchTreasuryData();
+      
+      // Fetch data with small delay to ensure wallet is ready
+      const timer = setTimeout(() => {
+        fetchPortfolioData();
+        fetchTreasuryData();
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    } else {
+      // Reset data when wallet disconnects
+      setData(prev => ({
+        ...prev,
+        ccitBalance: 0,
+        nav: 0,
+        portfolioValue: 0,
+        aptBalance: 0,
+        loading: false,
+        error: null
+      }));
     }
   }, [connected, account]);
 
-  // Handle deposit
+  // Handle deposit and mint
   const handleDeposit = async () => {
     if (!depositAmount || !account) return;
     
@@ -234,119 +221,175 @@ const fetchTreasuryData = async () => {
     try {
       const amount = parseFloat(depositAmount);
       if (isNaN(amount) || amount <= 0) {
-        throw new Error('Invalid deposit amount');
+        throw new Error(ERROR_MESSAGES.INVALID_AMOUNT);
+      }
+      
+      if (amount > data.aptBalance) {
+        throw new Error(ERROR_MESSAGES.INSUFFICIENT_BALANCE);
       }
       
       // Convert to on-chain format (APT has 8 decimals)
       const amountInOctas = Math.floor(amount * Math.pow(10, APT_DECIMALS));
       
+      console.log('Submitting deposit transaction:', {
+        amount,
+        amountInOctas
+      });
+      
       const transaction = {
         data: {
           function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::deposit_and_mint`,
-          arguments: [amountInOctas.toString()]
+          functionArguments: [amountInOctas.toString()]
         }
       };
       
-      console.log('Submitting deposit transaction:', transaction);
-      
       const response = await signAndSubmitTransaction(transaction);
+      
       console.log('Transaction submitted:', response);
       
-      // Wait for transaction to be confirmed
+      // Wait for transaction confirmation
       await aptosClient().waitForTransaction({
         transactionHash: response.hash
       });
       
       toast({
         title: "Success",
-        description: `Deposited ${amount} APT successfully!`
+        description: SUCCESS_MESSAGES.DEPOSIT_SUCCESS
       });
       
       setDepositAmount('');
-      // Refresh data
-      fetchPortfolioData();
-      fetchTreasuryData();
       
-    } catch (error) {
+      // Refresh data
+      await fetchPortfolioData();
+      await fetchTreasuryData();
+      
+    } catch (error: any) {
       console.error('Deposit error:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: `Deposit failed: ${error}`
+        description: error.message || ERROR_MESSAGES.TRANSACTION_FAILED
       });
     } finally {
       setTransactionLoading(false);
     }
   };
 
-  // Handle withdraw
-  const handleWithdraw = async () => {
+  // Handle redeem
+  const handleRedeem = async () => {
     if (!withdrawAmount || !account) return;
     
     setTransactionLoading(true);
     try {
       const amount = parseFloat(withdrawAmount);
       if (isNaN(amount) || amount <= 0) {
-        throw new Error('Invalid withdraw amount');
+        throw new Error(ERROR_MESSAGES.INVALID_AMOUNT);
+      }
+      
+      if (amount > data.ccitBalance) {
+        throw new Error(ERROR_MESSAGES.INSUFFICIENT_BALANCE);
       }
       
       // Convert to on-chain format (CCIT has 8 decimals)
       const amountInTokens = Math.floor(amount * Math.pow(10, CCIT_DECIMALS));
       
+      console.log('Submitting redeem transaction:', {
+        amount,
+        amountInTokens
+      });
+      
       const transaction = {
         data: {
           function: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::redeem`,
-          arguments: [amountInTokens.toString()]
+          functionArguments: [amountInTokens.toString()]
         }
       };
       
-      console.log('Submitting withdraw transaction:', transaction);
-      
       const response = await signAndSubmitTransaction(transaction);
+      
       console.log('Transaction submitted:', response);
       
-      // Wait for transaction to be confirmed
+      // Wait for transaction confirmation
       await aptosClient().waitForTransaction({
         transactionHash: response.hash
       });
       
       toast({
         title: "Success",
-        description: `Withdrew ${amount} CCIT successfully!`
+        description: SUCCESS_MESSAGES.REDEEM_SUCCESS
       });
       
       setWithdrawAmount('');
-      // Refresh data
-      fetchPortfolioData();
-      fetchTreasuryData();
       
-    } catch (error) {
-      console.error('Withdraw error:', error);
+      // Refresh data
+      await fetchPortfolioData();
+      await fetchTreasuryData();
+      
+    } catch (error: any) {
+      console.error('Redeem error:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: `Withdraw failed: ${error}`
+        description: error.message || ERROR_MESSAGES.TRANSACTION_FAILED
       });
     } finally {
       setTransactionLoading(false);
     }
   };
 
+  // Render loading state
+  if (data.loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-lg">Loading investor data...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Render error state
+  if (data.error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <div className="text-red-500 mb-4">
+              <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <p className="text-lg mb-4">Error loading data</p>
+            <p className="text-sm text-gray-400 mb-4">{data.error}</p>
+            <Button onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Render wallet connection prompt
   if (!connected) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-        <Card className="max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle className="text-center text-white">
-              🎰 ChainCasino CCIT Portal
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-gray-300 mb-4">
-              Connect your wallet to access the investor portal
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <div className="text-purple-400 mb-4">
+              <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold mb-4 text-white">🎰 ChainCasino Investor Portal</h2>
+            <p className="text-gray-300 mb-6">
+              Connect your wallet to start investing in the casino treasury and earn yield through rising NAV.
             </p>
             <p className="text-sm text-gray-400">
-              Use the wallet button in the top right corner
+              {ERROR_MESSAGES.WALLET_NOT_CONNECTED}
             </p>
           </CardContent>
         </Card>
@@ -354,199 +397,185 @@ const fetchTreasuryData = async () => {
     );
   }
 
+  // Debug logging
+  console.log('Current data state:', data);
+  
   return (
-    <div className="min-h-screen bg-gray-900 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-4">
-            🎰 ChainCasino CCIT
-          </h1>
+          <h1 className="text-4xl font-bold text-white mb-2">🎰 ChainCasino Investor Portal</h1>
           <p className="text-xl text-gray-300">
-            Investor Portal - Welcome back, Player!
+            Invest in the casino treasury and earn yield through rising NAV
           </p>
           <p className="text-sm text-gray-400 mt-2">
-            Connected: {account?.address.toString().slice(0, 8)}...{account?.address.toString().slice(-6)}
+            Connected: {account?.address?.toStringLong().slice(0, 6)}...{account?.address?.toStringLong().slice(-4)}
           </p>
-          {data.loading && (
-            <p className="text-blue-400 mt-2">Loading portfolio data...</p>
-          )}
-          {data.error && (
-            <p className="text-red-400 mt-2 text-sm">{data.error}</p>
-          )}
         </div>
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Portfolio Overview */}
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-blue-400">💰 Portfolio</CardTitle>
+        {/* Portfolio Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="bg-gradient-to-r from-green-600 to-green-700 text-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Portfolio Value</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center mb-4">
-                <div className="text-3xl font-bold text-white mb-2">
-                  {data.ccitBalance.toFixed(2)}
-                </div>
-                <div className="text-sm text-gray-400">CCIT TOKENS</div>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">NAV:</span>
-                  <span className="text-white">{data.nav.toFixed(4)} APT</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Total Value:</span>
-                  <span className="text-white">{data.portfolioValue.toFixed(2)} APT</span>
-                </div>
-              </div>
+              <div className="text-2xl font-bold">{data.portfolioValue.toFixed(4)} APT</div>
+              <p className="text-xs text-green-100">
+                {data.ccitBalance.toFixed(3)} CCIT × {data.nav.toFixed(4)} NAV
+              </p>
             </CardContent>
           </Card>
 
-          {/* Deposit/Withdraw */}
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-purple-400">💸 Deposit/Withdraw</CardTitle>
+          <Card className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Current NAV</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm text-gray-400 mb-2 block">
-                    Deposit Amount (APT)
-                  </label>
-                  <Input 
-                    type="number" 
-                    placeholder="0.00" 
-                    value={depositAmount}
-                    onChange={(e) => setDepositAmount(e.target.value)}
-                    className="bg-gray-700 border-gray-600 text-white"
-                  />
-                </div>
-                <Button 
-                  onClick={handleDeposit}
-                  className="w-full bg-green-600 hover:bg-green-700"
-                  disabled={transactionLoading || !depositAmount}
-                >
-                  {transactionLoading ? 'Processing...' : 'DEPOSIT & MINT'}
-                </Button>
-                
-                <div>
-                  <label className="text-sm text-gray-400 mb-2 block">
-                    Withdraw Amount (CCIT)
-                  </label>
-                  <Input 
-                    type="number" 
-                    placeholder="0.00" 
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    className="bg-gray-700 border-gray-600 text-white"
-                  />
-                </div>
-                <Button 
-                  onClick={handleWithdraw}
-                  className="w-full bg-red-600 hover:bg-red-700"
-                  disabled={transactionLoading || !withdrawAmount}
-                >
-                  {transactionLoading ? 'Processing...' : 'REDEEM'}
-                </Button>
-              </div>
+              <div className="text-2xl font-bold">{data.nav.toFixed(4)} APT</div>
+              <p className="text-xs text-blue-100">
+                Per CCIT Token
+              </p>
             </CardContent>
           </Card>
 
-          {/* Treasury Overview */}
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-yellow-400">🏦 Treasury</CardTitle>
+          <Card className="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">APT Balance</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">
-                    {data.totalTreasury.toFixed(2)}
-                  </div>
-                  <div className="text-sm text-gray-400">TOTAL APT</div>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Central:</span>
-                    <span className="text-white">{data.centralTreasury.toFixed(2)} APT</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Games:</span>
-                    <span className="text-white">{data.gameReserves.toFixed(2)} APT</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Game Stats */}
-          <Card className="bg-gray-800 border-gray-700 md:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-green-400">🎲 Game Stats</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <div className="text-xl font-bold text-white">{data.gamesToday}</div>
-                  <div className="text-sm text-gray-400">Games Today</div>
-                </div>
-                <div>
-                  <div className="text-xl font-bold text-white">{data.volumeToday.toFixed(1)} APT</div>
-                  <div className="text-sm text-gray-400">Volume Today</div>
-                </div>
-                <div>
-                  <div className="text-xl font-bold text-white">{data.houseEdge}%</div>
-                  <div className="text-sm text-gray-400">House Edge</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-cyan-400">⚡ Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <Button 
-                  className="w-full bg-blue-600 hover:bg-blue-700"
-                  onClick={() => window.open('/seven-out', '_blank')}
-                >
-                  🎲 PLAY SEVEN OUT
-                </Button>
-                <Button 
-                  className="w-full bg-gray-600 hover:bg-gray-700"
-                  onClick={() => {
-                    fetchPortfolioData();
-                    fetchTreasuryData();
-                  }}
-                >
-                  🔄 REFRESH DATA
-                </Button>
-                <Button 
-                  className="w-full bg-gray-600 hover:bg-gray-700"
-                  onClick={() => toast({
-                    title: "Coming Soon",
-                    description: "Analytics dashboard coming soon!"
-                  })}
-                >
-                  📊 VIEW ANALYTICS
-                </Button>
-              </div>
+              <div className="text-2xl font-bold">{data.aptBalance.toFixed(2)} APT</div>
+              <p className="text-xs text-purple-100">
+                Available for investment
+              </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Footer */}
-        <div className="text-center mt-8 text-gray-400">
-          <p>ChainCasino CCIT • Built on Aptos • {new Date().getFullYear()}</p>
-          <p className="text-sm mt-2">
-            Contracts: House({CASINO_HOUSE_ADDRESS.slice(0, 6)}...) • 
-            Token({INVESTOR_TOKEN_ADDRESS.slice(0, 6)}...) • 
-            Game({SEVEN_OUT_ADDRESS.slice(0, 6)}...)
-          </p>
+        {/* Treasury Statistics */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="text-xl">🏦 Treasury Overview</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {data.totalTreasury.toFixed(2)} APT
+                </div>
+                <p className="text-sm text-gray-600">Total Treasury</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {data.centralTreasury.toFixed(2)} APT
+                </div>
+                <p className="text-sm text-gray-600">Central Treasury</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">
+                  {data.gameReserves.toFixed(2)} APT
+                </div>
+                <p className="text-sm text-gray-600">Game Reserves</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">
+                  {data.totalSupply.toFixed(2)} CCIT
+                </div>
+                <p className="text-sm text-gray-600">Total Supply</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Investment Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Deposit & Mint */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl text-green-600">💰 Deposit & Mint CCIT</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="deposit-amount" className="text-sm font-medium">
+                  Deposit Amount (APT)
+                </Label>
+                <Input
+                  id="deposit-amount"
+                  type="number"
+                  placeholder="0.00"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  className="mt-1"
+                  min="0"
+                  step="0.01"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Available: {data.aptBalance.toFixed(2)} APT
+                </p>
+              </div>
+              
+              {depositAmount && (
+                <div className="bg-green-50 p-3 rounded-md">
+                  <p className="text-sm text-green-800">
+                    You will receive: ~{(parseFloat(depositAmount) / data.nav).toFixed(3)} CCIT
+                  </p>
+                </div>
+              )}
+              
+              <Button
+                onClick={handleDeposit}
+                disabled={!depositAmount || transactionLoading || parseFloat(depositAmount) <= 0}
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                {transactionLoading ? 'Processing...' : 'Deposit APT & Mint CCIT'}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Redeem */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl text-red-600">🔄 Redeem CCIT</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="withdraw-amount" className="text-sm font-medium">
+                  Redeem Amount (CCIT)
+                </Label>
+                <Input
+                  id="withdraw-amount"
+                  type="number"
+                  placeholder="0.00"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  className="mt-1"
+                  min="0"
+                  step="0.01"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Available: {data.ccitBalance.toFixed(3)} CCIT
+                </p>
+              </div>
+              
+              {withdrawAmount && (
+                <div className="bg-red-50 p-3 rounded-md">
+                  <p className="text-sm text-red-800">
+                    You will receive: ~{(parseFloat(withdrawAmount) * data.nav).toFixed(4)} APT
+                  </p>
+                </div>
+              )}
+              
+              <Button
+                onClick={handleRedeem}
+                disabled={!withdrawAmount || transactionLoading || parseFloat(withdrawAmount) <= 0}
+                className="w-full bg-red-600 hover:bg-red-700"
+                variant="destructive"
+              >
+                {transactionLoading ? 'Processing...' : 'Redeem CCIT for APT'}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
