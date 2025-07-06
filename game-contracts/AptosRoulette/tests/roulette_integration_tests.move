@@ -70,7 +70,7 @@ module roulette_game::RouletteIntegrationTests {
 
         // === PHASE 1: CASINO SETUP ===
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
 
         // Provide initial liquidity
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
@@ -184,7 +184,7 @@ module roulette_game::RouletteIntegrationTests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
@@ -219,7 +219,7 @@ module roulette_game::RouletteIntegrationTests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
@@ -254,7 +254,7 @@ module roulette_game::RouletteIntegrationTests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(

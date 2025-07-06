@@ -165,7 +165,7 @@ module casino::EndToEndTests {
 
         // Setup with adequate liquidity
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_INVESTOR_CAPITAL);
 
         // Register game with initial limits
@@ -270,7 +270,7 @@ module casino::EndToEndTests {
 
         // Setup
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_INVESTOR_CAPITAL);
 
         CasinoHouse::register_game(
@@ -299,7 +299,7 @@ module casino::EndToEndTests {
             setup_realistic_ecosystem();
 
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
 
         InvestorToken::deposit_and_mint(&early_investor, EARLY_INVESTOR_CAPITAL);
         let tokens = InvestorToken::user_balance(EARLY_INVESTOR_ADDR);

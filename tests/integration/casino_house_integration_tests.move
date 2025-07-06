@@ -99,7 +99,7 @@ module casino::CasinoHouseIntegrationTests {
 
         // === PHASE 1: SETUP COMPLETE ECOSYSTEM ===
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         CasinoHouse::register_game(
@@ -235,7 +235,7 @@ module casino::CasinoHouseIntegrationTests {
 
         // === PHASE 1: SETUP ECOSYSTEM ===
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         CasinoHouse::register_game(
@@ -453,7 +453,7 @@ module casino::CasinoHouseIntegrationTests {
         let (_, casino_signer, _, _, investor, _, _) = setup_casino_ecosystem();
 
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         // Try to register game with max < min - should fail
@@ -478,7 +478,7 @@ module casino::CasinoHouseIntegrationTests {
 
         // === PHASE 1: SETUP COMPLETE ECOSYSTEM ===
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         // Register multiple games to test selective unregistration
@@ -578,7 +578,7 @@ module casino::CasinoHouseIntegrationTests {
 
         // Setup
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         CasinoHouse::register_game(

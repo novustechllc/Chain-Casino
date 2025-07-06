@@ -70,7 +70,7 @@ module seven_out_game::SevenOutIntegrationTests {
 
         // === PHASE 1: CASINO SETUP ===
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
 
         // Provide initial liquidity
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
@@ -216,7 +216,7 @@ module seven_out_game::SevenOutIntegrationTests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
@@ -249,7 +249,7 @@ module seven_out_game::SevenOutIntegrationTests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
@@ -291,7 +291,7 @@ module seven_out_game::SevenOutIntegrationTests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
@@ -323,7 +323,7 @@ module seven_out_game::SevenOutIntegrationTests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(

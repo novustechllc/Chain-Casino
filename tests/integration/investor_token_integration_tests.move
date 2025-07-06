@@ -117,7 +117,7 @@ module casino::InvestorTokenIntegrationTests {
 
         // === PHASE 1: CASINO SETUP ===
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
 
         // Verify clean initial state
         assert!(InvestorToken::total_supply() == 0, 1);
@@ -237,7 +237,7 @@ module casino::InvestorTokenIntegrationTests {
         let unauthorized = account::create_account_for_test(UNAUTHORIZED_ADDR);
 
         // Try to initialize with wrong signer - should fail
-        InvestorToken::init(&unauthorized);
+        InvestorToken::init_module_for_test(&unauthorized);
     }
 
     #[test]
@@ -247,7 +247,7 @@ module casino::InvestorTokenIntegrationTests {
             setup_investor_ecosystem();
 
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
 
         // Try to deposit zero amount - should fail
         InvestorToken::deposit_and_mint(&early_investor, 0);
@@ -260,7 +260,7 @@ module casino::InvestorTokenIntegrationTests {
             setup_investor_ecosystem();
 
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
 
         // Setup investment first
         InvestorToken::deposit_and_mint(&early_investor, EARLY_CAPITAL);
@@ -276,7 +276,7 @@ module casino::InvestorTokenIntegrationTests {
             setup_investor_ecosystem();
 
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
 
         // Setup small investment
         InvestorToken::deposit_and_mint(&early_investor, SMALL_CAPITAL);
@@ -293,7 +293,7 @@ module casino::InvestorTokenIntegrationTests {
             setup_investor_ecosystem();
 
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
 
         // Setup investment
         InvestorToken::deposit_and_mint(&early_investor, EARLY_CAPITAL);
@@ -336,7 +336,7 @@ module casino::InvestorTokenIntegrationTests {
             setup_investor_ecosystem();
 
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
 
         // Setup very small investment to test edge cases
         let very_small_amount = 100; // Extremely small

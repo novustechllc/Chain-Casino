@@ -64,7 +64,7 @@ module aptos_fortune::aptos_fortune_tests {
 
         // === PHASE 1: INITIALIZE CASINO ECOSYSTEM ===
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
 
         // Fund treasury
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
@@ -142,7 +142,7 @@ module aptos_fortune::aptos_fortune_tests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         CasinoHouse::register_game(
@@ -299,7 +299,7 @@ module aptos_fortune::aptos_fortune_tests {
 
         // Setup game
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         CasinoHouse::register_game(
@@ -331,7 +331,7 @@ module aptos_fortune::aptos_fortune_tests {
 
         // Setup game
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         CasinoHouse::register_game(
@@ -363,7 +363,7 @@ module aptos_fortune::aptos_fortune_tests {
 
         // Setup game
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         CasinoHouse::register_game(
@@ -410,7 +410,7 @@ module aptos_fortune::aptos_fortune_tests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         CasinoHouse::register_game(
@@ -461,7 +461,7 @@ module aptos_fortune::aptos_fortune_tests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         CasinoHouse::register_game(
@@ -519,7 +519,7 @@ module aptos_fortune::aptos_fortune_tests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         CasinoHouse::register_game(
@@ -589,7 +589,7 @@ module aptos_fortune::aptos_fortune_tests {
 
         // Setup game
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
         CasinoHouse::register_game(

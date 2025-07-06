@@ -88,11 +88,11 @@ module casino::InvestorToken {
     // Initialization Interface
     //
 
-    /// Initialize the InvestorToken fungible asset
-    public entry fun init(owner: &signer) {
-        assert!(signer::address_of(owner) == @casino, E_UNAUTHORIZED_INIT);
+    /// Initialize the InvestorToken fungible asset automatically on deployment
+    fun init_module(deployer: &signer) {
+        assert!(signer::address_of(deployer) == @casino, E_UNAUTHORIZED_INIT);
 
-        let constructor_ref = object::create_named_object(owner, b"InvestorToken");
+        let constructor_ref = object::create_named_object(deployer, b"InvestorToken");
 
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             &constructor_ref,
@@ -123,6 +123,12 @@ module casino::InvestorToken {
                 creation_timestamp: timestamp::now_seconds()
             }
         );
+    }
+
+    #[test_only]
+    /// Test helper for initialization in tests
+    public fun init_module_for_test(test_signer: &signer) {
+        init_module(test_signer);
     }
 
     //

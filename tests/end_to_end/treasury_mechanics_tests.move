@@ -115,7 +115,7 @@ module casino::TreasuryMechanicsDemo {
 
         // === PHASE 1: ECOSYSTEM BOOTSTRAP ===
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
 
         // Fund central treasury through investor
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
@@ -300,7 +300,7 @@ module casino::TreasuryMechanicsDemo {
 
         // === PHASE 1: ECOSYSTEM SETUP ===
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
