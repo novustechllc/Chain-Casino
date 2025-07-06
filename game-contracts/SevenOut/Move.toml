@@ -1,0 +1,23 @@
+[package]
+name = "SevenOut"
+version = "1.0.0"
+authors = []
+
+[addresses]
+casino = "_"
+seven_out_game = "_"
+
+[dev-addresses]
+casino = "0xCC"
+seven_out_game = "0x7770"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-framework.git"
+rev = "mainnet"
+subdir = "aptos-framework"
+
+[dependencies.ChainCasino]
+git = "https://github.com/PersonaNormale/ChainCasino.git"
+rev = "feature/dashboard-frontend"
+
+[dev-dependencies]

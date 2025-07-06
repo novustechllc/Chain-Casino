@@ -83,9 +83,9 @@ module casino::CasinoHouseTests {
             1000000,
             1500, // max < min
             100_000_000,
-            string::utf8(b"https://chaincasino.apt/test"), // website_url
-            string::utf8(b"https://chaincasino.apt/icons/test.png"), // icon_url
-            string::utf8(b"Testing utility game that always pays out 3x bet amount") // description
+            string::utf8(b"https://chaincasino.apt/test"),
+            string::utf8(b"https://chaincasino.apt/icons/test.png"),
+            string::utf8(b"Testing utility game that always pays out 3x bet amount")
         );
     }
 
@@ -106,9 +106,9 @@ module casino::CasinoHouseTests {
             50000000,
             1500,
             100_000_000,
-            string::utf8(b"https://chaincasino.apt/test"), // website_url
-            string::utf8(b"https://chaincasino.apt/icons/test.png"), // icon_url
-            string::utf8(b"Testing utility game that always pays out 3x bet amount") // description
+            string::utf8(b"https://chaincasino.apt/test"),
+            string::utf8(b"https://chaincasino.apt/icons/test.png"),
+            string::utf8(b"Testing utility game that always pays out 3x bet amount")
         );
 
         // Try to register same game again - object creation will fail
@@ -121,9 +121,9 @@ module casino::CasinoHouseTests {
             50000000,
             1500,
             100_000_000,
-            string::utf8(b"https://chaincasino.apt/test"), // website_url
-            string::utf8(b"https://chaincasino.apt/icons/test.png"), // icon_url
-            string::utf8(b"Testing utility game that always pays out 3x bet amount") // description
+            string::utf8(b"https://chaincasino.apt/test"),
+            string::utf8(b"https://chaincasino.apt/icons/test.png"),
+            string::utf8(b"Testing utility game that always pays out 3x bet amount")
         );
     }
 
@@ -170,9 +170,9 @@ module casino::CasinoHouseTests {
             50000000,
             1500,
             0, // Zero max_payout - should fail immediately
-            string::utf8(b"https://chaincasino.apt/test"), // website_url
-            string::utf8(b"https://chaincasino.apt/icons/test.png"), // icon_url
-            string::utf8(b"Testing utility game that always pays out 3x bet amount") // description
+            string::utf8(b"https://chaincasino.apt/test"),
+            string::utf8(b"https://chaincasino.apt/icons/test.png"),
+            string::utf8(b"Testing utility game that always pays out 3x bet amount")
         );
     }
 

@@ -1,10 +1,10 @@
 //! MIT License
 //!
-//! Slot Machine Game for ChainCasino Platform (Block-STM Compatible)
+//! Slot Machine Game for ChainCasino Platform
 //!
-//! 3-reel slot machine with weighted symbols and secure randomness.
-//! Uses simplified bet flow with BetId struct.
+//! 3-reel slot machine with weighted symbols and multiple payout combinations.
 
+#[test_only]
 module casino::SlotMachine {
     use aptos_framework::randomness;
     use aptos_framework::event;

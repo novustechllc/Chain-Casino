@@ -1,10 +1,8 @@
 //! MIT License
 //!
-//! Treasury Mechanics Demo Test
+//! Treasury mechanics integration tests
 //!
-//! Comprehensive demonstration of Block-STM treasury mechanics working correctly:
-//! - Initial funding, treasury routing, dynamic rebalancing, parallel execution
-//! - Uses AlwaysLoseGame to force drain scenarios and rebalancing
+//! Tests for treasury routing, rebalancing, and liquidity management.
 
 #[test_only]
 module casino::TreasuryMechanicsDemo {

@@ -1,9 +1,8 @@
 //! MIT License
 //!
-//! InvestorToken Fungible Asset Implementation (Block-STM Compatible)
+//! Investor Token for ChainCasino Platform
 //!
-//! NAV-based investor tokens for the ChainCasino platform.
-//! Now aggregates treasury balance from central + all game treasuries.
+//! ERC-20 compatible token representing ownership in casino profits.
 
 module casino::InvestorToken {
     use std::string;
