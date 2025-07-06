@@ -84,14 +84,12 @@ module seven_out_game::SevenOutIntegrationTests {
             MIN_BET,
             MAX_BET,
             278, // 2.78% house edge
-            80000000,  // max_payout: 2x max_bet = 2 * 40M = 80M
+            80000000, // max_payout: 2x max_bet = 2 * 40M = 80M
             string::utf8(b"https://chaincasino.apt/seven-out"),
             string::utf8(
                 b"https://chaincasino.apt/icons/seven-out.png"
             ),
-            string::utf8(
-                b"SevenOut Dice Game with a 2:1 payout"
-            )
+            string::utf8(b"SevenOut Dice Game with a 2:1 payout")
         );
 
         // === PHASE 3: GAME INITIALIZATION ===
@@ -149,7 +147,7 @@ module seven_out_game::SevenOutIntegrationTests {
 
         // Test both bet types using boolean parameters
         SevenOut::test_only_play_seven_out(&player, false, STANDARD_BET); // Under bet
-        SevenOut::test_only_play_seven_out(&player, true, STANDARD_BET);  // Over bet
+        SevenOut::test_only_play_seven_out(&player, true, STANDARD_BET); // Over bet
 
         // Verify player spent money
         let final_balance =
@@ -166,7 +164,7 @@ module seven_out_game::SevenOutIntegrationTests {
         // Get result details
         let (die1, die2, dice_sum, _, bet_amount, payout, timestamp, session_id, outcome) =
             SevenOut::get_user_game_result(PLAYER_ADDR);
-        
+
         assert!(die1 >= 1 && die1 <= 6, 25);
         assert!(die2 >= 1 && die2 <= 6, 26);
         assert!(dice_sum == die1 + die2, 27);
@@ -184,7 +182,8 @@ module seven_out_game::SevenOutIntegrationTests {
         assert!(quick_payout == payout, 37);
 
         // Test session info
-        let (session_info_id, session_timestamp) = SevenOut::get_session_info(PLAYER_ADDR);
+        let (session_info_id, session_timestamp) =
+            SevenOut::get_session_info(PLAYER_ADDR);
         assert!(session_info_id == session_id, 38);
         assert!(session_timestamp == timestamp, 39);
 
@@ -233,9 +232,7 @@ module seven_out_game::SevenOutIntegrationTests {
             string::utf8(
                 b"https://chaincasino.apt/icons/seven-out.png"
             ),
-            string::utf8(
-                b"SevenOut Dice Game with a 2:1 payout"
-            )
+            string::utf8(b"SevenOut Dice Game with a 2:1 payout")
         );
 
         SevenOut::initialize_game(&seven_out_signer);
@@ -268,9 +265,7 @@ module seven_out_game::SevenOutIntegrationTests {
             string::utf8(
                 b"https://chaincasino.apt/icons/seven-out.png"
             ),
-            string::utf8(
-                b"SevenOut Dice Game with a 2:1 payout"
-            )
+            string::utf8(b"SevenOut Dice Game with a 2:1 payout")
         );
 
         SevenOut::initialize_game(&seven_out_signer);
@@ -312,9 +307,7 @@ module seven_out_game::SevenOutIntegrationTests {
             string::utf8(
                 b"https://chaincasino.apt/icons/seven-out.png"
             ),
-            string::utf8(
-                b"SevenOut Dice Game with a 2:1 payout"
-            )
+            string::utf8(b"SevenOut Dice Game with a 2:1 payout")
         );
 
         SevenOut::initialize_game(&seven_out_signer);
@@ -346,9 +339,7 @@ module seven_out_game::SevenOutIntegrationTests {
             string::utf8(
                 b"https://chaincasino.apt/icons/seven-out.png"
             ),
-            string::utf8(
-                b"SevenOut Dice Game with a 2:1 payout"
-            )
+            string::utf8(b"SevenOut Dice Game with a 2:1 payout")
         );
 
         SevenOut::initialize_game(&seven_out_signer);
@@ -358,21 +349,21 @@ module seven_out_game::SevenOutIntegrationTests {
         let i = 0;
         while (i < vector::length(&bet_amounts)) {
             let amount = *vector::borrow(&bet_amounts, i);
-            
+
             // Test over bet (true)
             SevenOut::test_only_play_seven_out(&player, true, amount);
             assert!(SevenOut::has_game_result(PLAYER_ADDR), 100 + i);
-            
+
             // Clear result
             SevenOut::clear_game_result(&player);
-            
+
             // Test under bet (false)
             SevenOut::test_only_play_seven_out(&player, false, amount);
             assert!(SevenOut::has_game_result(PLAYER_ADDR), 200 + i);
-            
+
             // Clear result for next iteration
             SevenOut::clear_game_result(&player);
-            
+
             i = i + 1;
         };
 

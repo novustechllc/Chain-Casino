@@ -56,8 +56,8 @@ module seven_out_game::SevenOut {
 
     /// Betting options for Seven Out game
     enum BetType has copy, drop, store {
-        Over,    // Bet that dice sum > 7
-        Under    // Bet that dice sum < 7
+        Over, // Bet that dice sum > 7
+        Under // Bet that dice sum < 7
     }
 
     //
@@ -98,7 +98,7 @@ module seven_out_game::SevenOut {
         /// Session identifier for frontend state management
         session_id: u64,
         /// Game outcome
-        outcome: u8  // 0 = lose, 1 = win, 2 = push
+        outcome: u8 // 0 = lose, 1 = win, 2 = push
     }
 
     //
@@ -112,9 +112,9 @@ module seven_out_game::SevenOut {
         die1: u8,
         die2: u8,
         dice_sum: u8,
-        bet_type_over: bool,  // true if Over, false if Under
+        bet_type_over: bool, // true if Over, false if Under
         bet_amount: u64,
-        outcome: u8,  // 0 = lose, 1 = win, 2 = push
+        outcome: u8, // 0 = lose, 1 = win, 2 = push
         payout: u64,
         treasury_used: address,
         session_id: u64
@@ -223,9 +223,14 @@ module seven_out_game::SevenOut {
         assert!(bet_amount <= MAX_BET, E_INVALID_AMOUNT);
 
         let player_addr = signer::address_of(player);
-        
+
         // Convert boolean to enum inside module
-        let bet_type = if (bet_over) { BetType::Over } else { BetType::Under };
+        let bet_type =
+            if (bet_over) {
+                BetType::Over
+            } else {
+                BetType::Under
+            };
 
         // Auto-cleanup: Remove previous result to prevent storage bloat
         if (exists<GameResult>(player_addr)) {
@@ -260,26 +265,27 @@ module seven_out_game::SevenOut {
             CasinoHouse::place_bet(capability, bet_fa, player_addr);
 
         // Roll two dice with secure randomness
-        let die1 = randomness::u8_range(1, 7);  // 1-6
-        let die2 = randomness::u8_range(1, 7);  // 1-6
+        let die1 = randomness::u8_range(1, 7); // 1-6
+        let die2 = randomness::u8_range(1, 7); // 1-6
         let dice_sum = die1 + die2;
 
         // Determine outcome
-        let (outcome, payout) = if (dice_sum == 7) {
-            (2, bet_amount)  // Push - return bet
-        } else if (bet_type == BetType::Over) {
-            if (dice_sum > 7) {
-                (1, bet_amount * PAYOUT_MULTIPLIER)  // Win
-            } else {
-                (0, 0)  // Lose
-            }
-        } else {  // Under
-            if (dice_sum < 7) {
-                (1, bet_amount * PAYOUT_MULTIPLIER)  // Win
-            } else {
-                (0, 0)  // Lose
-            }
-        };
+        let (outcome, payout) =
+            if (dice_sum == 7) {
+                (2, bet_amount) // Push - return bet
+            } else if (bet_type == BetType::Over) {
+                if (dice_sum > 7) {
+                    (1, bet_amount * PAYOUT_MULTIPLIER) // Win
+                } else {
+                    (0, 0) // Lose
+                }
+            } else { // Under
+                if (dice_sum < 7) {
+                    (1, bet_amount * PAYOUT_MULTIPLIER) // Win
+                } else {
+                    (0, 0) // Lose
+                }
+            };
 
         // Settle bet (BetId gets consumed here)
         CasinoHouse::settle_bet(
@@ -420,7 +426,7 @@ module seven_out_game::SevenOut {
     /// Simulate game outcome for testing
     public fun test_simulate_win(dice_sum: u8, bet_type: BetType): bool {
         if (dice_sum == 7) {
-            false  // Push is not a win
+            false // Push is not a win
         } else if (bet_type == BetType::Over) {
             dice_sum > 7
         } else {
@@ -540,7 +546,7 @@ module seven_out_game::SevenOut {
         // Over: 21 ways to win out of 36 (58.33%)
         // Under: 15 ways to win out of 36 (41.67%)
         // Push: 6 ways (16.67%)
-        (21, 15, 6)  // (over_ways, under_ways, push_ways)
+        (21, 15, 6) // (over_ways, under_ways, push_ways)
     }
 
     #[view]

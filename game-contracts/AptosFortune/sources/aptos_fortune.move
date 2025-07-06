@@ -68,19 +68,19 @@ module aptos_fortune::AptosFortune {
     const DIAMOND_WEIGHT: u8 = 2;
 
     /// Pre-computed thresholds for gas efficiency
-    const CHERRY_TO_BELL_TOTAL: u8 = 65;  // 35 + 30
-    const CHERRY_TO_COIN_TOTAL: u8 = 90;  // 35 + 30 + 25
-    const CHERRY_TO_STAR_TOTAL: u8 = 98;  // 35 + 30 + 25 + 8
+    const CHERRY_TO_BELL_TOTAL: u8 = 65; // 35 + 30
+    const CHERRY_TO_COIN_TOTAL: u8 = 90; // 35 + 30 + 25
+    const CHERRY_TO_STAR_TOTAL: u8 = 98; // 35 + 30 + 25 + 8
 
     //
     // Payout Multipliers
     //
 
     /// 3 matching symbols payouts
-    const CHERRY_PAYOUT_3X: u64 = 3;   // 3x bet
-    const BELL_PAYOUT_3X: u64 = 4;     // 4x bet
-    const COIN_PAYOUT_3X: u64 = 6;     // 6x bet
-    const STAR_PAYOUT_3X: u64 = 12;    // 12x bet
+    const CHERRY_PAYOUT_3X: u64 = 3; // 3x bet
+    const BELL_PAYOUT_3X: u64 = 4; // 4x bet
+    const COIN_PAYOUT_3X: u64 = 6; // 6x bet
+    const STAR_PAYOUT_3X: u64 = 12; // 12x bet
     const DIAMOND_PAYOUT_3X: u64 = 20; // 20x bet
 
     /// 2 matching symbols payout (partial return)
@@ -194,10 +194,9 @@ module aptos_fortune::AptosFortune {
         // Derive the game object that casino should have created
         let game_name = string::utf8(b"AptosFortune");
         let version = string::utf8(GAME_VERSION);
-        let game_object_addr = CasinoHouse::derive_game_object_address(
-            @casino, game_name, version
-        );
-        let game_object: Object<CasinoHouse::GameMetadata> = 
+        let game_object_addr =
+            CasinoHouse::derive_game_object_address(@casino, game_name, version);
+        let game_object: Object<CasinoHouse::GameMetadata> =
             object::address_to_object(game_object_addr);
 
         // Verify game object exists (casino must register first)
@@ -207,12 +206,10 @@ module aptos_fortune::AptosFortune {
         let capability = CasinoHouse::get_game_capability(game_admin, game_object);
 
         // Store game registry at module address
-        move_to(game_admin, GameRegistry {
-            creator: @aptos_fortune,
-            game_object,
-            game_name,
-            version
-        });
+        move_to(
+            game_admin,
+            GameRegistry { creator: @aptos_fortune, game_object, game_name, version }
+        );
 
         // Create named object for game auth
         let seed = build_seed(game_name, version);
@@ -221,19 +218,21 @@ module aptos_fortune::AptosFortune {
         let object_signer = object::generate_signer(&constructor_ref);
 
         // Store game auth at object address
-        move_to(&object_signer, GameAuth {
-            capability,
-            extend_ref
-        });
+        move_to(
+            &object_signer,
+            GameAuth { capability, extend_ref }
+        );
 
         // Emit initialization event
-        event::emit(GameInitialized {
-            creator: @aptos_fortune,
-            object_address: object::address_from_constructor_ref(&constructor_ref),
-            game_object,
-            game_name,
-            version
-        });
+        event::emit(
+            GameInitialized {
+                creator: @aptos_fortune,
+                object_address: object::address_from_constructor_ref(&constructor_ref),
+                game_object,
+                game_name,
+                version
+            }
+        );
     }
 
     //
@@ -241,7 +240,9 @@ module aptos_fortune::AptosFortune {
     //
 
     #[randomness]
-    entry fun spin_reels(player: &signer, bet_amount: u64) acquires GameRegistry, GameAuth, PlayerResult {
+    entry fun spin_reels(
+        player: &signer, bet_amount: u64
+    ) acquires GameRegistry, GameAuth, PlayerResult {
         // Validate bet amount
         assert!(bet_amount >= MIN_BET, E_INVALID_AMOUNT);
         assert!(bet_amount <= MAX_BET, E_INVALID_AMOUNT);
@@ -253,7 +254,8 @@ module aptos_fortune::AptosFortune {
         let session_id = account::get_sequence_number(player_addr);
 
         // Withdraw bet as FungibleAsset from player
-        let aptos_metadata_option = coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
+        let aptos_metadata_option =
+            coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
         let aptos_metadata = option::extract(&mut aptos_metadata_option);
         let bet_fa = primary_fungible_store::withdraw(player, aptos_metadata, bet_amount);
 
@@ -263,7 +265,8 @@ module aptos_fortune::AptosFortune {
         let capability = &game_auth.capability;
 
         // Casino creates and returns bet_id
-        let (treasury_source, bet_id) = CasinoHouse::place_bet(capability, bet_fa, player_addr);
+        let (treasury_source, bet_id) =
+            CasinoHouse::place_bet(capability, bet_fa, player_addr);
 
         // Generate random symbols for each reel
         let reel1 = generate_symbol();
@@ -271,9 +274,8 @@ module aptos_fortune::AptosFortune {
         let reel3 = generate_symbol();
 
         // Calculate payout and match type
-        let (payout, match_type, matching_symbol) = calculate_payout(
-            reel1, reel2, reel3, bet_amount
-        );
+        let (payout, match_type, matching_symbol) =
+            calculate_payout(reel1, reel2, reel3, bet_amount);
 
         // Settle bet (BetId gets consumed here)
         CasinoHouse::settle_bet(
@@ -302,18 +304,20 @@ module aptos_fortune::AptosFortune {
         move_to(player, player_result);
 
         // Emit spin event
-        event::emit(SpinResultEvent {
-            player: player_addr,
-            reel1,
-            reel2,
-            reel3,
-            match_type,
-            matching_symbol,
-            bet_amount,
-            payout,
-            session_id,
-            treasury_address: treasury_source
-        });
+        event::emit(
+            SpinResultEvent {
+                player: player_addr,
+                reel1,
+                reel2,
+                reel3,
+                match_type,
+                matching_symbol,
+                bet_amount,
+                payout,
+                session_id,
+                treasury_address: treasury_source
+            }
+        );
     }
 
     //
@@ -323,7 +327,7 @@ module aptos_fortune::AptosFortune {
     /// Generate a random symbol based on weighted probabilities
     fun generate_symbol(): u8 {
         let rand_value = randomness::u8_range(0, 100);
-        
+
         if (rand_value < CHERRY_WEIGHT) {
             SYMBOL_CHERRY
         } else if (rand_value < CHERRY_TO_BELL_TOTAL) {
@@ -341,19 +345,18 @@ module aptos_fortune::AptosFortune {
     fun calculate_payout(reel1: u8, reel2: u8, reel3: u8, bet: u64): (u64, u8, u8) {
         // Check for 3 matching symbols
         if (reel1 == reel2 && reel2 == reel3) {
-            let multiplier = if (reel1 == SYMBOL_CHERRY) {
-                CHERRY_PAYOUT_3X
-            } else if (reel1 == SYMBOL_BELL) {
-                BELL_PAYOUT_3X
-            } else if (reel1 == SYMBOL_COIN) {
-                COIN_PAYOUT_3X
-            } else if (reel1 == SYMBOL_STAR) {
-                STAR_PAYOUT_3X
-            } else if (reel1 == SYMBOL_DIAMOND) {
-                DIAMOND_PAYOUT_3X
-            } else {
-                0
-            };
+            let multiplier =
+                if (reel1 == SYMBOL_CHERRY) {
+                    CHERRY_PAYOUT_3X
+                } else if (reel1 == SYMBOL_BELL) {
+                    BELL_PAYOUT_3X
+                } else if (reel1 == SYMBOL_COIN) {
+                    COIN_PAYOUT_3X
+                } else if (reel1 == SYMBOL_STAR) {
+                    STAR_PAYOUT_3X
+                } else if (reel1 == SYMBOL_DIAMOND) {
+                    DIAMOND_PAYOUT_3X
+                } else { 0 };
             return (bet * multiplier, 3, reel1)
         };
 
@@ -382,13 +385,10 @@ module aptos_fortune::AptosFortune {
             (2, reel2)
         } else {
             // For consolation, return the highest value symbol
-            let max_symbol = if (reel1 > reel2 && reel1 > reel3) {
-                reel1
-            } else if (reel2 > reel3) {
-                reel2
-            } else {
-                reel3
-            };
+            let max_symbol =
+                if (reel1 > reel2 && reel1 > reel3) { reel1 }
+                else if (reel2 > reel3) { reel2 }
+                else { reel3 };
             (1, max_symbol)
         }
     }
@@ -426,7 +426,9 @@ module aptos_fortune::AptosFortune {
     }
 
     #[view]
-    public fun get_player_result(player: address): (u8, u8, u8, u8, u8, u64, u64, u64) acquires PlayerResult {
+    public fun get_player_result(
+        player: address
+    ): (u8, u8, u8, u8, u8, u64, u64, u64) acquires PlayerResult {
         if (!exists<PlayerResult>(player)) {
             return (0, 0, 0, 0, 0, 0, 0, 0)
         };
@@ -473,19 +475,12 @@ module aptos_fortune::AptosFortune {
 
     #[view]
     public fun get_symbol_char(symbol: u8): vector<u8> {
-        if (symbol == SYMBOL_CHERRY) {
-            b"C"
-        } else if (symbol == SYMBOL_BELL) {
-            b"B"
-        } else if (symbol == SYMBOL_COIN) {
-            b"O"
-        } else if (symbol == SYMBOL_STAR) {
-            b"S"
-        } else if (symbol == SYMBOL_DIAMOND) {
-            b"D"
-        } else {
-            b"?"
-        }
+        if (symbol == SYMBOL_CHERRY) { b"C" }
+        else if (symbol == SYMBOL_BELL) { b"B" }
+        else if (symbol == SYMBOL_COIN) { b"O" }
+        else if (symbol == SYMBOL_STAR) { b"S" }
+        else if (symbol == SYMBOL_DIAMOND) { b"D" }
+        else { b"?" }
     }
 
     #[view]
@@ -512,29 +507,28 @@ module aptos_fortune::AptosFortune {
     }
 
     #[view]
-    public fun calculate_potential_payout(bet_amount: u64, symbol: u8, match_type: u8): u64 {
+    public fun calculate_potential_payout(
+        bet_amount: u64, symbol: u8, match_type: u8
+    ): u64 {
         if (match_type == 3) {
-            let multiplier = if (symbol == SYMBOL_CHERRY) {
-                CHERRY_PAYOUT_3X
-            } else if (symbol == SYMBOL_BELL) {
-                BELL_PAYOUT_3X
-            } else if (symbol == SYMBOL_COIN) {
-                COIN_PAYOUT_3X
-            } else if (symbol == SYMBOL_STAR) {
-                STAR_PAYOUT_3X
-            } else if (symbol == SYMBOL_DIAMOND) {
-                DIAMOND_PAYOUT_3X
-            } else {
-                0
-            };
+            let multiplier =
+                if (symbol == SYMBOL_CHERRY) {
+                    CHERRY_PAYOUT_3X
+                } else if (symbol == SYMBOL_BELL) {
+                    BELL_PAYOUT_3X
+                } else if (symbol == SYMBOL_COIN) {
+                    COIN_PAYOUT_3X
+                } else if (symbol == SYMBOL_STAR) {
+                    STAR_PAYOUT_3X
+                } else if (symbol == SYMBOL_DIAMOND) {
+                    DIAMOND_PAYOUT_3X
+                } else { 0 };
             bet_amount * multiplier
         } else if (match_type == 2) {
             (bet_amount * PARTIAL_PAYOUT_2X) / 100
         } else if (match_type == 1) {
             (bet_amount * CONSOLATION_PAYOUT_1X) / 100
-        } else {
-            0
-        }
+        } else { 0 }
     }
 
     //
@@ -546,10 +540,9 @@ module aptos_fortune::AptosFortune {
         if (exists<PlayerResult>(player_addr)) {
             let result = move_from<PlayerResult>(player_addr);
             let session_id = result.session_id; // Extract session_id before result is consumed
-            event::emit(ResultCleared {
-                player: player_addr,
-                session_id
-            });
+            event::emit(
+                ResultCleared { player: player_addr, session_id }
+            );
         };
     }
 
@@ -559,16 +552,18 @@ module aptos_fortune::AptosFortune {
 
     #[test_only]
     #[lint::allow_unsafe_randomness]
-    public entry fun test_only_spin_reels(player: &signer, bet_amount: u64) acquires GameRegistry, GameAuth, PlayerResult {
+    public entry fun test_only_spin_reels(
+        player: &signer, bet_amount: u64
+    ) acquires GameRegistry, GameAuth, PlayerResult {
         spin_reels(player, bet_amount);
     }
 
     #[test_only]
     public entry fun test_spin_reels(
-        player: &signer, 
-        bet_amount: u64, 
-        reel1: u8, 
-        reel2: u8, 
+        player: &signer,
+        bet_amount: u64,
+        reel1: u8,
+        reel2: u8,
         reel3: u8
     ) acquires GameRegistry, GameAuth, PlayerResult {
         // Validate bet amount
@@ -579,7 +574,8 @@ module aptos_fortune::AptosFortune {
         let session_id = account::get_sequence_number(player_addr);
 
         // Withdraw bet as FungibleAsset from player
-        let aptos_metadata_option = coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
+        let aptos_metadata_option =
+            coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
         let aptos_metadata = option::extract(&mut aptos_metadata_option);
         let bet_fa = primary_fungible_store::withdraw(player, aptos_metadata, bet_amount);
 
@@ -589,12 +585,12 @@ module aptos_fortune::AptosFortune {
         let capability = &game_auth.capability;
 
         // Casino creates and returns bet_id
-        let (treasury_source, bet_id) = CasinoHouse::place_bet(capability, bet_fa, player_addr);
+        let (treasury_source, bet_id) =
+            CasinoHouse::place_bet(capability, bet_fa, player_addr);
 
         // Use provided reel values
-        let (payout, match_type, matching_symbol) = calculate_payout(
-            reel1, reel2, reel3, bet_amount
-        );
+        let (payout, match_type, matching_symbol) =
+            calculate_payout(reel1, reel2, reel3, bet_amount);
 
         // Settle bet (BetId gets consumed here)
         CasinoHouse::settle_bet(
@@ -623,18 +619,20 @@ module aptos_fortune::AptosFortune {
         move_to(player, player_result);
 
         // Emit spin event
-        event::emit(SpinResultEvent {
-            player: player_addr,
-            reel1,
-            reel2,
-            reel3,
-            match_type,
-            matching_symbol,
-            bet_amount,
-            payout,
-            session_id,
-            treasury_address: treasury_source
-        });
+        event::emit(
+            SpinResultEvent {
+                player: player_addr,
+                reel1,
+                reel2,
+                reel3,
+                match_type,
+                matching_symbol,
+                bet_amount,
+                payout,
+                session_id,
+                treasury_address: treasury_source
+            }
+        );
     }
 
     #[test_only]

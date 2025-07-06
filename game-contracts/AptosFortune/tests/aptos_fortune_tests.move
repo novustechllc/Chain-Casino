@@ -21,8 +21,8 @@ module aptos_fortune::aptos_fortune_tests {
     const INVESTOR_ADDR: address = @0xF1E2D3C4B5A6;
 
     // Betting constants
-    const MIN_BET: u64 = 10000000;      // 0.1 APT
-    const MAX_BET: u64 = 100000000;     // 1 APT
+    const MIN_BET: u64 = 10000000; // 0.1 APT
+    const MAX_BET: u64 = 100000000; // 1 APT
     const STANDARD_BET: u64 = 50000000; // 0.5 APT
     const LARGE_FUNDING: u64 = 20000000000; // 200 APT - FIXED: Increased for casino treasury requirements
 
@@ -40,13 +40,9 @@ module aptos_fortune::aptos_fortune_tests {
         randomness::initialize_for_testing(&aptos_framework);
 
         // Setup primary stores for all addresses - CRITICAL FIX
-        let aptos_metadata = option::extract(&mut coin::paired_metadata<aptos_coin::AptosCoin>());
-        let all_addresses = vector[
-            CASINO_ADDR,
-            GAME_ADDR,
-            PLAYER_ADDR,
-            INVESTOR_ADDR
-        ];
+        let aptos_metadata =
+            option::extract(&mut coin::paired_metadata<aptos_coin::AptosCoin>());
+        let all_addresses = vector[CASINO_ADDR, GAME_ADDR, PLAYER_ADDR, INVESTOR_ADDR];
         let i = 0;
         while (i < vector::length(&all_addresses)) {
             let addr = *vector::borrow(&all_addresses, i);
@@ -69,7 +65,7 @@ module aptos_fortune::aptos_fortune_tests {
         // === PHASE 1: INITIALIZE CASINO ECOSYSTEM ===
         CasinoHouse::init_module_for_test(&casino_signer);
         InvestorToken::init(&casino_signer);
-        
+
         // Fund treasury
         InvestorToken::deposit_and_mint(&investor, LARGE_FUNDING);
 
@@ -81,10 +77,12 @@ module aptos_fortune::aptos_fortune_tests {
             string::utf8(b"v1"),
             MIN_BET,
             MAX_BET,
-            2200,                    // 22% house edge
-            2000000000,             // 20 APT max payout
+            2200, // 22% house edge
+            2000000000, // 20 APT max payout
             string::utf8(b"https://chaincasino.apt/aptos-fortune"),
-            string::utf8(b"https://chaincasino.apt/icons/fortune.png"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/fortune.png"
+            ),
             string::utf8(b"Premium slot machine with frequent wins and partial matches")
         );
 
@@ -102,7 +100,8 @@ module aptos_fortune::aptos_fortune_tests {
         assert!(max_payout == 2000000000, 5);
 
         // === PHASE 6: VERIFY SYMBOL PROBABILITIES ===
-        let (cherry_p, bell_p, coin_p, star_p, diamond_p) = AptosFortune::get_symbol_probabilities();
+        let (cherry_p, bell_p, coin_p, star_p, diamond_p) =
+            AptosFortune::get_symbol_probabilities();
         assert!(cherry_p == 35, 6);
         assert!(bell_p == 30, 7);
         assert!(coin_p == 25, 8);
@@ -110,15 +109,22 @@ module aptos_fortune::aptos_fortune_tests {
         assert!(diamond_p == 2, 10);
 
         // === PHASE 7: VERIFY PAYOUT TABLE ===
-        let (cherry_pay, bell_pay, coin_pay, star_pay, diamond_pay, partial_pay, consolation_pay) = 
-            AptosFortune::get_payout_table();
+        let (
+            cherry_pay,
+            bell_pay,
+            coin_pay,
+            star_pay,
+            diamond_pay,
+            partial_pay,
+            consolation_pay
+        ) = AptosFortune::get_payout_table();
         assert!(cherry_pay == 3, 11);
         assert!(bell_pay == 4, 12);
         assert!(coin_pay == 6, 13);
         assert!(star_pay == 12, 14);
         assert!(diamond_pay == 20, 15);
-        assert!(partial_pay == 50, 16);      // 0.5x bet
-        assert!(consolation_pay == 10, 17);  // 0.1x bet
+        assert!(partial_pay == 50, 16); // 0.5x bet
+        assert!(consolation_pay == 10, 17); // 0.1x bet
 
         // === PHASE 8: VERIFY GAME INFO ===
         let (creator, _game_object, name, version) = AptosFortune::get_game_info();
@@ -149,20 +155,26 @@ module aptos_fortune::aptos_fortune_tests {
             2200,
             2000000000,
             string::utf8(b"https://chaincasino.apt/aptos-fortune"),
-            string::utf8(b"https://chaincasino.apt/icons/fortune.png"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/fortune.png"
+            ),
             string::utf8(b"Premium slot machine with frequent wins")
         );
 
         AptosFortune::initialize_game_for_test(&game_signer);
 
-        let aptos_metadata = option::extract(&mut coin::paired_metadata<aptos_coin::AptosCoin>());
-        let initial_balance = primary_fungible_store::balance(PLAYER_ADDR, aptos_metadata);
+        let aptos_metadata =
+            option::extract(&mut coin::paired_metadata<aptos_coin::AptosCoin>());
+        let initial_balance = primary_fungible_store::balance(
+            PLAYER_ADDR, aptos_metadata
+        );
 
         // === TEST 1: THREE MATCHING SYMBOLS (FULL PAYOUT) ===
         AptosFortune::test_spin_reels(&player, STANDARD_BET, 1, 1, 1); // Three cherries
-        let (reel1, reel2, reel3, match_type, matching_symbol, payout, _session, bet_amount) = 
-            AptosFortune::get_player_result(PLAYER_ADDR);
-        
+        let (
+            reel1, reel2, reel3, match_type, matching_symbol, payout, _session, bet_amount
+        ) = AptosFortune::get_player_result(PLAYER_ADDR);
+
         assert!(reel1 == 1 && reel2 == 1 && reel3 == 1, 1);
         assert!(match_type == 3, 2);
         assert!(matching_symbol == 1, 3);
@@ -171,9 +183,9 @@ module aptos_fortune::aptos_fortune_tests {
 
         // === TEST 2: TWO MATCHING SYMBOLS (PARTIAL PAYOUT) ===
         AptosFortune::test_spin_reels(&player, STANDARD_BET, 2, 2, 3); // Two bells, one coin
-        let (reel1_2, reel2_2, reel3_2, match_type_2, matching_symbol_2, payout_2, _, _) = 
+        let (reel1_2, reel2_2, reel3_2, match_type_2, matching_symbol_2, payout_2, _, _) =
             AptosFortune::get_player_result(PLAYER_ADDR);
-        
+
         assert!(reel1_2 == 2 && reel2_2 == 2 && reel3_2 == 3, 6);
         assert!(match_type_2 == 2, 7);
         assert!(matching_symbol_2 == 2, 8);
@@ -181,9 +193,9 @@ module aptos_fortune::aptos_fortune_tests {
 
         // === TEST 3: ONE MATCHING SYMBOL (CONSOLATION) ===
         AptosFortune::test_spin_reels(&player, STANDARD_BET, 3, 4, 5); // All different
-        let (reel1_3, reel2_3, reel3_3, match_type_3, matching_symbol_3, payout_3, _, _) = 
+        let (reel1_3, reel2_3, reel3_3, match_type_3, matching_symbol_3, payout_3, _, _) =
             AptosFortune::get_player_result(PLAYER_ADDR);
-        
+
         assert!(reel1_3 == 3 && reel2_3 == 4 && reel3_3 == 5, 10);
         assert!(match_type_3 == 1, 11);
         assert!(matching_symbol_3 == 5, 12); // Highest symbol (diamond)
@@ -191,9 +203,9 @@ module aptos_fortune::aptos_fortune_tests {
 
         // === TEST 4: NO MATCHES (RARE CASE) ===
         AptosFortune::test_spin_reels(&player, STANDARD_BET, 1, 2, 3); // All different, low values
-        let (reel1_4, reel2_4, reel3_4, match_type_4, matching_symbol_4, payout_4, _, _) = 
+        let (reel1_4, reel2_4, reel3_4, match_type_4, matching_symbol_4, payout_4, _, _) =
             AptosFortune::get_player_result(PLAYER_ADDR);
-        
+
         assert!(reel1_4 == 1 && reel2_4 == 2 && reel3_4 == 3, 14);
         assert!(match_type_4 == 1, 15); // Still gets consolation
         assert!(matching_symbol_4 == 3, 16); // Highest symbol (coin)
@@ -201,9 +213,9 @@ module aptos_fortune::aptos_fortune_tests {
 
         // === TEST 5: DIAMOND JACKPOT (MAXIMUM PAYOUT) ===
         AptosFortune::test_spin_reels(&player, MAX_BET, 5, 5, 5); // Three diamonds
-        let (reel1_5, reel2_5, reel3_5, match_type_5, matching_symbol_5, payout_5, _, _) = 
+        let (reel1_5, reel2_5, reel3_5, match_type_5, matching_symbol_5, payout_5, _, _) =
             AptosFortune::get_player_result(PLAYER_ADDR);
-        
+
         assert!(reel1_5 == 5 && reel2_5 == 5 && reel3_5 == 5, 18);
         assert!(match_type_5 == 3, 19);
         assert!(matching_symbol_5 == 5, 20);
@@ -211,7 +223,7 @@ module aptos_fortune::aptos_fortune_tests {
 
         // Verify balance changes reflect frequent wins
         let final_balance = primary_fungible_store::balance(PLAYER_ADDR, aptos_metadata);
-        
+
         // Player should have gained money due to frequent wins in tests
         assert!(final_balance > initial_balance, 22);
     }
@@ -221,20 +233,44 @@ module aptos_fortune::aptos_fortune_tests {
         let bet = 50000000; // 0.5 APT
 
         // Test 3-match payouts
-        assert!(AptosFortune::calculate_potential_payout(bet, 1, 3) == bet * 3, 1);   // Cherry
-        assert!(AptosFortune::calculate_potential_payout(bet, 2, 3) == bet * 4, 2);   // Bell
-        assert!(AptosFortune::calculate_potential_payout(bet, 3, 3) == bet * 6, 3);   // Coin
-        assert!(AptosFortune::calculate_potential_payout(bet, 4, 3) == bet * 12, 4);  // Star
-        assert!(AptosFortune::calculate_potential_payout(bet, 5, 3) == bet * 20, 5);  // Diamond
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 1, 3) == bet * 3,
+            1
+        ); // Cherry
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 2, 3) == bet * 4,
+            2
+        ); // Bell
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 3, 3) == bet * 6,
+            3
+        ); // Coin
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 4, 3) == bet * 12,
+            4
+        ); // Star
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 5, 3) == bet * 20,
+            5
+        ); // Diamond
 
         // Test 2-match payout
-        assert!(AptosFortune::calculate_potential_payout(bet, 1, 2) == (bet * 50) / 100, 6);
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 1, 2) == (bet * 50) / 100,
+            6
+        );
 
         // Test 1-match payout
-        assert!(AptosFortune::calculate_potential_payout(bet, 1, 1) == (bet * 10) / 100, 7);
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 1, 1) == (bet * 10) / 100,
+            7
+        );
 
         // Test no match
-        assert!(AptosFortune::calculate_potential_payout(bet, 1, 0) == 0, 8);
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 1, 0) == 0,
+            8
+        );
     }
 
     #[test]
@@ -276,7 +312,9 @@ module aptos_fortune::aptos_fortune_tests {
             2200,
             2000000000,
             string::utf8(b"https://chaincasino.apt/aptos-fortune"),
-            string::utf8(b"https://chaincasino.apt/icons/fortune.png"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/fortune.png"
+            ),
             string::utf8(b"Premium slot machine")
         );
 
@@ -306,7 +344,9 @@ module aptos_fortune::aptos_fortune_tests {
             2200,
             2000000000,
             string::utf8(b"https://chaincasino.apt/aptos-fortune"),
-            string::utf8(b"https://chaincasino.apt/icons/fortune.png"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/fortune.png"
+            ),
             string::utf8(b"Premium slot machine")
         );
 
@@ -336,7 +376,9 @@ module aptos_fortune::aptos_fortune_tests {
             2200,
             2000000000,
             string::utf8(b"https://chaincasino.apt/aptos-fortune"),
-            string::utf8(b"https://chaincasino.apt/icons/fortune.png"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/fortune.png"
+            ),
             string::utf8(b"Premium slot machine")
         );
 
@@ -381,7 +423,9 @@ module aptos_fortune::aptos_fortune_tests {
             2200,
             2000000000,
             string::utf8(b"https://chaincasino.apt/aptos-fortune"),
-            string::utf8(b"https://chaincasino.apt/icons/fortune.png"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/fortune.png"
+            ),
             string::utf8(b"Premium slot machine with real randomness")
         );
 
@@ -391,9 +435,17 @@ module aptos_fortune::aptos_fortune_tests {
         AptosFortune::test_only_spin_reels(&player, STANDARD_BET);
 
         // Verify result was stored
-        let (reel1, reel2, reel3, match_type, _matching_symbol, _payout, _session, bet_amount) = 
-            AptosFortune::get_player_result(signer::address_of(&player));
-        
+        let (
+            reel1,
+            reel2,
+            reel3,
+            match_type,
+            _matching_symbol,
+            _payout,
+            _session,
+            bet_amount
+        ) = AptosFortune::get_player_result(signer::address_of(&player));
+
         // Should have valid reel results (1-5)
         assert!(reel1 >= 1 && reel1 <= 5, 1);
         assert!(reel2 >= 1 && reel2 <= 5, 2);
@@ -422,7 +474,9 @@ module aptos_fortune::aptos_fortune_tests {
             2200,
             2000000000,
             string::utf8(b"https://chaincasino.apt/aptos-fortune"),
-            string::utf8(b"https://chaincasino.apt/icons/fortune.png"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/fortune.png"
+            ),
             string::utf8(b"Premium slot machine")
         );
 
@@ -439,8 +493,16 @@ module aptos_fortune::aptos_fortune_tests {
         AptosFortune::clear_result(&player);
 
         // Verify result is cleared (should return zeros)
-        let (reel1_after, reel2_after, reel3_after, match_type_after, matching_symbol_after, payout_after, session_after, bet_after) = 
-            AptosFortune::get_player_result(player_addr);
+        let (
+            reel1_after,
+            reel2_after,
+            reel3_after,
+            match_type_after,
+            matching_symbol_after,
+            payout_after,
+            session_after,
+            bet_after
+        ) = AptosFortune::get_player_result(player_addr);
         assert!(reel1_after == 0, 2);
         assert!(reel2_after == 0, 3);
         assert!(reel3_after == 0, 4);
@@ -470,7 +532,9 @@ module aptos_fortune::aptos_fortune_tests {
             2200,
             2000000000,
             string::utf8(b"https://chaincasino.apt/aptos-fortune"),
-            string::utf8(b"https://chaincasino.apt/icons/fortune.png"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/fortune.png"
+            ),
             string::utf8(b"Premium slot machine")
         );
 
@@ -485,17 +549,38 @@ module aptos_fortune::aptos_fortune_tests {
         let bet = 50000000; // 0.5 APT
 
         // Test edge case: invalid symbol should return 0 multiplier
-        assert!(AptosFortune::calculate_potential_payout(bet, 99, 3) == 0, 1);
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 99, 3) == 0,
+            1
+        );
 
         // Test edge case: 0 match type
-        assert!(AptosFortune::calculate_potential_payout(bet, 1, 0) == 0, 2);
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 1, 0) == 0,
+            2
+        );
 
         // Test all valid 3-match combinations
-        assert!(AptosFortune::calculate_potential_payout(bet, 1, 3) == bet * 3, 3);   // Cherry
-        assert!(AptosFortune::calculate_potential_payout(bet, 2, 3) == bet * 4, 4);   // Bell  
-        assert!(AptosFortune::calculate_potential_payout(bet, 3, 3) == bet * 6, 5);   // Coin
-        assert!(AptosFortune::calculate_potential_payout(bet, 4, 3) == bet * 12, 6);  // Star
-        assert!(AptosFortune::calculate_potential_payout(bet, 5, 3) == bet * 20, 7);  // Diamond
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 1, 3) == bet * 3,
+            3
+        ); // Cherry
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 2, 3) == bet * 4,
+            4
+        ); // Bell
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 3, 3) == bet * 6,
+            5
+        ); // Coin
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 4, 3) == bet * 12,
+            6
+        ); // Star
+        assert!(
+            AptosFortune::calculate_potential_payout(bet, 5, 3) == bet * 20,
+            7
+        ); // Diamond
     }
 
     #[test]
@@ -517,7 +602,9 @@ module aptos_fortune::aptos_fortune_tests {
             2200,
             2000000000,
             string::utf8(b"https://chaincasino.apt/aptos-fortune"),
-            string::utf8(b"https://chaincasino.apt/icons/fortune.png"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/fortune.png"
+            ),
             string::utf8(b"Premium slot machine")
         );
 
@@ -525,7 +612,7 @@ module aptos_fortune::aptos_fortune_tests {
 
         // Test get_casino_game_object function
         let game_object = AptosFortune::get_casino_game_object();
-        
+
         // Verify it's a valid object by checking if it's registered
         assert!(CasinoHouse::is_game_registered(game_object), 1);
     }
