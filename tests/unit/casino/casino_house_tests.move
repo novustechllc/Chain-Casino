@@ -184,6 +184,31 @@ module casino::CasinoHouseTests {
     }
 
     #[test]
+    #[expected_failure(abort_code = casino::CasinoHouse::E_INSUFFICIENT_CENTRAL_TREASURY)]
+    fun test_register_game_insufficient_funding() {
+        let (_, casino_admin, _) = setup_basic();
+        CasinoHouse::init_module_for_test(&casino_admin);
+        
+        // NO FUNDING - test will hit E_INSUFFICIENT_CENTRAL_TREASURY check
+        // This covers the financial safety validation path
+
+        CasinoHouse::register_game(
+            &casino_admin,
+            GAME_MODULE_1,
+            string::utf8(b"TestGame"),
+            string::utf8(b"v1"),
+            1_000_000,    // 0.01 APT min
+            50_000_000,   // 0.5 APT max  
+            1500,         // 15% house edge
+            100_000_000,  // 1 APT max payout -> needs 5 APT funding
+            string::utf8(b"https://chaincasino.apt/test"),
+            string::utf8(b"https://chaincasino.apt/icons/test.png"),
+            string::utf8(b"Test game for funding validation")
+        );
+        // ↑ Should abort with E_INSUFFICIENT_CENTRAL_TREASURY (covers financial guard)
+    }
+
+    #[test]
     fun test_view_functions_with_empty_state() {
         let (_, casino_admin, _) = setup_basic();
         CasinoHouse::init_module_for_test(&casino_admin);
