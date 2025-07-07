@@ -9,7 +9,7 @@ module roulette_game::AptosRoulette {
     use std::signer;
     use std::vector;
     use std::option;
-    use aptos_framework::object::{Self, Object};
+    use aptos_framework::object::{Self, Object, ExtendRef};
     use aptos_framework::account;
     use aptos_framework::coin;
     use aptos_framework::primary_fungible_store;
@@ -165,12 +165,16 @@ module roulette_game::AptosRoulette {
 
     /// Game registry and authentication
     struct GameRegistry has key {
-        game_object: Object<CasinoHouse::GameMetadata>
+        creator: address,
+        game_object: Object<CasinoHouse::GameMetadata>,
+        game_name: String,
+        version: String
     }
 
     /// Game authentication capability
     struct GameAuth has key {
-        capability: GameCapability
+        capability: GameCapability,
+        extend_ref: ExtendRef
     }
 
     //
@@ -505,7 +509,7 @@ module roulette_game::AptosRoulette {
         bet_value: u8,
         bet_numbers: vector<u8>,
         amount: u64
-    ) acquires GameAuth, SpinResult {
+    ) acquires GameAuth, SpinResult, GameRegistry {
         // Decode to validated enum
         let bet_type = decode_bet_type(bet_flag, bet_value, bet_numbers);
 
@@ -523,7 +527,7 @@ module roulette_game::AptosRoulette {
         bet_values: vector<u8>,
         bet_numbers_list: vector<vector<u8>>,
         amounts: vector<u64>
-    ) acquires GameAuth, SpinResult {
+    ) acquires GameAuth, SpinResult, GameRegistry {
         let num_bets = vector::length(&bet_flags);
         assert!(
             num_bets > 0 && num_bets <= MAX_BETS_PER_TRANSACTION,
@@ -554,7 +558,9 @@ module roulette_game::AptosRoulette {
 
     #[randomness]
     /// Straight up number bet
-    entry fun bet_number(player: &signer, number: u8, amount: u64) acquires GameAuth, SpinResult {
+    entry fun bet_number(
+        player: &signer, number: u8, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
         let bet_type = create_straight_up_bet(number);
         let bets = vector[bet_type];
         let amounts = vector[amount];
@@ -563,7 +569,9 @@ module roulette_game::AptosRoulette {
 
     #[randomness]
     /// Red or black color bet
-    entry fun bet_red_black(player: &signer, is_red: bool, amount: u64) acquires GameAuth, SpinResult {
+    entry fun bet_red_black(
+        player: &signer, is_red: bool, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
         let bet_type = create_red_black_bet(is_red);
         let bets = vector[bet_type];
         let amounts = vector[amount];
@@ -572,7 +580,9 @@ module roulette_game::AptosRoulette {
 
     #[randomness]
     /// Even or odd bet
-    entry fun bet_even_odd(player: &signer, is_even: bool, amount: u64) acquires GameAuth, SpinResult {
+    entry fun bet_even_odd(
+        player: &signer, is_even: bool, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
         let bet_type = create_even_odd_bet(is_even);
         let bets = vector[bet_type];
         let amounts = vector[amount];
@@ -581,7 +591,9 @@ module roulette_game::AptosRoulette {
 
     #[randomness]
     /// High or low bet
-    entry fun bet_high_low(player: &signer, is_high: bool, amount: u64) acquires GameAuth, SpinResult {
+    entry fun bet_high_low(
+        player: &signer, is_high: bool, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
         let bet_type = create_high_low_bet(is_high);
         let bets = vector[bet_type];
         let amounts = vector[amount];
@@ -590,7 +602,9 @@ module roulette_game::AptosRoulette {
 
     #[randomness]
     /// Dozen bet
-    entry fun bet_dozen(player: &signer, dozen: u8, amount: u64) acquires GameAuth, SpinResult {
+    entry fun bet_dozen(
+        player: &signer, dozen: u8, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
         let bet_type = create_dozen_bet(dozen);
         let bets = vector[bet_type];
         let amounts = vector[amount];
@@ -599,7 +613,9 @@ module roulette_game::AptosRoulette {
 
     #[randomness]
     /// Column bet
-    entry fun bet_column(player: &signer, column: u8, amount: u64) acquires GameAuth, SpinResult {
+    entry fun bet_column(
+        player: &signer, column: u8, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
         let bet_type = create_column_bet(column);
         let bets = vector[bet_type];
         let amounts = vector[amount];
@@ -613,7 +629,7 @@ module roulette_game::AptosRoulette {
     /// Internal multi-bet execution using enum system
     fun execute_multi_bet_internal(
         player: &signer, bet_types: vector<BetType>, amounts: vector<u64>
-    ) acquires GameAuth, SpinResult {
+    ) acquires GameAuth, SpinResult, GameRegistry {
         let num_bets = vector::length(&bet_types);
         assert!(num_bets == vector::length(&amounts), E_MISMATCHED_BET_ARRAYS);
 
@@ -974,28 +990,51 @@ module roulette_game::AptosRoulette {
 
         assert!(CasinoHouse::is_game_registered(game_object), E_GAME_NOT_REGISTERED);
 
-        // Store game registry
-        move_to(deployer, GameRegistry { game_object });
-
-        // Get capability and store authentication
-        let capability = CasinoHouse::get_game_capability(deployer, game_object);
-        let game_auth = GameAuth { capability };
-        // Reconstruct the ConstructorRef using the same seed as registration
-        let seed = vector::empty<u8>();
-        vector::append(&mut seed, b"game_metadata_");
-        vector::append(&mut seed, *std::string::bytes(&game_name));
-        vector::append(&mut seed, b"_");
-        vector::append(&mut seed, *std::string::bytes(&version));
+        // Create named object for game instance
+        let seed = build_seed(game_name, version);
         let constructor_ref = object::create_named_object(deployer, seed);
         let game_signer = object::generate_signer(&constructor_ref);
-        move_to(&game_signer, game_auth);
+
+        // Configure as non-transferable
+        let transfer_ref = object::generate_transfer_ref(&constructor_ref);
+        object::disable_ungated_transfer(&transfer_ref);
+
+        // Generate extend ref for future operations
+        let extend_ref = object::generate_extend_ref(&constructor_ref);
+
+        // Get capability from casino using game object
+        let capability = CasinoHouse::get_game_capability(deployer, game_object);
+
+        // Store GameAuth in the object with extend_ref
+        move_to(&game_signer, GameAuth { capability, extend_ref });
+
+        // Store complete registry info at module address (like SevenOut)
+        move_to(
+            deployer,
+            GameRegistry {
+                creator: signer::address_of(deployer),
+                game_object,
+                game_name,
+                version
+            }
+        );
     }
 
     /// Get game object address
-    fun get_game_object_address(): address {
-        let game_name = string::utf8(b"AptosRoulette");
-        let version = string::utf8(GAME_VERSION);
-        CasinoHouse::derive_game_object_address(@casino, game_name, version)
+    fun get_game_object_address(): address acquires GameRegistry {
+        let registry = borrow_global<GameRegistry>(@roulette_game);
+        let seed = build_seed(registry.game_name, registry.version);
+        object::create_object_address(&registry.creator, seed)
+    }
+
+    /// Build Seed
+    fun build_seed(name: String, version: String): vector<u8> {
+        let seed = vector::empty<u8>();
+        vector::append(&mut seed, b"game_metadata_");
+        vector::append(&mut seed, *string::bytes(&name));
+        vector::append(&mut seed, b"_");
+        vector::append(&mut seed, *string::bytes(&version));
+        seed
     }
 
     //
@@ -1101,7 +1140,7 @@ module roulette_game::AptosRoulette {
 
     #[view]
     /// Check if game object exists
-    public fun object_exists(): bool {
+    public fun object_exists(): bool acquires GameRegistry {
         if (!is_initialized()) { false }
         else {
             let object_addr = get_game_object_address();
@@ -1139,7 +1178,7 @@ module roulette_game::AptosRoulette {
     #[lint::allow_unsafe_randomness]
     public entry fun test_only_bet_number(
         player: &signer, number: u8, amount: u64
-    ) acquires GameAuth, SpinResult {
+    ) acquires GameAuth, SpinResult, GameRegistry {
         bet_number(player, number, amount);
     }
 
@@ -1147,7 +1186,7 @@ module roulette_game::AptosRoulette {
     #[lint::allow_unsafe_randomness]
     public entry fun test_only_bet_red_black(
         player: &signer, is_red: bool, amount: u64
-    ) acquires GameAuth, SpinResult {
+    ) acquires GameAuth, SpinResult, GameRegistry {
         bet_red_black(player, is_red, amount);
     }
 
@@ -1159,7 +1198,7 @@ module roulette_game::AptosRoulette {
         bet_value: u8,
         bet_numbers: vector<u8>,
         amount: u64
-    ) acquires GameAuth, SpinResult {
+    ) acquires GameAuth, SpinResult, GameRegistry {
         place_bet(
             player,
             bet_flag,
@@ -1177,7 +1216,7 @@ module roulette_game::AptosRoulette {
         bet_values: vector<u8>,
         bet_numbers_list: vector<vector<u8>>,
         amounts: vector<u64>
-    ) acquires GameAuth, SpinResult {
+    ) acquires GameAuth, SpinResult, GameRegistry {
         place_multi_bet(
             player,
             bet_flags,
