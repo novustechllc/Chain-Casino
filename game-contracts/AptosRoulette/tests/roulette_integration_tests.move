@@ -200,13 +200,11 @@ module roulette_game::test_aptos_roulette {
         let expected_payout =
             (if (number_17_won) {
                 MIN_BET * 35
-            } else { 0 })
-                + (if (red_won) {
-                    MIN_BET
-                } else { 0 })
-                + (if (dozen_2_won) {
-                    MIN_BET * 2
-                } else { 0 });
+            } else { 0 }) + (if (red_won) {
+                MIN_BET
+            } else { 0 }) + (if (dozen_2_won) {
+                MIN_BET * 2
+            } else { 0 });
 
         assert!(winning_bets == expected_winning_bets, 3);
         assert!(total_payout == expected_payout, 4);

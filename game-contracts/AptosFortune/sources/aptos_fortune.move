@@ -540,9 +540,7 @@ module aptos_fortune::AptosFortune {
         if (exists<PlayerResult>(player_addr)) {
             let result = move_from<PlayerResult>(player_addr);
             let session_id = result.session_id; // Extract session_id before result is consumed
-            event::emit(
-                ResultCleared { player: player_addr, session_id }
-            );
+            event::emit(ResultCleared { player: player_addr, session_id });
         };
     }
 
