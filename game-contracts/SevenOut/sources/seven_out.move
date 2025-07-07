@@ -4,6 +4,7 @@
 //!
 //! Classic Over/Under 7 dice game with two dice. Players bet whether the sum
 //! will be over or under 7. Sum of exactly 7 is a push (bet returned).
+//! Winning bets pay 1.933x total payout (2.78% house edge).
 
 module seven_out_game::SevenOut {
     use aptos_framework::randomness;
@@ -43,8 +44,10 @@ module seven_out_game::SevenOut {
     const MIN_BET: u64 = 2000000;
     /// Maximum bet amount (0.4 APT in octas)
     const MAX_BET: u64 = 40000000;
-    /// Payout multiplier for Over/Under wins (2:1)
-    const PAYOUT_MULTIPLIER: u64 = 2;
+    /// Payout multiplier numerator for precise integer math
+    const PAYOUT_NUM: u64 = 1933;
+    /// Payout multiplier denominator for precise integer math
+    const PAYOUT_DEN: u64 = 1000;
     /// House edge in basis points (278 = 2.78%)
     const HOUSE_EDGE_BPS: u64 = 278;
     /// Game version for object naming
@@ -130,7 +133,8 @@ module seven_out_game::SevenOut {
         version: String,
         min_bet: u64,
         max_bet: u64,
-        payout_multiplier: u64,
+        payout_numerator: u64,
+        payout_denominator: u64,
         house_edge_bps: u64
     }
 
@@ -139,6 +143,15 @@ module seven_out_game::SevenOut {
     struct ResultCleanedEvent has drop, store {
         player: address,
         session_id: u64
+    }
+
+    //
+    // Helper Functions
+    //
+
+    /// Calculate correct win payout to achieve 2.78% house edge
+    fun win_payout(bet_amount: u64): u64 {
+        (bet_amount * PAYOUT_NUM) / PAYOUT_DEN
     }
 
     //
@@ -203,7 +216,8 @@ module seven_out_game::SevenOut {
                 version,
                 min_bet: MIN_BET,
                 max_bet: MAX_BET,
-                payout_multiplier: PAYOUT_MULTIPLIER,
+                payout_numerator: PAYOUT_NUM,
+                payout_denominator: PAYOUT_DEN,
                 house_edge_bps: HOUSE_EDGE_BPS
             }
         );
@@ -275,13 +289,13 @@ module seven_out_game::SevenOut {
                 (2, bet_amount) // Push - return bet
             } else if (bet_type == BetType::Over) {
                 if (dice_sum > 7) {
-                    (1, bet_amount * PAYOUT_MULTIPLIER) // Win
+                    (1, win_payout(bet_amount)) // Win with correct house edge
                 } else {
                     (0, 0) // Lose
                 }
             } else { // Under
                 if (dice_sum < 7) {
-                    (1, bet_amount * PAYOUT_MULTIPLIER) // Win
+                    (1, win_payout(bet_amount)) // Win with correct house edge
                 } else {
                     (0, 0) // Lose
                 }
@@ -484,13 +498,13 @@ module seven_out_game::SevenOut {
     }
 
     #[view]
-    public fun get_game_config(): (u64, u64, u64, u64) {
-        (MIN_BET, MAX_BET, PAYOUT_MULTIPLIER, HOUSE_EDGE_BPS)
+    public fun get_game_config(): (u64, u64, u64, u64, u64) {
+        (MIN_BET, MAX_BET, PAYOUT_NUM, PAYOUT_DEN, HOUSE_EDGE_BPS)
     }
 
     #[view]
     public fun calculate_payout(bet_amount: u64): u64 {
-        bet_amount * PAYOUT_MULTIPLIER
+        win_payout(bet_amount)
     }
 
     #[view]
@@ -543,17 +557,17 @@ module seven_out_game::SevenOut {
     #[view]
     /// Get game odds information
     public fun get_game_odds(): (u64, u64, u64) {
-        // Over: 21 ways to win out of 36 (58.33%)
+        // Over: 15 ways to win out of 36 (41.67%)
         // Under: 15 ways to win out of 36 (41.67%)
         // Push: 6 ways (16.67%)
-        (21, 15, 6) // (over_ways, under_ways, push_ways)
+        (15, 15, 6) // (over_ways, under_ways, push_ways)
     }
 
     #[view]
     /// Check if game treasury has sufficient balance for a bet
     public fun can_handle_payout(bet_amount: u64): bool acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@seven_out_game);
-        let expected_payout = bet_amount * PAYOUT_MULTIPLIER;
+        let expected_payout = win_payout(bet_amount);
         let game_treasury_balance =
             CasinoHouse::game_treasury_balance(registry.game_object);
 
