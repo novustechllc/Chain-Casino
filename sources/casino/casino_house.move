@@ -132,6 +132,14 @@ module casino::CasinoHouse {
         registered_games: OrderedMap<Object<GameMetadata>, bool>
     }
 
+    /// Direction of treasury rebalancing operation
+    enum RebalanceDirection has copy, drop, store {
+        /// Excess funds sent from game treasury to central treasury  
+        TowardsCentral,
+        /// Liquidity injected from central treasury to game treasury
+        TowardsGame
+    }
+
     /// Capability resource proving game authorization (Object-Based)
     struct GameCapability has key, store {
         game_object: Object<GameMetadata>
@@ -167,7 +175,7 @@ module casino::CasinoHouse {
     struct TreasuryRebalancedEvent has drop, store {
         game_object: Object<GameMetadata>,
         transfer_amount: u64,
-        direction: bool,
+        direction: RebalanceDirection,
         new_balance: u64
     }
 
@@ -483,10 +491,10 @@ module casino::CasinoHouse {
 
     /// Accept bet from authorized game - simplified treasury operations only
     public fun place_bet(
-        capability: &GameCapability, bet_fa: FungibleAsset, player_addr: address
+        self: &GameCapability, bet_fa: FungibleAsset, player_addr: address
     ): (address, BetId) acquires GameRegistry, TreasuryRegistry, GameTreasury, GameMetadata {
 
-        let game_object = capability.game_object;
+        let game_object = self.game_object;
         let amount = fungible_asset::amount(&bet_fa);
 
         // Get sequence number BEFORE creating BetId struct
@@ -552,7 +560,7 @@ module casino::CasinoHouse {
 
     /// Settle bet with payout - simplified payout operations only
     public fun settle_bet(
-        capability: &GameCapability,
+        self: &GameCapability,
         bet_id: BetId,
         winner: address,
         payout: u64,
@@ -563,7 +571,7 @@ module casino::CasinoHouse {
         let BetId { player, sequence } = bet_id;
 
         // Verify game registration
-        let game_object = capability.game_object;
+        let game_object = self.game_object;
         let registry = borrow_global<GameRegistry>(@casino);
         assert!(
             ordered_map::contains(&registry.registered_games, &game_object),
@@ -685,7 +693,7 @@ module casino::CasinoHouse {
                 TreasuryRebalancedEvent {
                     game_object,
                     transfer_amount,
-                    direction: true,
+                    direction: RebalanceDirection::TowardsCentral,
                     new_balance: current_balance - transfer_amount
                 }
             );
@@ -699,7 +707,7 @@ module casino::CasinoHouse {
                 TreasuryRebalancedEvent {
                     game_object,
                     transfer_amount: needed,
-                    direction: false,
+                    direction: RebalanceDirection::TowardsGame,
                     new_balance: current_balance + needed
                 }
             );
@@ -820,9 +828,9 @@ module casino::CasinoHouse {
 
     /// Games can request limit changes (reduce risk only)
     public fun request_limit_update(
-        capability: &GameCapability, new_min_bet: u64, new_max_bet: u64
+        self: &GameCapability, new_min_bet: u64, new_max_bet: u64
     ) acquires GameMetadata {
-        let game_object = capability.game_object;
+        let game_object = self.game_object;
         let object_addr = object::object_address(&game_object);
         let game_metadata = borrow_global_mut<GameMetadata>(object_addr);
 
@@ -987,12 +995,12 @@ module casino::CasinoHouse {
 
     /// Games can update their own website URLs and metadata
     public fun update_game_metadata(
-        capability: &GameCapability,
+        self: &GameCapability,
         website_url: String,
         icon_url: String,
         description: String
     ) acquires GameMetadata {
-        let game_object = capability.game_object;
+        let game_object = self.game_object;
         let object_addr = object::object_address(&game_object);
         let game_metadata = borrow_global_mut<GameMetadata>(object_addr);
         game_metadata.website_url = website_url;

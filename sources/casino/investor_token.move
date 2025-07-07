@@ -57,6 +57,14 @@ module casino::InvestorToken {
         extend_ref: ExtendRef
     }
 
+    /// Type of investor token operation
+    enum TokenOperation has copy, drop, store {
+        /// User deposited APT and minted CCIT tokens
+        Mint { apt_amount: u64, tokens_minted: u64 },
+        /// User redeemed CCIT tokens for APT
+        Redeem { tokens_burned: u64, apt_received: u64, fee_paid: u64 }
+    }
+
     /// Economic metadata for dividend tracking
     struct DividendMetadata has key {
         treasury_backing_ratio: u64,
@@ -73,6 +81,16 @@ module casino::InvestorToken {
     struct DividendPaidEvent has drop, store {
         recipient: address,
         amount: u64
+    }
+
+    #[event]
+    /// Emitted for all token operations with detailed info
+    struct TokenOperationEvent has drop, store {
+        user: address,
+        operation: TokenOperation,
+        nav_before: u64,
+        nav_after: u64,
+        timestamp: u64
     }
 
     #[event]
@@ -195,6 +213,20 @@ module casino::InvestorToken {
 
         update_nav_tracking();
         emit_treasury_composition_event();
+
+        let user_addr = signer::address_of(user);
+        event::emit(
+            TokenOperationEvent {
+                user: user_addr,
+                operation: TokenOperation::Mint {
+                    apt_amount: amount,
+                    tokens_minted: tokens_to_mint
+                },
+                nav_before: nav(),
+                nav_after: nav(),
+                timestamp: timestamp::now_seconds()
+            }
+        );
     }
 
     /// Burn InvestorTokens and redeem APT at current NAV
@@ -251,6 +283,20 @@ module casino::InvestorToken {
 
         update_nav_tracking();
         emit_treasury_composition_event();
+
+        event::emit(
+            TokenOperationEvent {
+                user: user_addr,
+                operation: TokenOperation::Redeem {
+                    tokens_burned: tokens,
+                    apt_received: net_amount,
+                    fee_paid: fee
+                },
+                nav_before: current_nav,
+                nav_after: nav(),
+                timestamp: timestamp::now_seconds()
+            }
+        );
     }
 
     //
