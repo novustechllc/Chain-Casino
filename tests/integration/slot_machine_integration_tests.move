@@ -72,7 +72,7 @@ module casino::SlotMachineIntegrationTests {
 
         // === PHASE 1: CASINO SETUP ===
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
 
         // Provide initial liquidity
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
@@ -167,7 +167,7 @@ module casino::SlotMachineIntegrationTests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
@@ -278,7 +278,7 @@ module casino::SlotMachineIntegrationTests {
 
         // Setup ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
@@ -394,7 +394,7 @@ module casino::SlotMachineIntegrationTests {
 
         // Setup casino
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
@@ -424,7 +424,7 @@ module casino::SlotMachineIntegrationTests {
 
         // Setup casino and initialize once
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
@@ -457,7 +457,7 @@ module casino::SlotMachineIntegrationTests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
@@ -490,7 +490,7 @@ module casino::SlotMachineIntegrationTests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
@@ -523,7 +523,7 @@ module casino::SlotMachineIntegrationTests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(
@@ -555,7 +555,7 @@ module casino::SlotMachineIntegrationTests {
 
         // Setup complete ecosystem
         CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
         InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
 
         CasinoHouse::register_game(

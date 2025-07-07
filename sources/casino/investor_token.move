@@ -57,6 +57,14 @@ module casino::InvestorToken {
         extend_ref: ExtendRef
     }
 
+    /// Type of investor token operation
+    enum TokenOperation has copy, drop, store {
+        /// User deposited APT and minted CCIT tokens
+        Mint { apt_amount: u64, tokens_minted: u64 },
+        /// User redeemed CCIT tokens for APT
+        Redeem { tokens_burned: u64, apt_received: u64, fee_paid: u64 }
+    }
+
     /// Economic metadata for dividend tracking
     struct DividendMetadata has key {
         treasury_backing_ratio: u64,
@@ -76,6 +84,16 @@ module casino::InvestorToken {
     }
 
     #[event]
+    /// Emitted for all token operations with detailed info
+    struct TokenOperationEvent has drop, store {
+        user: address,
+        operation: TokenOperation,
+        nav_before: u64,
+        nav_after: u64,
+        timestamp: u64
+    }
+
+    #[event]
     /// Emitted when treasury composition changes
     struct TreasuryCompositionEvent has drop, store {
         central_balance: u64,
@@ -88,11 +106,11 @@ module casino::InvestorToken {
     // Initialization Interface
     //
 
-    /// Initialize the InvestorToken fungible asset
-    public entry fun init(owner: &signer) {
-        assert!(signer::address_of(owner) == @casino, E_UNAUTHORIZED_INIT);
+    /// Initialize the InvestorToken fungible asset automatically on deployment
+    fun init_module(deployer: &signer) {
+        assert!(signer::address_of(deployer) == @casino, E_UNAUTHORIZED_INIT);
 
-        let constructor_ref = object::create_named_object(owner, b"InvestorToken");
+        let constructor_ref = object::create_named_object(deployer, b"InvestorToken");
 
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             &constructor_ref,
@@ -123,6 +141,12 @@ module casino::InvestorToken {
                 creation_timestamp: timestamp::now_seconds()
             }
         );
+    }
+
+    #[test_only]
+    /// Test helper for initialization in tests
+    public fun init_module_for_test(test_signer: &signer) {
+        init_module(test_signer);
     }
 
     //
@@ -189,6 +213,20 @@ module casino::InvestorToken {
 
         update_nav_tracking();
         emit_treasury_composition_event();
+
+        let user_addr = signer::address_of(user);
+        event::emit(
+            TokenOperationEvent {
+                user: user_addr,
+                operation: TokenOperation::Mint {
+                    apt_amount: amount,
+                    tokens_minted: tokens_to_mint
+                },
+                nav_before: nav(),
+                nav_after: nav(),
+                timestamp: timestamp::now_seconds()
+            }
+        );
     }
 
     /// Burn InvestorTokens and redeem APT at current NAV
@@ -245,6 +283,20 @@ module casino::InvestorToken {
 
         update_nav_tracking();
         emit_treasury_composition_event();
+
+        event::emit(
+            TokenOperationEvent {
+                user: user_addr,
+                operation: TokenOperation::Redeem {
+                    tokens_burned: tokens,
+                    apt_received: net_amount,
+                    fee_paid: fee
+                },
+                nav_before: current_nav,
+                nav_after: nav(),
+                timestamp: timestamp::now_seconds()
+            }
+        );
     }
 
     //

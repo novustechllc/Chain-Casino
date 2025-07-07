@@ -27,7 +27,7 @@ export const SEVEN_OUT_MIN_BET = 50000000; // 0.5 APT (50M octas)
 export const SEVEN_OUT_MAX_BET = 4000000000; // 40 APT (4B octas)
 
 // UI Constants
-export const REFRESH_INTERVAL = 30000; // 10 seconds
+export const REFRESH_INTERVAL = 1000; // 10 seconds
 export const ANIMATION_DURATION = 300; // 300ms
 
 // Retro Arcade Theme

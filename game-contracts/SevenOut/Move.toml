@@ -18,6 +18,6 @@ subdir = "aptos-framework"
 
 [dependencies.ChainCasino]
 git = "https://github.com/PersonaNormale/ChainCasino.git"
-rev = "feature/dashboard-frontend"
+rev = "feature/contracts-refining"
 
 [dev-dependencies]
