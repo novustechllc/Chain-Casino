@@ -134,7 +134,7 @@ module casino::CasinoHouse {
 
     /// Direction of treasury rebalancing operation
     enum RebalanceDirection has copy, drop, store {
-        /// Excess funds sent from game treasury to central treasury  
+        /// Excess funds sent from game treasury to central treasury
         TowardsCentral,
         /// Liquidity injected from central treasury to game treasury
         TowardsGame
@@ -651,8 +651,6 @@ module casino::CasinoHouse {
         event::emit(LiquidityInjectedEvent { game_treasury_addr, amount });
     }
 
-
-
     /// FIXED: Withdraw excess from game treasury to central using resource account signer
     package fun withdraw_excess(
         game_treasury_addr: address, amount: u64
@@ -884,7 +882,7 @@ module casino::CasinoHouse {
         if (!exists<GameMetadata>(object_addr)) {
             return GameStatus::Deactivated
         };
-        
+
         let metadata = borrow_global<GameMetadata>(object_addr);
         if (!metadata.capability_claimed) {
             GameStatus::Registered
