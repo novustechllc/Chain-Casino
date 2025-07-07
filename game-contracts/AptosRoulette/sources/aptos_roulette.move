@@ -278,213 +278,213 @@ module roulette_game::AptosRoulette {
     //
 
     /// Calculate bet result using comprehensive pattern matching
-    fun calculate_bet_result(bet_type: BetType, winning_number: u8, amount: u64): BetResult {
-        match (bet_type) {
-            BetType::StraightUp { number } => {
-                if (number == winning_number) {
-                    BetResult { 
-                        won: true, 
-                        payout: amount * 35,
-                        description: string::utf8(b"Straight Up Win"),
-                        winning_numbers: vector[number]
-                    }
-                } else {
-                    BetResult { 
-                        won: false, 
-                        payout: 0,
-                        description: string::utf8(b"Straight Up Loss"),
-                        winning_numbers: vector[]
-                    }
+fun calculate_bet_result(bet_type: BetType, winning_number: u8, amount: u64): BetResult {
+    match (bet_type) {
+        BetType::StraightUp { number } => {
+            if (number == winning_number) {
+                BetResult { 
+                    won: true, 
+                    payout: amount + (amount * 35), 
+                    description: string::utf8(b"Straight Up Win"),
+                    winning_numbers: vector[number]
                 }
-            },
-            
-            BetType::Split { num1, num2 } => {
-                if (winning_number == num1 || winning_number == num2) {
-                    BetResult { 
-                        won: true, 
-                        payout: amount * 17,
-                        description: string::utf8(b"Split Win"),
-                        winning_numbers: vector[num1, num2]
-                    }
-                } else {
-                    BetResult { 
-                        won: false, 
-                        payout: 0,
-                        description: string::utf8(b"Split Loss"),
-                        winning_numbers: vector[]
-                    }
+            } else {
+                BetResult { 
+                    won: false, 
+                    payout: 0,
+                    description: string::utf8(b"Straight Up Loss"),
+                    winning_numbers: vector[]
                 }
-            },
-            
-            BetType::Street { row } => {
-                let street_numbers = get_street_numbers(row);
-                let won = vector::contains(&street_numbers, &winning_number);
-                if (won) {
-                    BetResult { 
-                        won: true, 
-                        payout: amount * 11,
-                        description: string::utf8(b"Street Win"),
-                        winning_numbers: street_numbers
-                    }
-                } else {
-                    BetResult { 
-                        won: false, 
-                        payout: 0,
-                        description: string::utf8(b"Street Loss"),
-                        winning_numbers: vector[]
-                    }
+            }
+        },
+        
+        BetType::Split { num1, num2 } => {
+            if (winning_number == num1 || winning_number == num2) {
+                BetResult { 
+                    won: true, 
+                    payout: amount + (amount * 17),
+                    description: string::utf8(b"Split Win"),
+                    winning_numbers: vector[num1, num2]
                 }
-            },
-            
-            BetType::Corner { top_left } => {
-                let corner_numbers = get_corner_numbers(top_left);
-                let won = vector::contains(&corner_numbers, &winning_number);
-                if (won) {
-                    BetResult { 
-                        won: true, 
-                        payout: amount * 8,
-                        description: string::utf8(b"Corner Win"),
-                        winning_numbers: corner_numbers
-                    }
-                } else {
-                    BetResult { 
-                        won: false, 
-                        payout: 0,
-                        description: string::utf8(b"Corner Loss"),
-                        winning_numbers: vector[]
-                    }
+            } else {
+                BetResult { 
+                    won: false, 
+                    payout: 0,
+                    description: string::utf8(b"Split Loss"),
+                    winning_numbers: vector[]
                 }
-            },
-            
-            BetType::RedBlack { is_red } => {
-                let is_winning_red = is_red_number(winning_number);
-                if (winning_number != 0 && is_red == is_winning_red) {
-                    BetResult { 
-                        won: true, 
-                        payout: amount * 1,
-                        description: if (is_red) { 
-                            string::utf8(b"Red Win") 
-                        } else { 
-                            string::utf8(b"Black Win") 
-                        },
-                        winning_numbers: get_color_numbers(is_red)
-                    }
-                } else {
-                    BetResult { 
-                        won: false, 
-                        payout: 0,
-                        description: string::utf8(b"Color Loss"),
-                        winning_numbers: vector[]
-                    }
+            }
+        },
+        
+        BetType::Street { row } => {
+            let street_numbers = get_street_numbers(row);
+            let won = vector::contains(&street_numbers, &winning_number);
+            if (won) {
+                BetResult { 
+                    won: true, 
+                    payout: amount + (amount * 11),
+                    description: string::utf8(b"Street Win"),
+                    winning_numbers: street_numbers
                 }
-            },
-            
-            BetType::EvenOdd { is_even } => {
-                let is_winning_even = (winning_number != 0 && winning_number % 2 == 0);
-                if (winning_number != 0 && is_even == is_winning_even) {
-                    BetResult { 
-                        won: true, 
-                        payout: amount * 1,
-                        description: if (is_even) { 
-                            string::utf8(b"Even Win") 
-                        } else { 
-                            string::utf8(b"Odd Win") 
-                        },
-                        winning_numbers: get_even_odd_numbers(is_even)
-                    }
-                } else {
-                    BetResult { 
-                        won: false, 
-                        payout: 0,
-                        description: string::utf8(b"Even/Odd Loss"),
-                        winning_numbers: vector[]
-                    }
+            } else {
+                BetResult { 
+                    won: false, 
+                    payout: 0,
+                    description: string::utf8(b"Street Loss"),
+                    winning_numbers: vector[]
                 }
-            },
-            
-            BetType::HighLow { is_high } => {
-                let is_winning_high = (winning_number >= 19 && winning_number <= 36);
-                let is_winning_low = (winning_number >= 1 && winning_number <= 18);
-                if ((is_high && is_winning_high) || (!is_high && is_winning_low)) {
-                    BetResult { 
-                        won: true, 
-                        payout: amount * 1,
-                        description: if (is_high) { 
-                            string::utf8(b"High Win") 
-                        } else { 
-                            string::utf8(b"Low Win") 
-                        },
-                        winning_numbers: get_high_low_numbers(is_high)
-                    }
-                } else {
-                    BetResult { 
-                        won: false, 
-                        payout: 0,
-                        description: string::utf8(b"High/Low Loss"),
-                        winning_numbers: vector[]
-                    }
+            }
+        },
+        
+        BetType::Corner { top_left } => {
+            let corner_numbers = get_corner_numbers(top_left);
+            let won = vector::contains(&corner_numbers, &winning_number);
+            if (won) {
+                BetResult { 
+                    won: true, 
+                    payout: amount + (amount * 8),
+                    description: string::utf8(b"Corner Win"),
+                    winning_numbers: corner_numbers
                 }
-            },
-            
-            BetType::Dozen { dozen } => {
-                let winning_dozen = get_dozen_for_number(winning_number);
-                if (dozen == winning_dozen && winning_dozen != 0) {
-                    BetResult { 
-                        won: true, 
-                        payout: amount * 2,
-                        description: string::utf8(b"Dozen Win"),
-                        winning_numbers: get_dozen_numbers(dozen)
-                    }
-                } else {
-                    BetResult { 
-                        won: false, 
-                        payout: 0,
-                        description: string::utf8(b"Dozen Loss"),
-                        winning_numbers: vector[]
-                    }
+            } else {
+                BetResult { 
+                    won: false, 
+                    payout: 0,
+                    description: string::utf8(b"Corner Loss"),
+                    winning_numbers: vector[]
                 }
-            },
-            
-            BetType::Column { column } => {
-                let winning_column = get_column_for_number(winning_number);
-                if (column == winning_column && winning_column != 0) {
-                    BetResult { 
-                        won: true, 
-                        payout: amount * 2,
-                        description: string::utf8(b"Column Win"),
-                        winning_numbers: get_column_numbers(column)
-                    }
-                } else {
-                    BetResult { 
-                        won: false, 
-                        payout: 0,
-                        description: string::utf8(b"Column Loss"),
-                        winning_numbers: vector[]
-                    }
+            }
+        },
+        
+        BetType::RedBlack { is_red } => {
+            let is_winning_red = is_red_number(winning_number);
+            if (winning_number != 0 && is_red == is_winning_red) {
+                BetResult { 
+                    won: true, 
+                    payout: amount + amount,
+                    description: if (is_red) { 
+                        string::utf8(b"Red Win") 
+                    } else { 
+                        string::utf8(b"Black Win") 
+                    },
+                    winning_numbers: get_color_numbers(is_red)
                 }
-            },
-            
-            BetType::Line { start_row } => {
-                let line_numbers = get_line_numbers(start_row);
-                let won = vector::contains(&line_numbers, &winning_number);
-                if (won) {
-                    BetResult { 
-                        won: true, 
-                        payout: amount * 5,
-                        description: string::utf8(b"Line Win"),
-                        winning_numbers: line_numbers
-                    }
-                } else {
-                    BetResult { 
-                        won: false, 
-                        payout: 0,
-                        description: string::utf8(b"Line Loss"),
-                        winning_numbers: vector[]
-                    }
+            } else {
+                BetResult { 
+                    won: false, 
+                    payout: 0,
+                    description: string::utf8(b"Color Loss"),
+                    winning_numbers: vector[]
+                }
+            }
+        },
+        
+        BetType::EvenOdd { is_even } => {
+            let is_winning_even = (winning_number != 0 && winning_number % 2 == 0);
+            if (winning_number != 0 && is_even == is_winning_even) {
+                BetResult { 
+                    won: true, 
+                    payout: amount + amount,
+                    description: if (is_even) { 
+                        string::utf8(b"Even Win") 
+                    } else { 
+                        string::utf8(b"Odd Win") 
+                    },
+                    winning_numbers: get_even_odd_numbers(is_even)
+                }
+            } else {
+                BetResult { 
+                    won: false, 
+                    payout: 0,
+                    description: string::utf8(b"Even/Odd Loss"),
+                    winning_numbers: vector[]
+                }
+            }
+        },
+        
+        BetType::HighLow { is_high } => {
+            let is_winning_high = (winning_number >= 19 && winning_number <= 36);
+            let is_winning_low = (winning_number >= 1 && winning_number <= 18);
+            if ((is_high && is_winning_high) || (!is_high && is_winning_low)) {
+                BetResult { 
+                    won: true, 
+                    payout: amount + amount,
+                    description: if (is_high) { 
+                        string::utf8(b"High Win") 
+                    } else { 
+                        string::utf8(b"Low Win") 
+                    },
+                    winning_numbers: get_high_low_numbers(is_high)
+                }
+            } else {
+                BetResult { 
+                    won: false, 
+                    payout: 0,
+                    description: string::utf8(b"High/Low Loss"),
+                    winning_numbers: vector[]
+                }
+            }
+        },
+        
+        BetType::Dozen { dozen } => {
+            let winning_dozen = get_dozen_for_number(winning_number);
+            if (dozen == winning_dozen && winning_dozen != 0) {
+                BetResult { 
+                    won: true, 
+                    payout: amount + (amount * 2), 
+                    description: string::utf8(b"Dozen Win"),
+                    winning_numbers: get_dozen_numbers(dozen)
+                }
+            } else {
+                BetResult { 
+                    won: false, 
+                    payout: 0,
+                    description: string::utf8(b"Dozen Loss"),
+                    winning_numbers: vector[]
+                }
+            }
+        },
+        
+        BetType::Column { column } => {
+            let winning_column = get_column_for_number(winning_number);
+            if (column == winning_column && winning_column != 0) {
+                BetResult { 
+                    won: true, 
+                    payout: amount + (amount * 2),
+                    description: string::utf8(b"Column Win"),
+                    winning_numbers: get_column_numbers(column)
+                }
+            } else {
+                BetResult { 
+                    won: false, 
+                    payout: 0,
+                    description: string::utf8(b"Column Loss"),
+                    winning_numbers: vector[]
+                }
+            }
+        },
+        
+        BetType::Line { start_row } => {
+            let line_numbers = get_line_numbers(start_row);
+            let won = vector::contains(&line_numbers, &winning_number);
+            if (won) {
+                BetResult { 
+                    won: true, 
+                    payout: amount + (amount * 5),
+                    description: string::utf8(b"Line Win"),
+                    winning_numbers: line_numbers
+                }
+            } else {
+                BetResult { 
+                    won: false, 
+                    payout: 0,
+                    description: string::utf8(b"Line Loss"),
+                    winning_numbers: vector[]
                 }
             }
         }
     }
+}
 
     //
     // Entry Functions - Modern Clean Interface
