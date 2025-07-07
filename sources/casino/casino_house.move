@@ -140,6 +140,28 @@ module casino::CasinoHouse {
         TowardsGame
     }
 
+    /// Game operational status for enhanced type safety
+    public enum GameStatus has copy, drop, store {
+        /// Game registered but capability not yet claimed
+        Registered,
+        /// Game active and accepting bets
+        Active,
+        /// Game temporarily suspended
+        Suspended,
+        /// Game permanently deactivated
+        Deactivated
+    }
+
+    /// Treasury operation result for pattern matching
+    public enum TreasuryOperationResult has copy, drop, store {
+        /// Operation completed successfully
+        Success { amount: u64, new_balance: u64 },
+        /// Operation failed due to insufficient funds
+        InsufficientFunds { requested: u64, available: u64 },
+        /// Operation rejected due to invalid parameters
+        InvalidOperation { reason: String }
+    }
+
     /// Capability resource proving game authorization (Object-Based)
     struct GameCapability has key, store {
         game_object: Object<GameMetadata>
@@ -639,6 +661,39 @@ module casino::CasinoHouse {
         event::emit(LiquidityInjectedEvent { game_treasury_addr, amount });
     }
 
+    /// Get game treasury status for internal package use
+    package fun get_internal_game_status(
+        game_object: Object<GameMetadata>
+    ): (bool, bool, u64) acquires GameMetadata, TreasuryRegistry {
+        let object_addr = object::object_address(&game_object);
+        let exists = exists<GameMetadata>(object_addr);
+        
+        if (!exists) {
+            return (false, false, 0)
+        };
+        
+        let metadata = borrow_global<GameMetadata>(object_addr);
+        let treasury_registry = borrow_global<TreasuryRegistry>(@casino);
+        let has_treasury = treasury_registry.game_treasuries.contains(&game_object);
+        
+        (exists, has_treasury, metadata.max_payout)
+    }
+
+    /// Inline helper for percentage calculations
+    inline fun calculate_percentage(amount: u64, percentage: u64, base: u64): u64 {
+        (amount * percentage) / base
+    }
+
+    /// Calculate threshold using inline function
+    public fun calculate_overflow_threshold(target_reserve: u64): u64 {
+        calculate_percentage(target_reserve, OVERFLOW_MULTIPLIER, PERCENTAGE_BASE)
+    }
+
+    /// Calculate drain threshold using inline function  
+    public fun calculate_drain_threshold(target_reserve: u64): u64 {
+        calculate_percentage(target_reserve, DRAIN_MULTIPLIER, PERCENTAGE_BASE)
+    }
+
     /// FIXED: Withdraw excess from game treasury to central using resource account signer
     package fun withdraw_excess(
         game_treasury_addr: address, amount: u64
@@ -797,9 +852,9 @@ module casino::CasinoHouse {
         let i = 0;
         let len = vector::length(&game_addrs);
         while (i < len) {
-            let game_addr = *vector::borrow(&game_addrs, i);
+            let game_addr = game_addrs[i];
             let balance = primary_fungible_store::balance(game_addr, aptos_metadata);
-            total = total + balance;
+            total += balance;
             i = i + 1;
         };
         total
@@ -864,6 +919,102 @@ module casino::CasinoHouse {
         object::create_object_address(&creator, seed)
     }
 
+    /// Get game status using new Move 2 enum
+    public fun get_game_status(game_object: Object<GameMetadata>): GameStatus acquires GameMetadata {
+        let object_addr = object::object_address(&game_object);
+        if (!exists<GameMetadata>(object_addr)) {
+            return GameStatus::Deactivated
+        };
+        
+        let metadata = borrow_global<GameMetadata>(object_addr);
+        if (!metadata.capability_claimed) {
+            GameStatus::Registered
+        } else {
+            GameStatus::Active
+        }
+    }
+
+    /// Validate treasury operation using Move 2 enum results
+    public fun validate_treasury_operation(
+        game_object: Object<GameMetadata>,
+        requested_amount: u64
+    ): TreasuryOperationResult acquires TreasuryRegistry {
+        let treasury_registry = borrow_global<TreasuryRegistry>(@casino);
+        
+        if (!treasury_registry.game_treasuries.contains(&game_object)) {
+            return TreasuryOperationResult::InvalidOperation { 
+                reason: std::string::utf8(b"Game treasury not found") 
+            }
+        };
+        
+        let game_treasury_addr = *treasury_registry.game_treasuries.borrow(&game_object);
+        let available_balance = primary_fungible_store::balance(game_treasury_addr, get_aptos_metadata());
+        
+        if (available_balance >= requested_amount) {
+            TreasuryOperationResult::Success { 
+                amount: requested_amount, 
+                new_balance: available_balance - requested_amount 
+            }
+        } else {
+            TreasuryOperationResult::InsufficientFunds { 
+                requested: requested_amount, 
+                available: available_balance 
+            }
+        }
+    }
+
+    /// Create success result for treasury operations
+    public fun create_success_result(amount: u64, new_balance: u64): TreasuryOperationResult {
+        TreasuryOperationResult::Success { amount, new_balance }
+    }
+
+    /// Create insufficient funds result
+    public fun create_insufficient_funds_result(requested: u64, available: u64): TreasuryOperationResult {
+        TreasuryOperationResult::InsufficientFunds { requested, available }
+    }
+
+    /// Create invalid operation result
+    public fun create_invalid_operation_result(reason: std::string::String): TreasuryOperationResult {
+        TreasuryOperationResult::InvalidOperation { reason }
+    }
+
+    /// Handle treasury operation result with Move 2 pattern matching
+    public fun handle_treasury_result(result: TreasuryOperationResult): bool {
+        match (result) {
+            TreasuryOperationResult::Success { amount: _, new_balance: _ } => {
+                true
+            },
+            TreasuryOperationResult::InsufficientFunds { requested: _, available: _ } => {
+                false
+            },
+            TreasuryOperationResult::InvalidOperation { reason: _ } => {
+                false
+            }
+        }
+    }
+
+    /// Check if game is in active status using Move 2 variant testing
+    public fun is_game_active(game_object: Object<GameMetadata>): bool acquires GameMetadata {
+        let status = get_game_status(game_object);
+        status is GameStatus::Active
+    }
+
+    /// Check if treasury operation was successful using variant testing
+    public fun is_operation_successful(result: &TreasuryOperationResult): bool {
+        result is TreasuryOperationResult::Success
+    }
+
+    /// Calculate percentage with Move 2 enhanced cast syntax
+    public fun calculate_house_edge_percentage(house_edge_bps: u64): u64 {
+        let percentage = house_edge_bps * 100 / 10000;
+        percentage as u64
+    }
+
+    /// Convert balance to smaller denomination using enhanced casts
+    public fun balance_to_micro_apt(balance: u64): u128 {
+        (balance as u128) * (1_000_000 as u128)
+    }
+
     //
     // View Interface
     //
@@ -909,11 +1060,11 @@ module casino::CasinoHouse {
         let i = 0;
         let len = vector::length(&game_addrs);
         while (i < len) {
-            let game_addr = *vector::borrow(&game_addrs, i);
+            let game_addr = game_addrs[i];
             let game_balance = primary_fungible_store::balance(
                 game_addr, aptos_metadata
             );
-            game_total = game_total + game_balance;
+            game_total += game_balance;
             i = i + 1;
         };
 
