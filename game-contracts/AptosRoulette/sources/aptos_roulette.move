@@ -1,152 +1,127 @@
 //! MIT License
 //!
-//! European Roulette Game for ChainCasino Platform
+//! AptosRoulette Game Module
 //!
-//! Complete European roulette with all standard bet types using
-//! multi-bet support, and advanced betting functionality.
+//! European roulette with comprehensive betting options and casino integration.
 
 module roulette_game::AptosRoulette {
+    use std::string::{Self, String};
+    use std::signer;
+    use std::vector;
+    use std::option;
+    use aptos_framework::object::{Self, Object};
+    use aptos_framework::account;
+    use aptos_framework::coin;
+    use aptos_framework::primary_fungible_store;
     use aptos_framework::randomness;
     use aptos_framework::event;
-    use aptos_framework::object::{Self, Object, ExtendRef};
-    use aptos_framework::timestamp;
-    use std::signer;
-    use std::option;
-    use std::string::{Self, String};
-    use std::vector;
-    use aptos_framework::primary_fungible_store;
-    use aptos_framework::coin;
-    use casino::CasinoHouse;
-    use casino::CasinoHouse::GameCapability;
-    use aptos_framework::account;
+    use casino::CasinoHouse::{Self, GameCapability};
 
     //
     // Error Codes
     //
 
-    /// Invalid number (must be 0-36 for European roulette)
-    const E_INVALID_NUMBER: u64 = 0x01;
+    /// Game not initialized
+    const E_NOT_INITIALIZED: u64 = 0;
+    /// Already initialized
+    const E_ALREADY_INITIALIZED: u64 = 1;
+    /// Unauthorized access
+    const E_UNAUTHORIZED: u64 = 2;
+    /// Game not registered with casino
+    const E_GAME_NOT_REGISTERED: u64 = 3;
     /// Invalid bet amount
-    const E_INVALID_AMOUNT: u64 = 0x02;
-    /// Unauthorized initialization
-    const E_UNAUTHORIZED: u64 = 0x03;
-    /// Game not registered by casino yet
-    const E_GAME_NOT_REGISTERED: u64 = 0x04;
-    /// Game already initialized
-    const E_ALREADY_INITIALIZED: u64 = 0x05;
+    const E_INVALID_AMOUNT: u64 = 4;
+    /// Invalid roulette number (must be 0-36)
+    const E_INVALID_NUMBER: u64 = 5;
     /// Invalid bet type
-    const E_INVALID_BET_TYPE: u64 = 0x06;
-    /// Invalid dozen (must be 1, 2, or 3)
-    const E_INVALID_DOZEN: u64 = 0x07;
-    /// Invalid column (must be 1, 2, or 3)
-    const E_INVALID_COLUMN: u64 = 0x08;
-    /// Mismatched bet arrays length
-    const E_MISMATCHED_BET_ARRAYS: u64 = 0x09;
+    const E_INVALID_BET_TYPE: u64 = 6;
+    /// Invalid dozen (must be 1-3)
+    const E_INVALID_DOZEN: u64 = 7;
+    /// Invalid column (must be 1-3)
+    const E_INVALID_COLUMN: u64 = 8;
+    /// Mismatched bet arrays
+    const E_MISMATCHED_BET_ARRAYS: u64 = 9;
     /// Too many bets in single transaction
-    const E_TOO_MANY_BETS: u64 = 0x0A;
-    /// Invalid split bet combination
-    const E_INVALID_SPLIT: u64 = 0x0B;
+    const E_TOO_MANY_BETS: u64 = 10;
+    /// Invalid split bet
+    const E_INVALID_SPLIT: u64 = 11;
     /// Invalid street bet
-    const E_INVALID_STREET: u64 = 0x0C;
+    const E_INVALID_STREET: u64 = 12;
     /// Invalid corner bet
-    const E_INVALID_CORNER: u64 = 0x0D;
+    const E_INVALID_CORNER: u64 = 13;
     /// Invalid line bet
-    const E_INVALID_LINE: u64 = 0x0E;
+    const E_INVALID_LINE: u64 = 14;
 
     //
     // Constants
     //
 
-    /// European roulette numbers (0-36)
-    const MAX_ROULETTE_NUMBER: u8 = 36;
+    /// Game version
+    const GAME_VERSION: vector<u8> = b"v1";
+    /// Minimum bet amount (0.01 APT)
+    const MIN_BET: u64 = 1000000;
+    /// Maximum bet amount (0.3 APT)
+    const MAX_BET: u64 = 30000000;
     /// Maximum bets per transaction
     const MAX_BETS_PER_TRANSACTION: u64 = 10;
-    
-    // Payout Multipliers
-    /// Single number payout multiplier (35:1)
-    const SINGLE_NUMBER_PAYOUT: u64 = 35;
-    /// Red/Black, Even/Odd, High/Low payout (1:1)
-    const EVEN_MONEY_PAYOUT: u64 = 1;
-    /// Dozens and Columns payout (2:1)
-    const DOZEN_COLUMN_PAYOUT: u64 = 2;
-    /// Split bet payout (17:1)
-    const SPLIT_PAYOUT: u64 = 17;
-    /// Street bet payout (11:1)
-    const STREET_PAYOUT: u64 = 11;
-    /// Corner bet payout (8:1)
-    const CORNER_PAYOUT: u64 = 8;
-    /// Line bet payout (5:1)
-    const LINE_PAYOUT: u64 = 5;
 
-    /// Minimum bet amount (0.01 APT in octas)
-    const MIN_BET: u64 = 1000000;
-    /// Maximum bet amount (0.3 APT in octas) - conservative for 35:1 payout
-    const MAX_BET: u64 = 30000000;
-    /// House edge in basis points (270 = 2.70% for European roulette)
-    const HOUSE_EDGE_BPS: u64 = 270;
-    /// Game version for object naming
-    const GAME_VERSION: vector<u8> = b"v1";
+    // Bet type constants
+    const BET_TYPE_NUMBER: u8 = 0;
+    const BET_TYPE_SPLIT: u8 = 1;
+    const BET_TYPE_STREET: u8 = 2;
+    const BET_TYPE_CORNER: u8 = 3;
+    const BET_TYPE_RED_BLACK: u8 = 4;
+    const BET_TYPE_EVEN_ODD: u8 = 5;
+    const BET_TYPE_HIGH_LOW: u8 = 6;
+    const BET_TYPE_DOZEN: u8 = 7;
+    const BET_TYPE_COLUMN: u8 = 8;
+    const BET_TYPE_LINE: u8 = 9;
 
-    // Red Numbers in European Roulette
-    /// Red numbers: 1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36
-    const RED_NUMBERS: vector<u8> = vector[
-        1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36
-    ];
+    // Payout multipliers
+    const PAYOUT_SINGLE: u64 = 35; // 35:1
+    const PAYOUT_SPLIT: u64 = 17; // 17:1
+    const PAYOUT_STREET: u64 = 11; // 11:1
+    const PAYOUT_CORNER: u64 = 8; // 8:1
+    const PAYOUT_LINE: u64 = 5; // 5:1
+    const PAYOUT_EVEN_MONEY: u64 = 1; // 1:1 (red/black, even/odd, high/low)
+    const PAYOUT_DOZEN_COLUMN: u64 = 2; // 2:1 (dozens, columns)
 
     //
-    // Enums (Type-Safe Bet Types)
+    // Structs
     //
 
-    /// All possible bet types in European roulette
-    public enum BetType has copy, drop, store {
-        /// Single number bet (0-36), 35:1 payout
-        SingleNumber { number: u8 },
-        /// Bet on red numbers, 1:1 payout
-        Red,
-        /// Bet on black numbers, 1:1 payout
-        Black,
-        /// Bet on even numbers, 1:1 payout
-        Even,
-        /// Bet on odd numbers, 1:1 payout
-        Odd,
-        /// Bet on high numbers (19-36), 1:1 payout
-        High,
-        /// Bet on low numbers (1-18), 1:1 payout
-        Low,
-        /// Bet on first dozen (1-12), 2:1 payout
-        FirstDozen,
-        /// Bet on second dozen (13-24), 2:1 payout
-        SecondDozen,
-        /// Bet on third dozen (25-36), 2:1 payout
-        ThirdDozen,
-        /// Bet on first column, 2:1 payout
-        FirstColumn,
-        /// Bet on second column, 2:1 payout
-        SecondColumn,
-        /// Bet on third column, 2:1 payout
-        ThirdColumn,
-        /// Split bet on two adjacent numbers, 17:1 payout
-        Split { num1: u8, num2: u8 },
-        /// Street bet on three numbers in a row, 11:1 payout
-        Street { start_num: u8 },
-        /// Corner bet on four numbers in a square, 8:1 payout
-        Corner { top_left: u8 },
-        /// Line bet on six numbers in two rows, 5:1 payout
-        Line { start_num: u8 }
+    /// Session identifier following BetId pattern
+    struct SessionId has copy, drop, store {
+        player: address,
+        sequence: u64
     }
 
-    //
-    // Resources
-    //
-
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// Stores the game's authorization capability in named object
-    struct GameAuth has key {
-        capability: GameCapability,
-        extend_ref: ExtendRef
+    /// Individual bet result
+    struct BetResult has copy, drop, store {
+        bet_type: u8,
+        bet_value: u8,
+        amount: u64,
+        payout: u64,
+        won: bool
     }
 
-    /// Registry tracking the creator and object address for this game
+    /// Complete roulette spin result stored at player address
+    struct SpinResult has key {
+        winning_number: u8,
+        winning_color: String,
+        is_even: bool,
+        is_high: bool,
+        dozen: u8,
+        column: u8,
+        all_bets: vector<BetResult>,
+        total_wagered: u64,
+        total_payout: u64,
+        winning_bets: u8,
+        session_id: SessionId,
+        net_result: bool
+    }
+
+    /// Game registry storing game metadata
     struct GameRegistry has key {
         creator: address,
         game_object: Object<CasinoHouse::GameMetadata>,
@@ -154,39 +129,10 @@ module roulette_game::AptosRoulette {
         version: String
     }
 
-    /// Individual bet details for tracking multiple bets
-    struct BetDetails has drop, store {
-        bet_type: BetType,
-        amount: u64,
-        payout: u64,
-        won: bool
-    }
-
-    /// Enhanced user's latest spin result with comprehensive bet tracking
-    struct SpinResult has key {
-        /// The number that won (0-36)
-        winning_number: u8,
-        /// Color of winning number
-        winning_color: String,  // "red", "black", "green"
-        /// Properties of winning number
-        is_even: bool,
-        is_high: bool,         // 19-36 vs 1-18
-        dozen: u8,             // 1, 2, or 3 (0 for number 0)
-        column: u8,            // 1, 2, or 3 (0 for number 0)
-        /// All bets placed in this spin
-        all_bets: vector<BetDetails>,
-        /// Total amount wagered across all bets
-        total_wagered: u64,
-        /// Total payout received across all bets
-        total_payout: u64,
-        /// Number of winning bets
-        winning_bets: u8,
-        /// When the spin occurred
-        timestamp: u64,
-        /// Session identifier for frontend
-        session_id: u64,
-        /// Overall win/loss for this spin
-        net_result: bool  // true if total_payout > total_wagered
+    /// Game authentication storing capability
+    struct GameAuth has key {
+        capability: GameCapability,
+        extend_ref: object::ExtendRef
     }
 
     //
@@ -194,7 +140,18 @@ module roulette_game::AptosRoulette {
     //
 
     #[event]
-    /// Event emitted when roulette is spun with multiple bets
+    /// Emitted for each individual bet result
+    struct BetResultEvent has drop, store {
+        player: address,
+        bet_type_description: String,
+        amount: u64,
+        payout: u64,
+        won: bool,
+        sequence: u64
+    }
+
+    #[event]
+    /// Emitted for complete roulette spin
     struct RouletteSpinEvent has drop, store {
         player: address,
         winning_number: u8,
@@ -203,293 +160,147 @@ module roulette_game::AptosRoulette {
         total_payout: u64,
         winning_bets: u8,
         total_bets: u8,
-        treasury_used: address,  // Changed from u8 to address
-        session_id: u64
-    }
-
-    #[event]
-    /// Event for individual bet results (for analytics)
-    struct BetResultEvent has drop, store {
-        player: address,
-        bet_type_description: String,
-        amount: u64,
-        payout: u64,
-        won: bool,
-        session_id: u64
-    }
-
-    //
-    // Enum Helper Functions
-    //
-
-    /// Convert primitive u8 to BetType enum (internal conversion from entry functions)
-    fun u8_to_bet_type(bet_type_u8: u8, bet_value: u8, bet_numbers: &vector<u8>): BetType {
-        if (bet_type_u8 == 0) {
-            BetType::SingleNumber { number: bet_value }
-        } else if (bet_type_u8 == 1) {
-            BetType::Red
-        } else if (bet_type_u8 == 2) {
-            BetType::Black
-        } else if (bet_type_u8 == 3) {
-            BetType::Even
-        } else if (bet_type_u8 == 4) {
-            BetType::Odd
-        } else if (bet_type_u8 == 5) {
-            BetType::High
-        } else if (bet_type_u8 == 6) {
-            BetType::Low
-        } else if (bet_type_u8 == 7) {
-            BetType::FirstDozen
-        } else if (bet_type_u8 == 8) {
-            BetType::SecondDozen
-        } else if (bet_type_u8 == 9) {
-            BetType::ThirdDozen
-        } else if (bet_type_u8 == 10) {
-            BetType::FirstColumn
-        } else if (bet_type_u8 == 11) {
-            BetType::SecondColumn
-        } else if (bet_type_u8 == 12) {
-            BetType::ThirdColumn
-        } else if (bet_type_u8 == 13) {
-            let num1 = *vector::borrow(bet_numbers, 0);
-            let num2 = *vector::borrow(bet_numbers, 1);
-            BetType::Split { num1, num2 }
-        } else if (bet_type_u8 == 14) {
-            BetType::Street { start_num: bet_value }
-        } else if (bet_type_u8 == 15) {
-            BetType::Corner { top_left: bet_value }
-        } else if (bet_type_u8 == 16) {
-            BetType::Line { start_num: bet_value }
-        } else {
-            abort E_INVALID_BET_TYPE
-        }
-    }
-
-    /// Get descriptive string for bet type (for events and frontend)
-    fun bet_type_to_string(bet_type: &BetType): String {
-        match (bet_type) {
-            BetType::SingleNumber { number } => {
-                if (*number == 0) {
-                    string::utf8(b"Single Number: 0")
-                } else if (*number < 10) {
-                    string::utf8(b"Single Number: 1-9")  // Simplified for now
-                } else {
-                    string::utf8(b"Single Number: 10+")  // Simplified for now
-                }
-            },
-            BetType::Red => string::utf8(b"Red"),
-            BetType::Black => string::utf8(b"Black"),
-            BetType::Even => string::utf8(b"Even"),
-            BetType::Odd => string::utf8(b"Odd"),
-            BetType::High => string::utf8(b"High (19-36)"),
-            BetType::Low => string::utf8(b"Low (1-18)"),
-            BetType::FirstDozen => string::utf8(b"First Dozen (1-12)"),
-            BetType::SecondDozen => string::utf8(b"Second Dozen (13-24)"),
-            BetType::ThirdDozen => string::utf8(b"Third Dozen (25-36)"),
-            BetType::FirstColumn => string::utf8(b"First Column"),
-            BetType::SecondColumn => string::utf8(b"Second Column"),
-            BetType::ThirdColumn => string::utf8(b"Third Column"),
-            BetType::Split { num1: _, num2: _ } => {
-                string::utf8(b"Split Bet")  // Simplified
-            },
-            BetType::Street { start_num: _ } => {
-                string::utf8(b"Street Bet")  // Simplified
-            },
-            BetType::Corner { top_left: _ } => {
-                string::utf8(b"Corner Bet")  // Simplified
-            },
-            BetType::Line { start_num: _ } => {
-                string::utf8(b"Line Bet")  // Simplified
-            }
-        }
+        treasury_used: address,
+        sequence: u64
     }
 
     //
     // Helper Functions
     //
 
-    /// Check if a number is red
-    public fun is_red(number: u8): bool {
-        if (number == 0) return false;
-        vector::contains(&RED_NUMBERS, &number)
+    /// Generate unique session ID following BetId pattern
+    fun generate_session_id(player_addr: address): SessionId {
+        SessionId {
+            player: player_addr,
+            sequence: account::get_sequence_number(player_addr)
+        }
     }
 
-    /// Check if a number is black
-    public fun is_black(number: u8): bool {
-        if (number == 0) return false;
-        !is_red(number)
+    /// Build seed for game object creation
+    fun build_game_seed(): vector<u8> {
+        let seed = b"AptosRoulette";
+        vector::append(&mut seed, GAME_VERSION);
+        seed
     }
 
-    /// Check if a number is even (0 is neither even nor odd for betting)
-    public fun is_even(number: u8): bool {
-        if (number == 0) return false;
-        number % 2 == 0
+    /// Check if number is red
+    fun is_red_number(num: u8): bool {
+        if (num == 0) { false }
+        else if (num <= 10) {
+            num % 2 == 1
+        } else if (num <= 18) {
+            num % 2 == 0
+        } else if (num <= 28) {
+            num % 2 == 1
+        } else {
+            num % 2 == 0
+        }
     }
 
-    /// Check if a number is odd
-    public fun is_odd(number: u8): bool {
-        if (number == 0) return false;
-        number % 2 == 1
+    /// Get dozen for number (1-3, 0 for zero)
+    fun get_dozen_for_number(num: u8): u8 {
+        if (num == 0) { 0 }
+        else if (num <= 12) { 1 }
+        else if (num <= 24) { 2 }
+        else { 3 }
     }
 
-    /// Check if a number is high (19-36)
-    public fun is_high(number: u8): bool {
-        number >= 19 && number <= 36
+    /// Get column for number (1-3, 0 for zero)
+    fun get_column_for_number(num: u8): u8 {
+        if (num == 0) { 0 }
+        else {
+            ((num - 1) % 3) + 1
+        }
     }
 
-    /// Check if a number is low (1-18)
-    public fun is_low(number: u8): bool {
-        number >= 1 && number <= 18
-    }
-
-    /// Get dozen for a number (1-12 = 1, 13-24 = 2, 25-36 = 3, 0 = 0)
-    public fun get_dozen(number: u8): u8 {
-        if (number == 0) return 0;
-        if (number <= 12) return 1;
-        if (number <= 24) return 2;
-        3
-    }
-
-    /// Get column for a number (1,4,7... = 1, 2,5,8... = 2, 3,6,9... = 3, 0 = 0)
-    public fun get_column(number: u8): u8 {
-        if (number == 0) return 0;
-        ((number - 1) % 3) + 1
-    }
-
-    /// Get color string for a number
-    public fun get_color_string(number: u8): String {
-        if (number == 0) return string::utf8(b"green");
-        if (is_red(number)) return string::utf8(b"red");
-        string::utf8(b"black")
-    }
-
-    /// Validate split bet (two adjacent numbers)
+    /// Validate split bet (adjacent numbers)
     fun is_valid_split(num1: u8, num2: u8): bool {
-        if (num1 > MAX_ROULETTE_NUMBER || num2 > MAX_ROULETTE_NUMBER) return false;
-        if (num1 == num2) return false;
-        
-        // Horizontal adjacency (same row)
-        if ((num1 != 0 && num2 != 0) && (num1 / 3 == num2 / 3) && 
-            ((num1 + 1 == num2) || (num2 + 1 == num1))) return true;
-        
-        // Vertical adjacency (same column)
-        if ((num1 != 0 && num2 != 0) && ((num1 + 3 == num2) || (num2 + 3 == num1))) return true;
-        
-        // Special case: 0 can split with 1, 2, 3
-        if ((num1 == 0 && (num2 == 1 || num2 == 2 || num2 == 3)) || 
-            (num2 == 0 && (num1 == 1 || num1 == 2 || num1 == 3))) return true;
-        
+        if (num1 > 36 || num2 > 36) {
+            return false
+        };
+        if (num1 == num2) {
+            return false
+        };
+
+        // 0 can split with 1, 2, 3
+        if (num1 == 0) {
+            return num2 == 1 || num2 == 2 || num2 == 3
+        };
+        if (num2 == 0) {
+            return num1 == 1 || num1 == 2 || num1 == 3
+        };
+
+        let diff = if (num1 > num2) {
+            num1 - num2
+        } else {
+            num2 - num1
+        };
+
+        // Horizontal split (adjacent in same row)
+        if (diff == 1) {
+            let row1 = (num1 - 1) / 3;
+            let row2 = (num2 - 1) / 3;
+            return row1 == row2;
+        };
+
+        // Vertical split (adjacent in same column)
+        if (diff == 3) {
+            return true
+        };
+
         false
     }
 
-    /// Validate street bet (three numbers in a row)
-    fun is_valid_street(start_num: u8): bool {
-        if (start_num == 0 || start_num > 34) return false;
-        (start_num - 1) % 3 == 0  // Must be 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34
-    }
-
-    /// Validate corner bet (four numbers in a square)
-    fun is_valid_corner(top_left: u8): bool {
-        if (top_left == 0 || top_left > 32) return false;
-        let _row = (top_left - 1) / 3;
-        let col = (top_left - 1) % 3;
-        col < 2  // Can't be rightmost column
-    }
-
-    /// Validate line bet (six numbers in two rows)
-    fun is_valid_line(start_num: u8): bool {
-        if (start_num == 0 || start_num > 31) return false;
-        (start_num - 1) % 3 == 0  // Must be 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31
-    }
-
-    /// Calculate payout for a specific bet type and amount using enums
-    fun calculate_bet_payout(bet_type: &BetType, amount: u64, winning_number: u8): u64 {
-        let won = is_winning_bet(bet_type, winning_number);
-        if (!won) return 0;
-
-        match (bet_type) {
-            BetType::SingleNumber { number: _ } => amount * SINGLE_NUMBER_PAYOUT,
-            BetType::Red => amount * EVEN_MONEY_PAYOUT,
-            BetType::Black => amount * EVEN_MONEY_PAYOUT,
-            BetType::Even => amount * EVEN_MONEY_PAYOUT,
-            BetType::Odd => amount * EVEN_MONEY_PAYOUT,
-            BetType::High => amount * EVEN_MONEY_PAYOUT,
-            BetType::Low => amount * EVEN_MONEY_PAYOUT,
-            BetType::FirstDozen => amount * DOZEN_COLUMN_PAYOUT,
-            BetType::SecondDozen => amount * DOZEN_COLUMN_PAYOUT,
-            BetType::ThirdDozen => amount * DOZEN_COLUMN_PAYOUT,
-            BetType::FirstColumn => amount * DOZEN_COLUMN_PAYOUT,
-            BetType::SecondColumn => amount * DOZEN_COLUMN_PAYOUT,
-            BetType::ThirdColumn => amount * DOZEN_COLUMN_PAYOUT,
-            BetType::Split { num1: _, num2: _ } => amount * SPLIT_PAYOUT,
-            BetType::Street { start_num: _ } => amount * STREET_PAYOUT,
-            BetType::Corner { top_left: _ } => amount * CORNER_PAYOUT,
-            BetType::Line { start_num: _ } => amount * LINE_PAYOUT
-        }
-    }
-
-    /// Check if a bet wins for the given winning number using enums
-    fun is_winning_bet(bet_type: &BetType, winning_number: u8): bool {
-        match (bet_type) {
-            BetType::SingleNumber { number } => winning_number == *number,
-            BetType::Red => is_red(winning_number),
-            BetType::Black => is_black(winning_number),
-            BetType::Even => is_even(winning_number),
-            BetType::Odd => is_odd(winning_number),
-            BetType::High => is_high(winning_number),
-            BetType::Low => is_low(winning_number),
-            BetType::FirstDozen => get_dozen(winning_number) == 1,
-            BetType::SecondDozen => get_dozen(winning_number) == 2,
-            BetType::ThirdDozen => get_dozen(winning_number) == 3,
-            BetType::FirstColumn => get_column(winning_number) == 1,
-            BetType::SecondColumn => get_column(winning_number) == 2,
-            BetType::ThirdColumn => get_column(winning_number) == 3,
-            BetType::Split { num1, num2 } => winning_number == *num1 || winning_number == *num2,
-            BetType::Street { start_num } => {
-                winning_number >= *start_num && winning_number <= *start_num + 2
-            },
-            BetType::Corner { top_left } => {
-                let tl = *top_left;
-                winning_number == tl || winning_number == tl + 1 || 
-                winning_number == tl + 3 || winning_number == tl + 4
-            },
-            BetType::Line { start_num } => {
-                winning_number >= *start_num && winning_number <= *start_num + 5
-            }
+    /// Convert bet type to string for events
+    fun bet_type_to_string(bet_type: u8): String {
+        if (bet_type == BET_TYPE_NUMBER) {
+            string::utf8(b"Number")
+        } else if (bet_type == BET_TYPE_SPLIT) {
+            string::utf8(b"Split")
+        } else if (bet_type == BET_TYPE_STREET) {
+            string::utf8(b"Street")
+        } else if (bet_type == BET_TYPE_CORNER) {
+            string::utf8(b"Corner")
+        } else if (bet_type == BET_TYPE_RED_BLACK) {
+            string::utf8(b"Red/Black")
+        } else if (bet_type == BET_TYPE_EVEN_ODD) {
+            string::utf8(b"Even/Odd")
+        } else if (bet_type == BET_TYPE_HIGH_LOW) {
+            string::utf8(b"High/Low")
+        } else if (bet_type == BET_TYPE_DOZEN) {
+            string::utf8(b"Dozen")
+        } else if (bet_type == BET_TYPE_COLUMN) {
+            string::utf8(b"Column")
+        } else if (bet_type == BET_TYPE_LINE) {
+            string::utf8(b"Line")
+        } else {
+            string::utf8(b"Unknown")
         }
     }
 
     //
-    // Game Initialization
+    // Initialization
     //
 
-    /// Initialize game after registration with casino
+    /// Initialize roulette game with casino registration
     public entry fun initialize_game(deployer: &signer) {
         let deployer_addr = signer::address_of(deployer);
         assert!(deployer_addr == @roulette_game, E_UNAUTHORIZED);
         assert!(!exists<GameRegistry>(deployer_addr), E_ALREADY_INITIALIZED);
 
-        // Get game object from casino registration - CASINO is always the creator
+        // Get game object from casino registration
         let game_name = string::utf8(b"AptosRoulette");
         let version = string::utf8(GAME_VERSION);
-        let game_object_addr = CasinoHouse::derive_game_object_address(
-            @casino,      // ✅ Casino creates the object, not @roulette_game
-            game_name, 
-            version
-        );
-        let game_object: Object<CasinoHouse::GameMetadata> = 
+        let game_object_addr =
+            CasinoHouse::derive_game_object_address(@casino, game_name, version);
+        let game_object: Object<CasinoHouse::GameMetadata> =
             object::address_to_object(game_object_addr);
         assert!(CasinoHouse::is_game_registered(game_object), E_GAME_NOT_REGISTERED);
 
         // Create named object for storing capability
         let seed = build_game_seed();
         let constructor_ref = object::create_named_object(deployer, seed);
-        let _object_addr = object::address_from_constructor_ref(&constructor_ref);
-
-        // Get extend ref before moving constructor_ref
         let extend_ref = object::generate_extend_ref(&constructor_ref);
-
-        // Disable transfer for security
         let transfer_ref = object::generate_transfer_ref(&constructor_ref);
         object::disable_ungated_transfer(&transfer_ref);
 
@@ -497,10 +308,7 @@ module roulette_game::AptosRoulette {
         let capability = CasinoHouse::get_game_capability(deployer, game_object);
 
         // Store capability in object
-        let game_auth = GameAuth {
-            capability,
-            extend_ref
-        };
+        let game_auth = GameAuth { capability, extend_ref };
         move_to(&object::generate_signer(&constructor_ref), game_auth);
 
         // Store registry information
@@ -513,14 +321,18 @@ module roulette_game::AptosRoulette {
         move_to(deployer, registry);
     }
 
+    //
+    // Core Game Logic
+    //
+
     #[randomness]
     entry fun place_multi_bet(
         player: &signer,
-        bet_types_u8: vector<u8>,           // Primitives for entry function
+        bet_types_u8: vector<u8>,
         bet_values: vector<u8>,
         bet_numbers_list: vector<vector<u8>>,
         amounts: vector<u64>
-    ) acquires GameAuth, SpinResult {
+    ) acquires GameAuth, SpinResult, GameRegistry {
         let num_bets = vector::length(&bet_types_u8);
         assert!(num_bets > 0, E_INVALID_AMOUNT);
         assert!(num_bets <= MAX_BETS_PER_TRANSACTION, E_TOO_MANY_BETS);
@@ -530,26 +342,7 @@ module roulette_game::AptosRoulette {
 
         let player_addr = signer::address_of(player);
 
-        // Convert primitives to enum bet types and validate
-        let bet_types = vector::empty<BetType>();
-        let total_amount = 0;
-        let i = 0;
-        while (i < num_bets) {
-            let bet_type_u8 = *vector::borrow(&bet_types_u8, i);
-            let bet_value = *vector::borrow(&bet_values, i);
-            let bet_numbers = vector::borrow(&bet_numbers_list, i);
-            let amount = *vector::borrow(&amounts, i);
-
-            // Convert to enum (internal type safety)
-            let bet_type = u8_to_bet_type(bet_type_u8, bet_value, bet_numbers);
-            validate_bet(&bet_type, amount);
-            vector::push_back(&mut bet_types, bet_type);
-            
-            total_amount = total_amount + amount;
-            i = i + 1;
-        };
-
-        // Auto-cleanup previous result
+        // Auto-cleanup: Remove previous result
         if (exists<SpinResult>(player_addr)) {
             let old_result = move_from<SpinResult>(player_addr);
             let SpinResult {
@@ -563,71 +356,93 @@ module roulette_game::AptosRoulette {
                 total_wagered: _,
                 total_payout: _,
                 winning_bets: _,
-                timestamp: _,
                 session_id: _,
                 net_result: _
             } = old_result;
         };
 
-        // Withdraw total bet amount
-        let aptos_metadata_option = coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
-        let aptos_metadata = option::extract(&mut aptos_metadata_option);
-        let total_bet_fa = primary_fungible_store::withdraw(player, aptos_metadata, total_amount);
+        // Validate all bets and calculate total
+        let total_amount = 0u64;
+        let i = 0;
+        while (i < num_bets) {
+            let amount = *vector::borrow(&amounts, i);
+            assert!(amount >= MIN_BET, E_INVALID_AMOUNT);
+            assert!(amount <= MAX_BET, E_INVALID_AMOUNT);
+            total_amount = total_amount + amount;
+            i = i + 1;
+        };
 
-        // Get capability
+        // Get fungible asset metadata
+        let aptos_metadata_option =
+            coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
+        let aptos_metadata = option::extract(&mut aptos_metadata_option);
+
+        // Withdraw total bet amount
+        let bet_fa = primary_fungible_store::withdraw(
+            player, aptos_metadata, total_amount
+        );
+
+        // Get capability from object
         let object_addr = get_game_object_address();
         let game_auth = borrow_global<GameAuth>(object_addr);
         let capability = &game_auth.capability;
 
-        // Place consolidated bet with casino
-        let (treasury_source, bet_id) = CasinoHouse::place_bet(
-            capability, 
-            total_bet_fa, 
-            player_addr
-        );
+        // Casino creates bet ID
+        let (treasury_source, bet_id) =
+            CasinoHouse::place_bet(capability, bet_fa, player_addr);
 
-        // Spin the wheel
-        let winning_number = randomness::u8_range(0, 37); // 0 to 36 inclusive
+        // Spin the roulette wheel with secure randomness
+        let winning_number = randomness::u8_range(0, 37); // 0-36
 
-        // Calculate properties of winning number
-        let winning_color = get_color_string(winning_number);
-        let is_even_win = is_even(winning_number);
-        let is_high_win = is_high(winning_number);
-        let dozen_win = get_dozen(winning_number);
-        let column_win = get_column(winning_number);
+        // Determine winning properties
+        let winning_color =
+            if (winning_number == 0) {
+                string::utf8(b"green")
+            } else if (is_red_number(winning_number)) {
+                string::utf8(b"red")
+            } else {
+                string::utf8(b"black")
+            };
+
+        let is_even_win = winning_number != 0 && winning_number % 2 == 0;
+        let is_high_win = winning_number >= 19 && winning_number <= 36;
+        let dozen_win = get_dozen_for_number(winning_number);
+        let column_win = get_column_for_number(winning_number);
 
         // Process all bets and calculate payouts
-        let all_bets = vector::empty<BetDetails>();
-        let total_payout = 0;
-        let winning_bets_count = 0;
+        let all_bets = vector::empty<BetResult>();
+        let total_payout = 0u64;
+        let winning_bets_count = 0u8;
+        let sequence = account::get_sequence_number(player_addr);
 
         i = 0;
         while (i < num_bets) {
-            let bet_type = vector::borrow(&bet_types, i);
+            let bet_type = *vector::borrow(&bet_types_u8, i);
+            let bet_value = *vector::borrow(&bet_values, i);
             let amount = *vector::borrow(&amounts, i);
 
-            let payout = calculate_bet_payout(bet_type, amount, winning_number);
-            let won = payout > 0;
-            if (won) winning_bets_count = winning_bets_count + 1;
-            total_payout = total_payout + payout;
+            let (won, payout) =
+                calculate_bet_payout(bet_type, bet_value, winning_number, amount);
 
-            let bet_detail = BetDetails {
-                bet_type: *bet_type,
-                amount,
-                payout,
-                won
+            if (won) {
+                total_payout = total_payout + payout;
+                winning_bets_count = winning_bets_count + 1;
             };
-            vector::push_back(&mut all_bets, bet_detail);
+
+            let bet_result = BetResult { bet_type, bet_value, amount, payout, won };
+            vector::push_back(&mut all_bets, bet_result);
 
             // Emit individual bet result event
-            event::emit(BetResultEvent {
-                player: player_addr,
-                bet_type_description: bet_type_to_string(bet_type),
-                amount,
-                payout,
-                won,
-                session_id: account::get_sequence_number(player_addr)
-            });
+            event::emit(
+                BetResultEvent {
+                    player: player_addr,
+                    bet_type_description: bet_type_to_string(bet_type),
+                    amount,
+                    payout,
+                    won,
+                    sequence
+                }
+            );
 
             i = i + 1;
         };
@@ -641,11 +456,11 @@ module roulette_game::AptosRoulette {
             treasury_source
         );
 
-        // Store comprehensive result
-        let current_time = timestamp::now_seconds();
-        let session_id = account::get_sequence_number(player_addr);
+        // Generate collision-free session ID
+        let session_id = generate_session_id(player_addr);
         let net_result = total_payout > total_amount;
 
+        // Store comprehensive result
         let spin_result = SpinResult {
             winning_number,
             winning_color,
@@ -657,89 +472,159 @@ module roulette_game::AptosRoulette {
             total_wagered: total_amount,
             total_payout,
             winning_bets: winning_bets_count,
-            timestamp: current_time,
             session_id,
             net_result
         };
         move_to(player, spin_result);
 
         // Emit comprehensive spin event
-        event::emit(RouletteSpinEvent {
-            player: player_addr,
-            winning_number,
-            winning_color,
-            total_wagered: total_amount,
-            total_payout,
-            winning_bets: winning_bets_count,
-            total_bets: (num_bets as u8),
-            treasury_used: treasury_source,  // Now correctly using address type
-            session_id
-        });
+        event::emit(
+            RouletteSpinEvent {
+                player: player_addr,
+                winning_number,
+                winning_color,
+                total_wagered: total_amount,
+                total_payout,
+                winning_bets: winning_bets_count,
+                total_bets: (num_bets as u8),
+                treasury_used: treasury_source,
+                sequence
+            }
+        );
+    }
+
+    /// Calculate payout for individual bet
+    fun calculate_bet_payout(
+        bet_type: u8,
+        bet_value: u8,
+        winning_number: u8,
+        amount: u64
+    ): (bool, u64) {
+        if (bet_type == BET_TYPE_NUMBER) {
+            if (bet_value == winning_number) {
+                (true, amount * PAYOUT_SINGLE)
+            } else {
+                (false, 0)
+            }
+        } else if (bet_type == BET_TYPE_RED_BLACK) {
+            let is_red_bet = bet_value == 1;
+            let is_winning_red = is_red_number(winning_number);
+            if (winning_number != 0 && is_red_bet == is_winning_red) {
+                (true, amount * PAYOUT_EVEN_MONEY)
+            } else {
+                (false, 0)
+            }
+        } else if (bet_type == BET_TYPE_EVEN_ODD) {
+            let is_even_bet = bet_value == 1;
+            if (winning_number != 0 && (winning_number % 2 == 0) == is_even_bet) {
+                (true, amount * PAYOUT_EVEN_MONEY)
+            } else {
+                (false, 0)
+            }
+        } else if (bet_type == BET_TYPE_HIGH_LOW) {
+            let is_high_bet = bet_value == 1;
+            let is_high = winning_number >= 19 && winning_number <= 36;
+            let is_low = winning_number >= 1 && winning_number <= 18;
+            if ((is_high_bet && is_high) || (!is_high_bet && is_low)) {
+                (true, amount * PAYOUT_EVEN_MONEY)
+            } else {
+                (false, 0)
+            }
+        } else if (bet_type == BET_TYPE_DOZEN) {
+            let dozen = get_dozen_for_number(winning_number);
+            if (bet_value == dozen && dozen != 0) {
+                (true, amount * PAYOUT_DOZEN_COLUMN)
+            } else {
+                (false, 0)
+            }
+        } else if (bet_type == BET_TYPE_COLUMN) {
+            let column = get_column_for_number(winning_number);
+            if (bet_value == column && column != 0) {
+                (true, amount * PAYOUT_DOZEN_COLUMN)
+            } else {
+                (false, 0)
+            }
+        } else {
+            (false, 0)
+        }
     }
 
     //
-    // Convenience Entry Functions (Backward Compatible - SECURE: Not callable from other contracts)
+    // Convenience Entry Functions
     //
 
     #[randomness]
-    entry fun spin_roulette(player: &signer, bet_number: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
+    entry fun bet_number(
+        player: &signer, number: u8, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
+        assert!(number <= 36, E_INVALID_NUMBER);
+
         place_multi_bet(
             player,
-            vector[0], // SingleNumber bet type
-            vector[bet_number],
+            vector[BET_TYPE_NUMBER],
+            vector[number],
             vector[vector::empty<u8>()],
             vector[amount]
         );
     }
 
     #[randomness]
-    entry fun bet_red_black(player: &signer, is_red: bool, amount: u64) 
-    acquires GameAuth, SpinResult {
-        let bet_type_u8 = if (is_red) 1 else 2; // Red = 1, Black = 2
+    entry fun bet_red_black(
+        player: &signer, is_red: bool, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
+        let bet_value = if (is_red) { 1 }
+        else { 0 };
+
         place_multi_bet(
             player,
-            vector[bet_type_u8],
-            vector[0], // Value not used for red/black
+            vector[BET_TYPE_RED_BLACK],
+            vector[bet_value],
             vector[vector::empty<u8>()],
             vector[amount]
         );
     }
 
     #[randomness]
-    entry fun bet_even_odd(player: &signer, is_even: bool, amount: u64) 
-    acquires GameAuth, SpinResult {
-        let bet_type_u8 = if (is_even) 3 else 4; // Even = 3, Odd = 4
+    entry fun bet_even_odd(
+        player: &signer, is_even: bool, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
+        let bet_value = if (is_even) { 1 }
+        else { 0 };
+
         place_multi_bet(
             player,
-            vector[bet_type_u8],
-            vector[0],
+            vector[BET_TYPE_EVEN_ODD],
+            vector[bet_value],
             vector[vector::empty<u8>()],
             vector[amount]
         );
     }
 
     #[randomness]
-    entry fun bet_high_low(player: &signer, is_high: bool, amount: u64) 
-    acquires GameAuth, SpinResult {
-        let bet_type_u8 = if (is_high) 5 else 6; // High = 5, Low = 6
+    entry fun bet_high_low(
+        player: &signer, is_high: bool, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
+        let bet_value = if (is_high) { 1 }
+        else { 0 };
+
         place_multi_bet(
             player,
-            vector[bet_type_u8],
-            vector[0],
+            vector[BET_TYPE_HIGH_LOW],
+            vector[bet_value],
             vector[vector::empty<u8>()],
             vector[amount]
         );
     }
 
     #[randomness]
-    entry fun bet_dozen(player: &signer, dozen: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
+    entry fun bet_dozen(
+        player: &signer, dozen: u8, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
         assert!(dozen >= 1 && dozen <= 3, E_INVALID_DOZEN);
-        let bet_type_u8 = 6 + dozen; // FirstDozen = 7, SecondDozen = 8, ThirdDozen = 9
+
         place_multi_bet(
             player,
-            vector[bet_type_u8],
+            vector[BET_TYPE_DOZEN],
             vector[dozen],
             vector[vector::empty<u8>()],
             vector[amount]
@@ -747,258 +632,18 @@ module roulette_game::AptosRoulette {
     }
 
     #[randomness]
-    entry fun bet_column(player: &signer, column: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
+    entry fun bet_column(
+        player: &signer, column: u8, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
         assert!(column >= 1 && column <= 3, E_INVALID_COLUMN);
-        let bet_type_u8 = 9 + column; // FirstColumn = 10, SecondColumn = 11, ThirdColumn = 12
+
         place_multi_bet(
             player,
-            vector[bet_type_u8],
+            vector[BET_TYPE_COLUMN],
             vector[column],
             vector[vector::empty<u8>()],
             vector[amount]
         );
-    }
-
-    #[randomness]
-    entry fun bet_split(player: &signer, num1: u8, num2: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
-        assert!(is_valid_split(num1, num2), E_INVALID_SPLIT);
-        place_multi_bet(
-            player,
-            vector[13], // Split bet type
-            vector[num1],
-            vector[vector[num1, num2]],
-            vector[amount]
-        );
-    }
-
-    #[randomness]
-    entry fun bet_street(player: &signer, start_num: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
-        assert!(is_valid_street(start_num), E_INVALID_STREET);
-        place_multi_bet(
-            player,
-            vector[14], // Street bet type
-            vector[start_num],
-            vector[vector[start_num, start_num + 1, start_num + 2]],
-            vector[amount]
-        );
-    }
-
-    #[randomness]
-    entry fun bet_corner(player: &signer, top_left: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
-        assert!(is_valid_corner(top_left), E_INVALID_CORNER);
-        place_multi_bet(
-            player,
-            vector[15], // Corner bet type
-            vector[top_left],
-            vector[vector[top_left, top_left + 1, top_left + 3, top_left + 4]],
-            vector[amount]
-        );
-    }
-
-    #[randomness]
-    entry fun bet_line(player: &signer, start_num: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
-        assert!(is_valid_line(start_num), E_INVALID_LINE);
-        let line_numbers = vector[
-            start_num, start_num + 1, start_num + 2, 
-            start_num + 3, start_num + 4, start_num + 5
-        ];
-        place_multi_bet(
-            player,
-            vector[16], // Line bet type
-            vector[start_num],
-            vector[line_numbers],
-            vector[amount]
-        );
-    }
-
-    //
-    // Validation Functions
-    //
-
-    /// Validate a bet using enum
-    fun validate_bet(bet_type: &BetType, amount: u64) {
-        // Validate amount
-        assert!(amount >= MIN_BET, E_INVALID_AMOUNT);
-        assert!(amount <= MAX_BET, E_INVALID_AMOUNT);
-
-        // Validate bet type specific constraints
-        match (bet_type) {
-            BetType::SingleNumber { number } => {
-                assert!(*number <= MAX_ROULETTE_NUMBER, E_INVALID_NUMBER);
-            },
-            BetType::Split { num1, num2 } => {
-                assert!(is_valid_split(*num1, *num2), E_INVALID_SPLIT);
-            },
-            BetType::Street { start_num } => {
-                assert!(is_valid_street(*start_num), E_INVALID_STREET);
-            },
-            BetType::Corner { top_left } => {
-                assert!(is_valid_corner(*top_left), E_INVALID_CORNER);
-            },
-            BetType::Line { start_num } => {
-                assert!(is_valid_line(*start_num), E_INVALID_LINE);
-            },
-            BetType::Red => {
-                // No additional validation needed
-            },
-            BetType::Black => {
-                // No additional validation needed
-            },
-            BetType::Even => {
-                // No additional validation needed
-            },
-            BetType::Odd => {
-                // No additional validation needed
-            },
-            BetType::High => {
-                // No additional validation needed
-            },
-            BetType::Low => {
-                // No additional validation needed
-            },
-            BetType::FirstDozen => {
-                // No additional validation needed
-            },
-            BetType::SecondDozen => {
-                // No additional validation needed
-            },
-            BetType::ThirdDozen => {
-                // No additional validation needed
-            },
-            BetType::FirstColumn => {
-                // No additional validation needed
-            },
-            BetType::SecondColumn => {
-                // No additional validation needed
-            },
-            BetType::ThirdColumn => {
-                // No additional validation needed
-            }
-        };
-    }
-
-    //
-    // Utility Functions
-    //
-
-    fun build_game_seed(): vector<u8> {
-        let seed = vector::empty<u8>();
-        vector::append(&mut seed, b"AptosRoulette_");
-        vector::append(&mut seed, GAME_VERSION);
-        seed
-    }
-
-    fun get_game_object_address(): address {
-        let creator = @roulette_game;
-        let seed = build_game_seed();
-        object::create_object_address(&creator, seed)
-    }
-
-    //
-    // Test-Only Functions (Following your security pattern)
-    //
-
-    #[test_only]
-    #[lint::allow_unsafe_randomness]
-    public entry fun test_only_spin_roulette(player: &signer, bet_number: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
-        spin_roulette(player, bet_number, amount);
-    }
-
-    #[test_only]
-    #[lint::allow_unsafe_randomness]
-    public entry fun test_only_place_multi_bet(
-        player: &signer,
-        bet_types_u8: vector<u8>,
-        bet_values: vector<u8>,
-        bet_numbers_list: vector<vector<u8>>,
-        amounts: vector<u64>
-    ) acquires GameAuth, SpinResult {
-        place_multi_bet(player, bet_types_u8, bet_values, bet_numbers_list, amounts);
-    }
-
-    #[test_only]
-    #[lint::allow_unsafe_randomness]
-    public entry fun test_only_bet_red_black(player: &signer, is_red: bool, amount: u64) 
-    acquires GameAuth, SpinResult {
-        bet_red_black(player, is_red, amount);
-    }
-
-    #[test_only]
-    #[lint::allow_unsafe_randomness]
-    public entry fun test_only_bet_even_odd(player: &signer, is_even: bool, amount: u64) 
-    acquires GameAuth, SpinResult {
-        bet_even_odd(player, is_even, amount);
-    }
-
-    #[test_only]
-    #[lint::allow_unsafe_randomness]
-    public entry fun test_only_bet_high_low(player: &signer, is_high: bool, amount: u64) 
-    acquires GameAuth, SpinResult {
-        bet_high_low(player, is_high, amount);
-    }
-
-    #[test_only]
-    #[lint::allow_unsafe_randomness]
-    public entry fun test_only_bet_dozen(player: &signer, dozen: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
-        bet_dozen(player, dozen, amount);
-    }
-
-    #[test_only]
-    #[lint::allow_unsafe_randomness]
-    public entry fun test_only_bet_column(player: &signer, column: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
-        bet_column(player, column, amount);
-    }
-
-    #[test_only]
-    #[lint::allow_unsafe_randomness]
-    public entry fun test_only_bet_split(player: &signer, num1: u8, num2: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
-        bet_split(player, num1, num2, amount);
-    }
-
-    #[test_only]
-    #[lint::allow_unsafe_randomness]
-    public entry fun test_only_bet_street(player: &signer, start_num: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
-        bet_street(player, start_num, amount);
-    }
-
-    #[test_only]
-    #[lint::allow_unsafe_randomness]
-    public entry fun test_only_bet_corner(player: &signer, top_left: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
-        bet_corner(player, top_left, amount);
-    }
-
-    #[test_only]
-    #[lint::allow_unsafe_randomness]
-    public entry fun test_only_bet_line(player: &signer, start_num: u8, amount: u64) 
-    acquires GameAuth, SpinResult {
-        bet_line(player, start_num, amount);
-    }
-
-    // Test helper to create enum variants (module boundary pattern)
-    #[test_only]
-    public fun create_single_number_bet(number: u8): BetType {
-        BetType::SingleNumber { number }
-    }
-
-    #[test_only]
-    public fun create_red_bet(): BetType {
-        BetType::Red
-    }
-
-    #[test_only]
-    public fun create_split_bet(num1: u8, num2: u8): BetType {
-        BetType::Split { num1, num2 }
     }
 
     //
@@ -1006,51 +651,12 @@ module roulette_game::AptosRoulette {
     //
 
     #[view]
-    public fun is_valid_roulette_number(number: u8): bool {
-        number <= MAX_ROULETTE_NUMBER
-    }
-
-    #[view]
-    public fun calculate_single_number_payout(amount: u64): u64 {
-        amount * SINGLE_NUMBER_PAYOUT
-    }
-
-    #[view]
-    public fun get_game_config(): (u64, u64, u64, u64) {
-        (MIN_BET, MAX_BET, SINGLE_NUMBER_PAYOUT, HOUSE_EDGE_BPS)
-    }
-
-    #[view]
-    public fun get_roulette_range(): (u8, u8) {
-        (0, MAX_ROULETTE_NUMBER)
-    }
-
-    #[view]
-    public fun get_wheel_info(): (u8, String, u64) {
-        (MAX_ROULETTE_NUMBER + 1, string::utf8(b"European"), SINGLE_NUMBER_PAYOUT)
-    }
-
-    #[view]
-    /// Get payout multipliers for all bet types
-    public fun get_payout_table(): (u64, u64, u64, u64, u64, u64, u64) {
-        (
-            SINGLE_NUMBER_PAYOUT,  // 35:1
-            EVEN_MONEY_PAYOUT,     // 1:1
-            DOZEN_COLUMN_PAYOUT,   // 2:1
-            SPLIT_PAYOUT,          // 17:1
-            STREET_PAYOUT,         // 11:1
-            CORNER_PAYOUT,         // 8:1
-            LINE_PAYOUT            // 5:1
-        )
-    }
-
-    #[view]
-    /// Get player's latest spin result
-    public fun get_latest_result(player: address): (
-        u8, String, bool, bool, u8, u8, u64, u64, u8, u64, bool
-    ) acquires SpinResult {
-        assert!(exists<SpinResult>(player), E_INVALID_AMOUNT);
-        let result = borrow_global<SpinResult>(player);
+    /// Get latest spin result for player
+    public fun get_latest_result(
+        player_addr: address
+    ): (u8, String, bool, bool, u8, u8, u64, u64, u8, bool) acquires SpinResult {
+        assert!(exists<SpinResult>(player_addr), E_NOT_INITIALIZED);
+        let result = borrow_global<SpinResult>(player_addr);
         (
             result.winning_number,
             result.winning_color,
@@ -1061,31 +667,83 @@ module roulette_game::AptosRoulette {
             result.total_wagered,
             result.total_payout,
             result.winning_bets,
-            result.session_id,
             result.net_result
         )
     }
 
     #[view]
-    public fun can_handle_payout(bet_amount: u64): bool acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@roulette_game);
-        let expected_payout = bet_amount * SINGLE_NUMBER_PAYOUT;
-        let game_treasury_balance = CasinoHouse::game_treasury_balance(registry.game_object);
-
-        game_treasury_balance >= expected_payout || 
-        CasinoHouse::central_treasury_balance() >= expected_payout
+    /// Get session info returning SessionId struct
+    public fun get_session_info(player_addr: address): SessionId acquires SpinResult {
+        assert!(exists<SpinResult>(player_addr), E_NOT_INITIALIZED);
+        let result = borrow_global<SpinResult>(player_addr);
+        result.session_id
     }
 
     #[view]
-    public fun game_treasury_balance(): u64 acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@roulette_game);
-        CasinoHouse::game_treasury_balance(registry.game_object)
+    /// Get payout table
+    public fun get_payout_table(): (u64, u64, u64, u64, u64, u64, u64) {
+        (
+            PAYOUT_SINGLE, // 35:1
+            PAYOUT_EVEN_MONEY, // 1:1
+            PAYOUT_DOZEN_COLUMN, // 2:1
+            PAYOUT_SPLIT, // 17:1
+            PAYOUT_STREET, // 11:1
+            PAYOUT_CORNER, // 8:1
+            PAYOUT_LINE // 5:1
+        )
     }
 
     #[view]
-    public fun game_treasury_address(): address acquires GameRegistry {
+    public fun is_red(number: u8): bool {
+        is_red_number(number)
+    }
+
+    #[view]
+    public fun is_black(number: u8): bool {
+        number != 0 && !is_red_number(number)
+    }
+
+    #[view]
+    public fun is_even(number: u8): bool {
+        number != 0 && number % 2 == 0
+    }
+
+    #[view]
+    public fun is_odd(number: u8): bool {
+        number != 0 && number % 2 == 1
+    }
+
+    #[view]
+    public fun get_dozen(number: u8): u8 {
+        get_dozen_for_number(number)
+    }
+
+    #[view]
+    public fun get_column(number: u8): u8 {
+        get_column_for_number(number)
+    }
+
+    #[view]
+    public fun get_color_string(number: u8): String {
+        if (number == 0) {
+            string::utf8(b"green")
+        } else if (is_red_number(number)) {
+            string::utf8(b"red")
+        } else {
+            string::utf8(b"black")
+        }
+    }
+
+    #[view]
+    public fun get_game_object_address(): address acquires GameRegistry {
         let registry = borrow_global<GameRegistry>(@roulette_game);
-        CasinoHouse::get_game_treasury_address(registry.game_object)
+        let seed = build_game_seed();
+        object::create_object_address(&registry.creator, seed)
+    }
+
+    #[view]
+    public fun is_initialized(): bool {
+        exists<GameRegistry>(@roulette_game)
     }
 
     #[view]
@@ -1098,17 +756,12 @@ module roulette_game::AptosRoulette {
     }
 
     #[view]
-    public fun is_initialized(): bool {
-        exists<GameRegistry>(@roulette_game)
-    }
-
-    #[view]
     public fun is_ready(): bool acquires GameRegistry {
         is_registered() && is_initialized()
     }
 
     #[view]
-    public fun object_exists(): bool {
+    public fun object_exists(): bool acquires GameRegistry {
         if (!is_initialized()) { false }
         else {
             let object_addr = get_game_object_address();
@@ -1116,10 +769,95 @@ module roulette_game::AptosRoulette {
         }
     }
 
-    #[view]
-    public fun get_game_info(): (address, Object<CasinoHouse::GameMetadata>, String, String) 
-    acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(@roulette_game);
-        (registry.creator, registry.game_object, registry.game_name, registry.version)
+    /// Clear game result (for testing)
+    public entry fun clear_game_result(player: &signer) acquires SpinResult {
+        let player_addr = signer::address_of(player);
+        if (exists<SpinResult>(player_addr)) {
+            let old_result = move_from<SpinResult>(player_addr);
+            let SpinResult {
+                winning_number: _,
+                winning_color: _,
+                is_even: _,
+                is_high: _,
+                dozen: _,
+                column: _,
+                all_bets: _,
+                total_wagered: _,
+                total_payout: _,
+                winning_bets: _,
+                session_id: _,
+                net_result: _
+            } = old_result;
+        };
+    }
+
+    //
+    // Test-only Functions
+    //
+
+    #[test_only]
+    #[lint::allow_unsafe_randomness]
+    public entry fun test_only_bet_number(
+        player: &signer, number: u8, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
+        bet_number(player, number, amount);
+    }
+
+    #[test_only]
+    #[lint::allow_unsafe_randomness]
+    public entry fun test_only_bet_red_black(
+        player: &signer, is_red: bool, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
+        bet_red_black(player, is_red, amount);
+    }
+
+    #[test_only]
+    #[lint::allow_unsafe_randomness]
+    public entry fun test_only_bet_even_odd(
+        player: &signer, is_even: bool, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
+        bet_even_odd(player, is_even, amount);
+    }
+
+    #[test_only]
+    #[lint::allow_unsafe_randomness]
+    public entry fun test_only_bet_high_low(
+        player: &signer, is_high: bool, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
+        bet_high_low(player, is_high, amount);
+    }
+
+    #[test_only]
+    #[lint::allow_unsafe_randomness]
+    public entry fun test_only_bet_dozen(
+        player: &signer, dozen: u8, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
+        bet_dozen(player, dozen, amount);
+    }
+
+    #[test_only]
+    #[lint::allow_unsafe_randomness]
+    public entry fun test_only_bet_column(
+        player: &signer, column: u8, amount: u64
+    ) acquires GameAuth, SpinResult, GameRegistry {
+        bet_column(player, column, amount);
+    }
+
+    #[test_only]
+    #[lint::allow_unsafe_randomness]
+    public entry fun test_only_place_multi_bet(
+        player: &signer,
+        bet_types_u8: vector<u8>,
+        bet_values: vector<u8>,
+        bet_numbers_list: vector<vector<u8>>,
+        amounts: vector<u64>
+    ) acquires GameAuth, SpinResult, GameRegistry {
+        place_multi_bet(
+            player,
+            bet_types_u8,
+            bet_values,
+            bet_numbers_list,
+            amounts
+        );
     }
 }

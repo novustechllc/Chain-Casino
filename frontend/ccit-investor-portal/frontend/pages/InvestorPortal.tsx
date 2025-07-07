@@ -102,7 +102,7 @@ const FloatingTitle = () => {
         <div className="flex items-center gap-2">
           <AptosLogo size={40} />
           <span className="text-cyan-400 font-bold text-lg tracking-wider">
-            APTOS MOVE 2
+            APTOS
           </span>
         </div>
       </div>
@@ -1506,7 +1506,7 @@ const InvestorPortal: React.FC = () => {
             </div>
             <div className="text-gray-400">•</div>
             <div className="text-yellow-400">
-              📊 Charts: 5s • 📄 Data: 30s • 🎮 {data.totalSupply > 0 ? Math.floor(data.totalSupply / 100) : 0} investors
+              📊 Charts: 5s • 📄 Data: 30s
             </div>
             {data.error && data.error.includes('Rate limited') && (
               <>
@@ -1829,11 +1829,10 @@ const InvestorPortal: React.FC = () => {
             <CoinImage size={48} spinning={dataLoading} />
             <div className="text-center">
               <div className="retro-pixel-font text-2xl text-cyan-400 mb-2">
-                🎰 CHAINCASINO.APT × INVESTOR TERMINAL 🎰
+                🎰 CHAINCASINO.APT INVESTOR TERMINAL 🎰
               </div>
               <div className="retro-pixel-font text-sm text-cyan-400 mb-2">
-                POWERED BY APTOS MOVE 2 • FUNGIBLE ASSET STANDARD<br />
-                EST. 2024 • WHERE DEFI MEETS RETRO GAMING
+                POWERED BY APTOS • WHERE DEFI MEETS PLAYERS
               </div>
               <div className="text-xs text-gray-400">
                 🚀 Rate-limit optimized • 💎 HODL for maximum gains • ⚡ Smart refresh intervals • 🔄 Auto-retry enabled
