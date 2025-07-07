@@ -103,8 +103,8 @@ module roulette_game::test_aptos_roulette {
         let (
             winning_number,
             winning_color,
-            is_even,
-            is_high,
+            _is_even,
+            _is_high,
             dozen,
             column,
             total_wagered,
