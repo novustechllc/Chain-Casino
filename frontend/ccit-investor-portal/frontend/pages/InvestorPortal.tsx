@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import { useToast } from '../components/ui/use-toast';
 import { aptosClient } from '../utils/aptosClient';
@@ -434,7 +435,7 @@ const RealTimeTreasuryChart = ({ totalTreasury, className = "" }) => {
 };
 
 // Games Dashboard Component
-const GamesDashboard = ({ className = "" }) => {
+const GamesDashboard = ({ navigate, className = "" }) => {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -605,8 +606,23 @@ const GamesDashboard = ({ className = "" }) => {
           <div className="w-4 h-4 bg-purple-400 animate-pulse rounded-full"></div>
           ACTIVE GAMES ({games.length})
         </div>
-        <div className="text-xs text-gray-400">
-          🎮 GAMING HUB
+        <div className="text-center">
+          <button 
+            onClick={() => navigate('/game-hub')}
+            className="group relative bg-gradient-to-r from-purple-500/20 to-cyan-500/20 
+                     hover:from-purple-500/30 hover:to-cyan-500/30 
+                     border-2 border-purple-400/40 hover:border-purple-400/60
+                     text-white px-8 py-4 rounded-xl font-black text-lg 
+                     transition-all duration-300 hover:scale-105 
+                     shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)]
+                     backdrop-blur-sm"
+          >
+          <div className="flex items-center gap-3">
+            <CoinImage size={24} className="group-hover:animate-spin" />
+            <span className="tracking-wider font-black">GAME HUB</span>
+            <AptosLogo size={24} />
+          </div>
+          </button>
         </div>
       </div>
 
@@ -1086,6 +1102,7 @@ interface PortalData {
 const InvestorPortal: React.FC = () => {
   const { account, connected, signAndSubmitTransaction } = useWallet();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [data, setData] = useState<PortalData>({
     ccitBalance: 0,
@@ -1678,7 +1695,7 @@ const InvestorPortal: React.FC = () => {
         </div>
 
         {/* Games Dashboard */}
-        <GamesDashboard className="max-w-7xl mx-auto mb-8" />
+        <GamesDashboard navigate={navigate} className="max-w-7xl mx-auto mb-8" />
 
         {/* Enhanced Terminal Status */}
         <div className="retro-terminal max-w-6xl mx-auto">
