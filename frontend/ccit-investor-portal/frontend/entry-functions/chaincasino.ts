@@ -1,5 +1,5 @@
 import { InputTransactionData } from '@aptos-labs/wallet-adapter-react';
-import { CASINO_HOUSE_ADDRESS, INVESTOR_TOKEN_ADDRESS, SEVEN_OUT_ADDRESS } from '@/constants/chaincasino';
+import { CASINO_HOUSE_ADDRESS, INVESTOR_TOKEN_ADDRESS, GAMES_ADDRESS } from '@/constants/chaincasino';
 
 // InvestorToken entry functions
 export const depositAndMint = (args: { amount: number }): InputTransactionData => {
@@ -33,7 +33,7 @@ export const playSevenOut = (args: {
   
   return {
     data: {
-      function: `${SEVEN_OUT_ADDRESS}::SevenOut::play_seven_out`,
+      function: `${GAMES_ADDRESS}::SevenOut::play_seven_out`,
       arguments: [betOver, betAmount.toString()],
     },
   };
@@ -42,7 +42,7 @@ export const playSevenOut = (args: {
 export const clearGameResult = (): InputTransactionData => {
   return {
     data: {
-      function: `${SEVEN_OUT_ADDRESS}::SevenOut::clear_game_result`,
+      function: `${GAMES_ADDRESS}::SevenOut::clear_game_result`,
       arguments: [],
     },
   };
@@ -62,13 +62,13 @@ export const getViewFunctions = () => ({
   treasuryComposition: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::treasury_composition`,
   
   // SevenOut functions
-  getGameResult: `${SEVEN_OUT_ADDRESS}::SevenOut::get_game_result`,
-  hasGameResult: `${SEVEN_OUT_ADDRESS}::SevenOut::has_game_result`,
-  getGameConfig: `${SEVEN_OUT_ADDRESS}::SevenOut::get_game_config`,
-  getGameOdds: `${SEVEN_OUT_ADDRESS}::SevenOut::get_game_odds`,
-  isReady: `${SEVEN_OUT_ADDRESS}::SevenOut::is_ready`,
-  getSessionInfo: `${SEVEN_OUT_ADDRESS}::SevenOut::get_session_info`,
-  canHandlePayout: `${SEVEN_OUT_ADDRESS}::SevenOut::can_handle_payout`,
+  getGameResult: `${GAMES_ADDRESS}::SevenOut::get_game_result`,
+  hasGameResult: `${GAMES_ADDRESS}::SevenOut::has_game_result`,
+  getGameConfig: `${GAMES_ADDRESS}::SevenOut::get_game_config`,
+  getGameOdds: `${GAMES_ADDRESS}::SevenOut::get_game_odds`,
+  isReady: `${GAMES_ADDRESS}::SevenOut::is_ready`,
+  getSessionInfo: `${GAMES_ADDRESS}::SevenOut::get_session_info`,
+  canHandlePayout: `${GAMES_ADDRESS}::SevenOut::can_handle_payout`,
 });
 
 // Type definitions for responses
