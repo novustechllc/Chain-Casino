@@ -600,15 +600,13 @@ const GamesDashboard = ({ className = "" }) => {
 
   return (
     <div className={`bg-black/60 rounded-xl p-6 border-2 border-purple-400/40 backdrop-blur-sm ${className}`}>
-      <div className="flex items-center justify-between mb-6">
+      <div className="retro-pixel-font text-sm text-purple-300 mb-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>
-          <span className="text-lg text-purple-400 font-bold tracking-wider">
-            🎮 ACTIVE GAMES ({games.length})
-          </span>
+          <div className="w-4 h-4 bg-purple-400 animate-pulse rounded-full"></div>
+          ACTIVE GAMES ({games.length})
         </div>
         <div className="text-xs text-gray-400">
-          Last updated: {new Date().toLocaleTimeString()}
+          🎮 GAMING HUB
         </div>
       </div>
 
@@ -1045,7 +1043,7 @@ const CashoutButton = ({ onClick, disabled, loading, amount, className = "" }) =
 
 // Quick Amount Selector
 const QuickAmountSelector = ({ amounts, onSelect, symbol = "APT", disabled = false }) => (
-  <div className="grid grid-cols-4 gap-2 mb-4">
+  <div className="grid grid-cols-3 gap-2 mb-4">
     {amounts.map((amount, index) => (
       <button
         key={index}
@@ -1110,6 +1108,14 @@ const InvestorPortal: React.FC = () => {
   const formatAPT = (amount: number): string => amount.toFixed(4);
   const formatCCIT = (amount: number): string => amount.toFixed(3);
   const formatPercentage = (value: number): string => `${value.toFixed(2)}%`;
+
+  // Helper function to round to multiples of 5 or 10
+  const roundToNiceAmount = (amount: number): number => {
+    if (amount === 0) return 0;
+    if (amount < 10) return Math.round(amount * 2) / 2; // Round to 0.5
+    if (amount < 100) return Math.round(amount / 5) * 5; // Round to 5
+    return Math.round(amount / 10) * 10; // Round to 10
+  };
 
   const fetchPortfolioData = async () => {
     if (!account || !connected) return;
@@ -1655,8 +1661,14 @@ const InvestorPortal: React.FC = () => {
 
         {/* Enhanced Terminal Status */}
         <div className="retro-terminal max-w-6xl mx-auto">
-          <div className="retro-terminal-header">
-            ⚡ LIVE SYSTEM STATUS ⚡
+          <div className="retro-pixel-font text-sm text-yellow-300 mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-yellow-400 animate-pulse rounded-full"></div>
+              LIVE SYSTEM STATUS
+            </div>
+            <div className="text-xs text-gray-400">
+              ⚡ REAL-TIME
+            </div>
           </div>
           <div className="retro-terminal-line">
             <span className="retro-terminal-prompt">CCIT:\&gt;</span>
@@ -1708,8 +1720,12 @@ const InvestorPortal: React.FC = () => {
                 />
                 
                 <QuickAmountSelector
-                  amounts={[10, 50, 100, data.aptBalance]}
-                  onSelect={setDepositAmount}
+                  amounts={[
+                    roundToNiceAmount(data.aptBalance * 0.25),
+                    roundToNiceAmount(data.aptBalance * 0.5),
+                    'MAX'
+                  ]}
+                  onSelect={(amount) => setDepositAmount(amount === 'MAX' ? data.aptBalance.toString() : amount)}
                   symbol="APT"
                   disabled={transactionLoading}
                 />
@@ -1776,8 +1792,12 @@ const InvestorPortal: React.FC = () => {
                 />
                 
                 <QuickAmountSelector
-                  amounts={[100, 500, 1000, data.ccitBalance]}
-                  onSelect={setWithdrawAmount}
+                  amounts={[
+                    roundToNiceAmount(data.aptBalance * 0.25 / data.nav),
+                    roundToNiceAmount(data.aptBalance * 0.5 / data.nav),
+                    'MAX'
+                  ]}
+                  onSelect={(amount) => setWithdrawAmount(amount === 'MAX' ? data.ccitBalance.toString() : amount)}
                   symbol="CCIT"
                   disabled={transactionLoading}
                 />
