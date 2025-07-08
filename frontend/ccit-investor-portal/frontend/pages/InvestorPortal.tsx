@@ -930,23 +930,32 @@ const InsertCoinButton = ({ onClick, disabled, loading, className = "" }) => {
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
       
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(6)].map((_, i) => (
+        {[...Array(8)].map((_, i) => (
           <div
             key={i}
-            className="absolute text-yellow-200 opacity-0 group-hover:opacity-100 group-hover:animate-bounce"
+            className="absolute opacity-0 group-hover:opacity-100 group-hover:animate-bounce"
             style={{
-              left: `${20 + i * 10}%`,
-              top: `${10 + (i % 2) * 20}%`,
-              animationDelay: `${i * 0.1}s`,
-              animationDuration: '2s'
+              left: `${10 + i * 12}%`,
+              top: `${5 + (i % 3) * 15}%`,
+              animationDelay: `${i * 0.15}s`,
+              animationDuration: '2.5s'
             }}
           >
-            💰
+            <CoinImage size={16} />
           </div>
         ))}
       </div>
       
-      <div className="relative z-10 flex items-center gap-3">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1 right-2 opacity-0 group-hover:opacity-100 group-hover:animate-ping">
+          <CoinImage size={20} className="group-hover:animate-spin" />
+        </div>
+        <div className="absolute bottom-1 left-2 opacity-0 group-hover:opacity-100 group-hover:animate-ping animation-delay-500">
+          <CoinImage size={20} className="group-hover:animate-spin" />
+        </div>
+      </div>
+      
+      <div className="relative z-10 flex items-center justify-center gap-3">
         {loading ? (
           <>
             <div className="w-6 h-6 border-3 border-black border-t-transparent rounded-full animate-spin" />
@@ -956,7 +965,7 @@ const InsertCoinButton = ({ onClick, disabled, loading, className = "" }) => {
           <>
             <CoinImage size={24} className="group-hover:animate-spin" />
             <span className="tracking-wider font-black">INSERT COIN</span>
-            <div className="text-2xl group-hover:animate-pulse">🎰</div>
+            <CoinImage size={24} className="group-hover:animate-pulse" />
           </>
         )}
       </div>
@@ -1003,7 +1012,7 @@ const CashoutButton = ({ onClick, disabled, loading, amount, className = "" }) =
         {[...Array(8)].map((_, i) => (
           <div
             key={i}
-            className="absolute text-green-200 opacity-0 group-hover:opacity-100 group-hover:animate-bounce"
+            className="absolute opacity-0 group-hover:opacity-100 group-hover:animate-bounce"
             style={{
               left: `${10 + i * 12}%`,
               top: `${5 + (i % 3) * 15}%`,
@@ -1011,19 +1020,23 @@ const CashoutButton = ({ onClick, disabled, loading, amount, className = "" }) =
               animationDuration: '2.5s'
             }}
           >
-            💸
+            <AptosLogo size={16} />
           </div>
         ))}
       </div>
       
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1 right-2 text-yellow-300 opacity-0 group-hover:opacity-100 group-hover:animate-ping">⚡</div>
-        <div className="absolute bottom-1 left-2 text-yellow-300 opacity-0 group-hover:opacity-100 group-hover:animate-ping animation-delay-500">⚡</div>
+        <div className="absolute top-1 right-2 opacity-0 group-hover:opacity-100 group-hover:animate-ping">
+          <AptosLogo size={20} />
+        </div>
+        <div className="absolute bottom-1 left-2 opacity-0 group-hover:opacity-100 group-hover:animate-ping animation-delay-500">
+          <AptosLogo size={20} className="group-hover:animate-spin" />
+        </div>
       </div>
       
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
       
-      <div className="relative z-10 flex items-center gap-3">
+      <div className="relative z-10 flex items-center justify-center gap-3">
         {loading ? (
           <>
             <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
@@ -1031,9 +1044,9 @@ const CashoutButton = ({ onClick, disabled, loading, amount, className = "" }) =
           </>
         ) : (
           <>
-            <CoinImage size={24} className="group-hover:animate-bounce" />
-            <span className="tracking-wider font-black">CASH OUT</span>
-            <div className="text-2xl group-hover:animate-pulse">💰</div>
+            <AptosLogo size={24} className="group-hover:animate-spin" />
+            <span className="tracking-wider font-black">CASHOUT</span>
+            <AptosLogo size={24} className="group-hover:animate-pulse" />
           </>
         )}
       </div>
