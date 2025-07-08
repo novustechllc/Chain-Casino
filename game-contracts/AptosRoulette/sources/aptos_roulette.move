@@ -60,8 +60,8 @@ module roulette_game::AptosRoulette {
     const GAME_VERSION: vector<u8> = b"v2";
     /// Minimum bet amount (0.01 APT)
     const MIN_BET: u64 = 1000000;
-    /// Maximum bet amount (0.3 APT)
-    const MAX_BET: u64 = 30000000;
+    /// Maximum bet amount (0.1 APT)
+    const MAX_BET: u64 = 10000000;
     /// Maximum bets per transaction
     const MAX_BETS_PER_TRANSACTION: u64 = 10;
 

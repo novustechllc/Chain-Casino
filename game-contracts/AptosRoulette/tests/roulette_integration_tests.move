@@ -27,9 +27,9 @@ module roulette_game::AptosRouletteIntegrationTests {
 
     const WHALE_CAPITAL: u64 = 100000000000; // 1000 APT for liquidity
     const PLAYER_FUNDING: u64 = 5000000000; // 50 APT for testing
-    const STANDARD_BET: u64 = 10000000; // 0.1 APT
+    const STANDARD_BET: u64 = 2000000; // 0.02 APT
     const MIN_BET: u64 = 1000000; // 0.01 APT
-    const MAX_BET: u64 = 30000000; // 0.3 APT
+    const MAX_BET: u64 = 10000000; // 0.1 APT
 
     fun setup_roulette_ecosystem(): (signer, signer, signer, signer, signer) {
         let aptos_framework = account::create_account_for_test(@aptos_framework);
@@ -84,7 +84,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             MIN_BET,
             MAX_BET,
             270, // 2.7% house edge (European roulette)
-            1050000000, // max_payout: 35x max_bet = 35 * 30M = 1050M
+            350000000, // max_payout: 35x max_bet = 35 * 10M = 350M
             string::utf8(b"https://chaincasino.apt/roulette"),
             string::utf8(
                 b"https://chaincasino.apt/icons/roulette.png"
@@ -163,15 +163,15 @@ module roulette_game::AptosRouletteIntegrationTests {
         // Get result details
         let (
             winning_number,
-            winning_color,
-            is_even,
-            is_high,
+            _winning_color,
+            _is_even,
+            _is_high,
             dozen,
             column,
             total_wagered,
-            total_payout,
+            _total_payout,
             winning_bets,
-            net_result
+            _net_result
         ) = AptosRoulette::get_latest_result(PLAYER_ADDR);
 
         assert!(winning_number <= 36, 32);
@@ -396,7 +396,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             _,
             _,
             total_wagered_multi,
-            total_payout_multi,
+            _total_payout_multi,
             winning_bets_multi,
             _
         ) = AptosRoulette::get_latest_result(PLAYER_ADDR);
@@ -432,7 +432,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             MIN_BET,
             MAX_BET,
             270,
-            1050000000,
+            350000000,
             string::utf8(b"https://chaincasino.apt/roulette"),
             string::utf8(
                 b"https://chaincasino.apt/icons/roulette.png"
@@ -498,7 +498,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             MIN_BET,
             MAX_BET,
             270,
-            1050000000,
+            350000000,
             string::utf8(b"https://chaincasino.apt/roulette"),
             string::utf8(
                 b"https://chaincasino.apt/icons/roulette.png"
@@ -531,7 +531,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             MIN_BET,
             MAX_BET,
             270,
-            1050000000,
+            350000000,
             string::utf8(b"https://chaincasino.apt/roulette"),
             string::utf8(
                 b"https://chaincasino.apt/icons/roulette.png"
@@ -570,7 +570,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             MIN_BET,
             MAX_BET,
             270,
-            1050000000,
+            350000000,
             string::utf8(b"https://chaincasino.apt/roulette"),
             string::utf8(
                 b"https://chaincasino.apt/icons/roulette.png"
@@ -618,7 +618,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             MIN_BET,
             MAX_BET,
             270,
-            1050000000,
+            350000000,
             string::utf8(b"https://chaincasino.apt/roulette"),
             string::utf8(
                 b"https://chaincasino.apt/icons/roulette.png"
@@ -651,7 +651,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             MIN_BET,
             MAX_BET,
             270,
-            1050000000,
+            350000000,
             string::utf8(b"https://chaincasino.apt/roulette"),
             string::utf8(
                 b"https://chaincasino.apt/icons/roulette.png"
@@ -695,7 +695,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             MIN_BET,
             MAX_BET,
             270,
-            1050000000,
+            350000000,
             string::utf8(b"https://chaincasino.apt/roulette"),
             string::utf8(
                 b"https://chaincasino.apt/icons/roulette.png"
@@ -762,7 +762,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             MIN_BET,
             MAX_BET,
             270,
-            1050000000,
+            350000000,
             string::utf8(b"https://chaincasino.apt/roulette"),
             string::utf8(
                 b"https://chaincasino.apt/icons/roulette.png"
@@ -845,7 +845,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             MIN_BET,
             MAX_BET,
             270,
-            1050000000,
+            350000000,
             string::utf8(b"https://chaincasino.apt/roulette"),
             string::utf8(
                 b"https://chaincasino.apt/icons/roulette.png"
