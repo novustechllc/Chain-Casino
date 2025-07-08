@@ -444,11 +444,8 @@ const GamesDashboard = ({ navigate, className = "" }) => {
     // Initial fetch with delay
     setTimeout(() => fetchRegisteredGames(), 2000);
     
-    // Refresh games list every 30 seconds with random delay to avoid rate limits
-    const interval = setInterval(() => {
-      const randomDelay = Math.random() * 5000; // 0-5 second random delay
-      setTimeout(() => fetchRegisteredGames(), randomDelay);
-    }, 30000);
+    // Refresh games list every 60 seconds with to avoid rate limits
+    const interval = 60000;
     
     return () => clearInterval(interval);
   }, []);

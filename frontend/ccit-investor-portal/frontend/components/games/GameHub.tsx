@@ -155,7 +155,7 @@ const ConnectWalletBlock = () => {
           WALLET CONNECTION REQUIRED
         </h2>
         <p className="text-gray-300 mb-6 text-lg">
-          Connect your wallet to access the gaming ecosystem
+          Connect your wallet to access the Game Hub 
         </p>
         <div className="flex justify-center items-center gap-4 text-sm text-gray-400">
           <div className="flex items-center gap-2">
@@ -276,12 +276,9 @@ export function GameHub() {
     // Initial fetch with delay
     setTimeout(() => fetchRegisteredGames(), 2000);
     
-    // Refresh games list every 30 seconds with random delay to avoid rate limits
-    const interval = setInterval(() => {
-      const randomDelay = Math.random() * 5000; // 0-5 second random delay
-      setTimeout(() => fetchRegisteredGames(), randomDelay);
-    }, 30000);
-    
+    // Refresh games list every 60 seconds to avoid rate limits
+    const interval = 60000;
+
     return () => clearInterval(interval);
   }, []);
 
@@ -388,7 +385,7 @@ export function GameHub() {
             </div>
             <div className="text-gray-400">•</div>
             <div className="text-yellow-400">
-              🎮 Games: {games.length} • 🔗 Blockchain: Live
+              🎮 Games: {games.length} • 
             </div>
             <div className="text-gray-400">•</div>
             <div className="text-purple-400">
@@ -410,7 +407,7 @@ export function GameHub() {
               </h2>
             </div>
             <div className="text-xs text-gray-400">
-              🎲 GAMING ECOSYSTEM
+              🎲 GAMBLING ECOSYSTEM
             </div>
           </div>
 
@@ -421,7 +418,7 @@ export function GameHub() {
                 No Games Available
               </h3>
               <div className="text-gray-500 mb-6 space-y-2">
-                <p>The gaming ecosystem is ready, but no games have been registered yet.</p>
+                <p>The gambling ecosystem is ready, but no games have been registered yet.</p>
                 <div className="text-sm text-gray-400 bg-black/20 p-4 rounded-lg">
                   <div className="font-bold mb-2">🔍 Troubleshooting:</div>
                   <div className="space-y-1 text-left">
