@@ -14,7 +14,7 @@ casino = "0xCC"
 
 [dependencies.ChainCasino]
 git = "https://github.com/PersonaNormale/ChainCasino.git"
-rev = "feature/contracts-refining"
+rev = "master"
 
 [dependencies.AptosFramework]
 git = "https://github.com/aptos-labs/aptos-core.git"
