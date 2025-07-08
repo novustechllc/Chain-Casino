@@ -1869,7 +1869,7 @@ const InvestorPortal: React.FC = () => {
                 🎰 CHAINCASINO.APT INVESTOR TERMINAL 🎰
               </div>
               <div className="retro-pixel-font text-sm text-cyan-400 mb-2">
-                POWERED BY APTOS • WHERE DEFI MEETS PLAYERS
+                POWERED BY APTOS • WHERE DEFI MEETS GAMBLING
               </div>
               <div className="text-xs text-gray-400">
                 🚀 Rate-limit optimized • 💎 HODL for maximum gains • ⚡ Smart refresh intervals • 🔄 Auto-retry enabled

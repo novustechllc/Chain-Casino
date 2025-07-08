@@ -182,111 +182,108 @@ export function GameHub() {
     try {
       setLoading(true);
       setError(null);
-
-      console.log('Fetching registered games from:', CASINO_HOUSE_ADDRESS);
+      console.log('Fetching registered games...');
       
-      const response = await aptosClient().view({
+      // Add delay to help with rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Fetch registered game objects
+      const gameObjectsResponse = await aptosClient().view({
         payload: {
           function: `${CASINO_HOUSE_ADDRESS}::CasinoHouse::get_registered_games`,
           functionArguments: []
         }
       });
 
-      console.log('Raw response:', response);
-
-      if (!response || !Array.isArray(response) || response.length === 0) {
-        console.log('No games registered or empty response');
-        setGames([]);
-        return;
-      }
-
-      const gameObjects = response[0];
+      console.log('Game objects response:', gameObjectsResponse);
+      const gameObjects = gameObjectsResponse[0] || [];
       console.log('Game objects:', gameObjects);
       
       if (!Array.isArray(gameObjects) || gameObjects.length === 0) {
-        console.log('No game objects found');
+        console.log('No games found or invalid response');
         setGames([]);
+        setError(null);
         return;
       }
 
       const gamesData: GameData[] = [];
 
+      // Fetch metadata for each game
       for (const gameObject of gameObjects) {
         try {
+          // Extract address from object if needed
           const gameObjectAddr = typeof gameObject === 'object' && gameObject.inner 
             ? gameObject.inner 
             : typeof gameObject === 'string' 
             ? gameObject 
-            : String(gameObject);
-
-          console.log('Processing game object:', gameObjectAddr);
-
-          // Try to get game metadata directly from the game object
-          const gameDataResponse = await aptosClient().view({
+            : gameObject.toString();
+            
+          console.log('Fetching metadata for game address:', gameObjectAddr);
+          
+          // Add delay between requests to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          const metadataResponse = await aptosClient().view({
             payload: {
               function: `${CASINO_HOUSE_ADDRESS}::CasinoHouse::get_game_metadata`,
               functionArguments: [gameObjectAddr]
             }
           });
 
-          console.log('Game metadata response:', gameDataResponse);
+          console.log('Metadata response for', gameObjectAddr, ':', metadataResponse);
 
-          if (gameDataResponse && gameDataResponse.length > 0) {
-            const gameInfo = gameDataResponse[0];
-            // Parse array response: [name, version, module_address, min_bet, max_bet, house_edge, max_payout, capability_claimed, website_url, icon_url, description]
+          if (metadataResponse && metadataResponse.length >= 11) {
+            const [name, version, moduleAddress, minBet, maxBet, houseEdgeBps, maxPayout, capabilityClaimed, websiteUrl, iconUrl, description] = metadataResponse;
+            
             gamesData.push({
               objectAddress: gameObjectAddr,
-              name: gameInfo[0] || 'Unknown Game',
-              version: gameInfo[1] || '1.0.0', 
-              moduleAddress: gameInfo[2] || '',
-              minBet: Number(gameInfo[3]) || 0,
-              maxBet: Number(gameInfo[4]) || 0,
-              houseEdge: Number(gameInfo[5]) || 0,
-              maxPayout: Number(gameInfo[6]) || 0,
-              capabilityClaimed: Boolean(gameInfo[7]),
-              websiteUrl: gameInfo[8] || '',
-              iconUrl: gameInfo[9] || '',
-              description: gameInfo[10] || ''
+              name: name.toString(),
+              version: version.toString(),
+              moduleAddress: moduleAddress.toString(),
+              minBet: Number(minBet) / Math.pow(10, APT_DECIMALS),
+              maxBet: Number(maxBet) / Math.pow(10, APT_DECIMALS),
+              houseEdge: Number(houseEdgeBps) / 100,
+              maxPayout: Number(maxPayout) / Math.pow(10, APT_DECIMALS),
+              capabilityClaimed: Boolean(capabilityClaimed),
+              websiteUrl: websiteUrl.toString(),
+              iconUrl: iconUrl.toString(),
+              description: description.toString()
             });
+          } else {
+            console.warn(`Invalid metadata response for game ${gameObjectAddr}:`, metadataResponse);
           }
         } catch (gameError) {
-          console.error('Error fetching game data for object:', gameObject, gameError);
+          console.warn(`Failed to fetch metadata for game:`, gameError);
         }
       }
 
       console.log('Final games data:', gamesData);
       setGames(gamesData);
-    } catch (error) {
-      console.error('Error fetching games:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch games';
-      setError(errorMessage);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching games:', err);
+      if (err.message?.includes('429') || err.message?.includes('rate')) {
+        setError('Rate limited - will retry automatically');
+      } else {
+        setError(`Failed to load games: ${err.message || 'Unknown error'}`);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Real-time updates with rate limiting protection (copying InvestorPortal pattern)
   useEffect(() => {
-    if (connected) {
-      // Initial fetch with loading indicator
-      setTimeout(() => fetchRegisteredGames(), 1000);
-      
-      // Refresh games every 30 seconds WITHOUT loading indicator
-      const interval = setInterval(() => {
-        console.log('Refreshing games data (30s interval)');
-        const randomDelay = Math.random() * 2000; // Random delay to avoid rate limits
-        setTimeout(() => {
-          setLoading(false); // Don't show loading on refresh
-          fetchRegisteredGames();
-        }, randomDelay);
-      }, 30000); // 30 seconds
-      
-      return () => clearInterval(interval);
-    } else {
-      // Still fetch games even if not connected (for display purposes)
-      setTimeout(() => fetchRegisteredGames(), 1000);
-    }
-  }, [connected]);
+    // Initial fetch with delay
+    setTimeout(() => fetchRegisteredGames(), 2000);
+    
+    // Refresh games list every 30 seconds with random delay to avoid rate limits
+    const interval = setInterval(() => {
+      const randomDelay = Math.random() * 5000; // 0-5 second random delay
+      setTimeout(() => fetchRegisteredGames(), randomDelay);
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const getGameIcon = (name: string, iconUrl: string) => {
     if (iconUrl && iconUrl !== '') return iconUrl;
@@ -491,19 +488,19 @@ export function GameHub() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Min Bet:</span>
-                      <span className="text-yellow-400">{formatAPT(game.minBet)} APT</span>
+                      <span className="text-yellow-400">{game.minBet.toFixed(4)} APT</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Max Bet:</span>
-                      <span className="text-yellow-400">{formatAPT(game.maxBet)} APT</span>
+                      <span className="text-yellow-400">{game.maxBet.toFixed(4)} APT</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">House Edge:</span>
-                      <span className="text-purple-400">{(game.houseEdge / 100).toFixed(2)}%</span>
+                      <span className="text-purple-400">{game.houseEdge.toFixed(2)}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Max Payout:</span>
-                      <span className="text-green-400">{formatAPT(game.maxPayout)} APT</span>
+                      <span className="text-green-400">{game.maxPayout.toFixed(4)} APT</span>
                     </div>
                   </div>
 
@@ -559,10 +556,20 @@ export function GameHub() {
         {/* Navigation */}
         <div className="text-center">
           <button 
-            onClick={() => navigate('/investor-portal')}
-            className="bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white px-8 py-4 rounded-lg font-bold text-lg transition-all duration-200 hover:scale-105 shadow-lg"
+            onClick={() => navigate('/')}
+            className="group relative bg-gradient-to-r from-purple-500/20 to-cyan-500/20 
+                     hover:from-purple-500/30 hover:to-cyan-500/30 
+                     border-2 border-purple-400/40 hover:border-purple-400/60
+                     text-white px-8 py-4 rounded-xl font-bold text-lg 
+                     transition-all duration-300 hover:scale-105 
+                     shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)]
+                     backdrop-blur-sm"
           >
-            📊 INVESTOR PORTAL
+            <div className="flex items-center gap-3">
+              <CoinImage size={32} className="group-hover:animate-spin" />
+              <span>INVESTOR PORTAL</span>
+              <AptosLogo size={32} />
+            </div>
           </button>
         </div>
       </div>
