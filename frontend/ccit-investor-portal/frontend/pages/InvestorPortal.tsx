@@ -1096,6 +1096,7 @@ const InvestorPortal: React.FC = () => {
   const [dataLoading, setDataLoading] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
 
   // Animated values
   const portfolioCounter = useCountUp(data.portfolioValue, 1200, 4);
@@ -1280,8 +1281,10 @@ const InvestorPortal: React.FC = () => {
     }
   };
 
-  const fetchAllData = async () => {
-    setDataLoading(true);
+  const fetchAllData = async (showLoading: boolean = false) => {
+    if (showLoading) {
+      setDataLoading(true);
+    }
     setPrevData(data);
     try {
       await Promise.all([
@@ -1289,8 +1292,15 @@ const InvestorPortal: React.FC = () => {
         fetchTreasuryData()
       ]);
       setLastUpdateTime(Date.now());
+      
+      // Mark first load as complete
+      if (isFirstLoad) {
+        setIsFirstLoad(false);
+      }
     } finally {
-      setDataLoading(false);
+      if (showLoading) {
+        setDataLoading(false);
+      }
     }
   };
 
@@ -1348,7 +1358,7 @@ const InvestorPortal: React.FC = () => {
 
       setDepositAmount('');
       setShowDepositModal(false);
-      await fetchAllData();
+      await fetchAllData(false);
       
     } catch (error) {
       console.error('Deposit error:', error);
@@ -1416,7 +1426,7 @@ const InvestorPortal: React.FC = () => {
 
       setWithdrawAmount('');
       setShowWithdrawModal(false);
-      await fetchAllData();
+      await fetchAllData(false);
       
     } catch (error) {
       console.error('Withdraw error:', error);
@@ -1430,23 +1440,21 @@ const InvestorPortal: React.FC = () => {
     }
   };
 
-  // Enhanced real-time updates with rate limiting protection
+  // Real-time updates with rate limiting protection
   useEffect(() => {
     if (connected) {
-      // Initial fetch with delay
-      setTimeout(() => fetchAllData(), 1000);
+      // Initial fetch with loading indicator
+      setTimeout(() => fetchAllData(true), 1000);
       
-      // Main data refresh every 30 seconds with staggered timing
+      // Main data refresh every 30 seconds WITHOUT loading indicator
       const mainDataInterval = setInterval(() => {
         console.log('Refreshing main data (30s interval)');
-        setDataLoading(false); // Don't show loading for background updates
-        setTimeout(() => fetchAllData(), Math.random() * 2000); // Random delay 0-2s
+        setTimeout(() => fetchAllData(false), Math.random() * 2000); // No loading shown
       }, 30000); // 30 seconds
       
       // Chart data refresh every 5 seconds (just trigger counter updates)
       const chartInterval = setInterval(() => {
         console.log('Chart update tick (5s interval)');
-        // Trigger a small state update to refresh charts without full data fetch
         setLastUpdateTime(Date.now());
       }, 5000); // 5 seconds
       
@@ -1673,10 +1681,6 @@ const InvestorPortal: React.FC = () => {
           <div className="retro-terminal-line">
             <span className="retro-terminal-prompt">CCIT:\&gt;</span>
             <span>NAV: ${formatAPT(navCounter.count)} | SUPPLY: {formatCCIT(totalSupplyCounter.count)} CCIT | TREASURY: {formatAPT(data.totalTreasury)} APT</span>
-          </div>
-          <div className="retro-terminal-line">
-            <span className="retro-terminal-prompt">CCIT:\&gt;</span>
-            <span className="text-green-400">TREASURY GROWTH: +{formatAPT(Math.max(0, data.totalTreasury - 2000))} APT TODAY 📈</span>
           </div>
           <div className="retro-terminal-line">
             <span className="retro-terminal-prompt">CCIT:\&gt;</span>
