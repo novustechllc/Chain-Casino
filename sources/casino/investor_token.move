@@ -60,9 +60,16 @@ module casino::InvestorToken {
     /// Type of investor token operation
     enum TokenOperation has copy, drop, store {
         /// User deposited APT and minted CCIT tokens
-        Mint { apt_amount: u64, tokens_minted: u64 },
+        Mint {
+            apt_amount: u64,
+            tokens_minted: u64
+        },
         /// User redeemed CCIT tokens for APT
-        Redeem { tokens_burned: u64, apt_received: u64, fee_paid: u64 }
+        Redeem {
+            tokens_burned: u64,
+            apt_received: u64,
+            fee_paid: u64
+        }
     }
 
     /// Economic metadata for dividend tracking
