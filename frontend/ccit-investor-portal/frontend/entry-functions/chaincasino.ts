@@ -34,7 +34,8 @@ export const playSevenOut = (args: {
   return {
     data: {
       function: `${GAMES_ADDRESS}::SevenOut::play_seven_out`,
-      arguments: [betOver, betAmount.toString()],
+      typeArguments: [],
+      functionArguments: [betOver, betAmount.toString()],
     },
   };
 };
@@ -43,7 +44,8 @@ export const clearGameResult = (): InputTransactionData => {
   return {
     data: {
       function: `${GAMES_ADDRESS}::SevenOut::clear_game_result`,
-      arguments: [],
+      typeArguments: [],
+      functionArguments: [],
     },
   };
 };

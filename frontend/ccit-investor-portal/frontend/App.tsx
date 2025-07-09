@@ -5,6 +5,7 @@ import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react';
 
 // Pages
 import { GameHub } from '@/components/games/GameHub';
+import { SevenOut } from '@/components/games/SevenOut';
 
 // Components
 import InvestorPortal from './pages/InvestorPortal';
@@ -44,6 +45,9 @@ function App() {
               
               {/* Game Hub */}
               <Route path="/game-hub" element={<GameHub />} />
+
+              {/* SevenOut game route */}
+              <Route path="/sevenout" element={<SevenOut />} />
 
               {/* Catch all - redirect to home */}
               <Route path="*" element={<Navigate to="/" replace />} />
