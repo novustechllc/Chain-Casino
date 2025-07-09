@@ -64,7 +64,7 @@ export const getViewFunctions = () => ({
   treasuryComposition: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::treasury_composition`,
   
   // SevenOut functions
-  getGameResult: `${GAMES_ADDRESS}::SevenOut::get_game_result`,
+  getGameResult: `${GAMES_ADDRESS}::SevenOut::get_user_game_result`,
   hasGameResult: `${GAMES_ADDRESS}::SevenOut::has_game_result`,
   getGameConfig: `${GAMES_ADDRESS}::SevenOut::get_game_config`,
   getGameOdds: `${GAMES_ADDRESS}::SevenOut::get_game_odds`,

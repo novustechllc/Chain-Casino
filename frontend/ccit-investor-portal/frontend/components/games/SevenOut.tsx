@@ -65,7 +65,7 @@ const SevenOut: React.FC = () => {
       if (hasResult[0]) {
         const resultData = await aptosClient().view({
           payload: {
-            function: getViewFunctions().getUserGameResult,
+            function: getViewFunctions().getGameResult,  // Changed from getUserGameResult
             functionArguments: [account.address.toString()]
           }
         });
@@ -152,7 +152,7 @@ const SevenOut: React.FC = () => {
     try {
       const transaction = clearGameResult();
       const response = await signAndSubmitTransaction(transaction);
-      await aptosClient.waitForTransaction({ transactionHash: response.hash });
+      await aptosClient().waitForTransaction({ transactionHash: response.hash });
       
       setGameResult(null);
       toast({
