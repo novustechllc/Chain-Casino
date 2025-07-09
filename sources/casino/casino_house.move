@@ -441,6 +441,8 @@ module casino::CasinoHouse {
     }
 
     /// Remove game from registry and withdraw all treasury funds
+    /// TODO: fix, breaks pattern when used, need full architectural refactor from module based to object based
+    /// See TODO.md for reference
     public entry fun unregister_game(
         admin: &signer, game_object: Object<GameMetadata>
     ) acquires GameRegistry, GameMetadata, TreasuryRegistry, GameTreasury {
