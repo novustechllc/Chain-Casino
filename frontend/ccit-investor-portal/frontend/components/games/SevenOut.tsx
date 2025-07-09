@@ -63,59 +63,69 @@ const DiceRoll3D = ({ die1, die2, isRolling = false }) => {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mountRef.current.appendChild(renderer.domElement);
 
-    // Improved lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
-    const directionalLight = new THREE.DirectionalLight(0x00c3ff, 0.8);
-    directionalLight.position.set(3, 3, 3);
-    directionalLight.castShadow = true;
-    scene.add(ambientLight, directionalLight);
+    // Improved lighting for better visibility
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1.0);
+    directionalLight1.position.set(3, 3, 3);
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight2.position.set(-3, 3, -3);
+    scene.add(ambientLight, directionalLight1, directionalLight2);
 
-    // Create dice
+    // Create flashy dice
     const createDie = (value, position) => {
-      const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+      const geometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
       geometry.computeBoundingBox();
-      
-      // Rounded edges
-      const edges = new THREE.EdgesGeometry(geometry);
       
       const createFace = (number) => {
         const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
+        canvas.width = 256;
+        canvas.height = 256;
         const context = canvas.getContext('2d');
         
-        // Background with gradient
-        const gradient = context.createLinearGradient(0, 0, 128, 128);
-        gradient.addColorStop(0, '#ffffff');
-        gradient.addColorStop(1, '#f0f0f0');
-        context.fillStyle = gradient;
-        context.fillRect(0, 0, 128, 128);
+        // Bright white base with subtle color
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, 256, 256);
         
-        // Subtle border
-        context.strokeStyle = '#cccccc';
-        context.lineWidth = 2;
-        context.strokeRect(4, 4, 120, 120);
+        // Add subtle color overlay
+        const time = Date.now() * 0.001;
+        const hue = (time * 30 + number * 45) % 360;
+        const colorOverlay = context.createRadialGradient(128, 128, 50, 128, 128, 180);
+        colorOverlay.addColorStop(0, `hsla(${hue}, 30%, 95%, 0.3)`);
+        colorOverlay.addColorStop(1, `hsla(${hue}, 20%, 90%, 0.2)`);
+        context.fillStyle = colorOverlay;
+        context.fillRect(0, 0, 256, 256);
         
-        // Dots with shadow
-        context.fillStyle = '#1a1a1a';
-        context.shadowColor = 'rgba(0,0,0,0.3)';
-        context.shadowBlur = 2;
-        context.shadowOffsetX = 1;
-        context.shadowOffsetY = 1;
+        // Clean border
+        context.strokeStyle = '#333333';
+        context.lineWidth = 3;
+        context.strokeRect(6, 6, 244, 244);
         
-        const dotSize = 8;
+        // Reset shadow for dots
+        context.shadowColor = 'transparent';
+        context.shadowBlur = 0;
+        
+        // Neon glowing dots
+        const dotSize = 18;
         const patterns = {
-          1: [[64, 64]],
-          2: [[40, 40], [88, 88]],
-          3: [[32, 32], [64, 64], [96, 96]],
-          4: [[40, 40], [88, 40], [40, 88], [88, 88]],
-          5: [[32, 32], [96, 32], [64, 64], [32, 96], [96, 96]],
-          6: [[32, 32], [96, 32], [32, 64], [96, 64], [32, 96], [96, 96]]
+          1: [[128, 128]],
+          2: [[80, 80], [176, 176]],
+          3: [[64, 64], [128, 128], [192, 192]],
+          4: [[80, 80], [176, 80], [80, 176], [176, 176]],
+          5: [[64, 64], [192, 64], [128, 128], [64, 192], [192, 192]],
+          6: [[64, 64], [192, 64], [64, 128], [192, 128], [64, 192], [192, 192]]
         };
         
-        patterns[number].forEach(([x, y]) => {
+        patterns[number].forEach(([x, y], index) => {
+          // Dark dots that are clearly visible
+          context.fillStyle = '#000000';
           context.beginPath();
           context.arc(x, y, dotSize, 0, Math.PI * 2);
+          context.fill();
+          
+          // Small white highlight for 3D effect
+          context.fillStyle = '#ffffff';
+          context.beginPath();
+          context.arc(x - dotSize * 0.3, y - dotSize * 0.3, dotSize * 0.25, 0, Math.PI * 2);
           context.fill();
         });
         
@@ -123,12 +133,12 @@ const DiceRoll3D = ({ die1, die2, isRolling = false }) => {
       };
 
       const materials = [
-        new THREE.MeshPhongMaterial({ map: createFace(4) }),
-        new THREE.MeshPhongMaterial({ map: createFace(3) }),
-        new THREE.MeshPhongMaterial({ map: createFace(2) }),
-        new THREE.MeshPhongMaterial({ map: createFace(5) }),
-        new THREE.MeshPhongMaterial({ map: createFace(value) }),
-        new THREE.MeshPhongMaterial({ map: createFace(7-value) })
+        new THREE.MeshLambertMaterial({ map: createFace(4), color: 0xffffff }),
+        new THREE.MeshLambertMaterial({ map: createFace(3), color: 0xffffff }),
+        new THREE.MeshLambertMaterial({ map: createFace(2), color: 0xffffff }),
+        new THREE.MeshLambertMaterial({ map: createFace(5), color: 0xffffff }),
+        new THREE.MeshLambertMaterial({ map: createFace(value), color: 0xffffff }),
+        new THREE.MeshLambertMaterial({ map: createFace(7-value), color: 0xffffff })
       ];
       
       const die = new THREE.Mesh(geometry, materials);
@@ -296,6 +306,7 @@ export const SevenOut: React.FC = () => {
         if (session_id !== lastSessionId) {
           setIsPlaying(false);
           setLastSessionId(session_id);
+          setWaitingForNewResult(false);
         }
         
         setGameResult(newResult);
@@ -353,6 +364,7 @@ export const SevenOut: React.FC = () => {
       });
     } catch (error) {
       console.error('Game play failed:', error);
+      setWaitingForNewResult(false);
       toast({
         title: "Game Failed",
         description: error instanceof Error ? error.message : 'Transaction failed',
@@ -629,7 +641,7 @@ export const SevenOut: React.FC = () => {
                     <div className="text-center">
                       <div className="text-yellow-400 retro-pixel-font text-xs mb-1">STATUS</div>
                       <div className={`text-lg font-bold ${winStreak >= 3 ? 'text-gold animate-bounce' : winStreak > 0 ? 'text-green-400' : 'text-gray-500'}`}>
-                        {winStreak >= 5 ? '🔥 HOT!' : winStreak >= 3 ? '⚡ ON FIRE' : winStreak > 0 ? '📈 WINNING' : '🎯 READY'}
+                        {winStreak >= 5 ? '🔥 HOT!' : winStreak >= 3 ? '⚡ ON FIRE' : winStreak > 0 ? '💰 WINNING' : '🎯 READY'}
                       </div>
                     </div>
                   </div>
