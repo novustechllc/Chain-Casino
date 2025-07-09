@@ -161,3 +161,58 @@ export const parseSessionInfo = (moveResult: any[]): SessionInfo => {
     timestamp: Number(moveResult[1]),
   };
 };
+
+// AptosFortune game entry functions  
+export const playAptosFortune = (args: { 
+  betAmount: number 
+}): InputTransactionData => {
+  const { betAmount } = args;
+  
+  return {
+    data: {
+      function: `${GAMES_ADDRESS}::AptosFortune::spin_reels`,
+      typeArguments: [],
+      functionArguments: [betAmount.toString()],
+    },
+  };
+};
+
+export const clearFortuneResult = (): InputTransactionData => {
+  return {
+    data: {
+      function: `${GAMES_ADDRESS}::AptosFortune::clear_result`,
+      typeArguments: [],
+      functionArguments: [],
+    },
+  };
+};
+
+// AptosFortune view functions
+export const getFortuneViewFunctions = () => ({
+  gameConfig: `${GAMES_ADDRESS}::AptosFortune::get_game_config`,
+  symbolProbabilities: `${GAMES_ADDRESS}::AptosFortune::get_symbol_probabilities`,
+  payoutTable: `${GAMES_ADDRESS}::AptosFortune::get_payout_table`,
+  isReady: `${GAMES_ADDRESS}::AptosFortune::is_ready`,
+  hasResult: `${GAMES_ADDRESS}::AptosFortune::has_player_result`,
+  getResult: `${GAMES_ADDRESS}::AptosFortune::get_player_result`,
+  calculatePayout: `${GAMES_ADDRESS}::AptosFortune::calculate_potential_payout`,
+});
+
+// Type definitions for AptosFortune
+export interface FortuneResult {
+  reel1: number;
+  reel2: number;
+  reel3: number;
+  match_type: number;     // 0=no match, 1=consolation, 2=partial, 3=jackpot
+  matching_symbol: number;
+  payout: number;
+  session_id: number;
+  bet_amount: number;
+}
+
+export interface FortuneConfig {
+  min_bet: number;
+  max_bet: number;
+  house_edge: number;
+  max_payout: number;
+}
