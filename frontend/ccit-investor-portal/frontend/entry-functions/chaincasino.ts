@@ -34,7 +34,8 @@ export const playSevenOut = (args: {
   return {
     data: {
       function: `${GAMES_ADDRESS}::SevenOut::play_seven_out`,
-      arguments: [betOver, betAmount.toString()],
+      typeArguments: [],
+      functionArguments: [betOver, betAmount.toString()],
     },
   };
 };
@@ -43,7 +44,8 @@ export const clearGameResult = (): InputTransactionData => {
   return {
     data: {
       function: `${GAMES_ADDRESS}::SevenOut::clear_game_result`,
-      arguments: [],
+      typeArguments: [],
+      functionArguments: [],
     },
   };
 };
@@ -62,7 +64,7 @@ export const getViewFunctions = () => ({
   treasuryComposition: `${INVESTOR_TOKEN_ADDRESS}::InvestorToken::treasury_composition`,
   
   // SevenOut functions
-  getGameResult: `${GAMES_ADDRESS}::SevenOut::get_game_result`,
+  getGameResult: `${GAMES_ADDRESS}::SevenOut::get_user_game_result`,
   hasGameResult: `${GAMES_ADDRESS}::SevenOut::has_game_result`,
   getGameConfig: `${GAMES_ADDRESS}::SevenOut::get_game_config`,
   getGameOdds: `${GAMES_ADDRESS}::SevenOut::get_game_odds`,
