@@ -453,7 +453,6 @@ const GamesDashboard = ({ navigate, className = "" }) => {
   const fetchRegisteredGames = async () => {
     try {
       setLoading(true);
-      console.log('Fetching registered games...');
       
       // Add delay to help with rate limiting
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -466,12 +465,9 @@ const GamesDashboard = ({ navigate, className = "" }) => {
         }
       });
 
-      console.log('Game objects response:', gameObjectsResponse);
       const gameObjects = gameObjectsResponse[0] || [];
-      console.log('Game objects:', gameObjects);
       
       if (!Array.isArray(gameObjects) || gameObjects.length === 0) {
-        console.log('No games found or invalid response');
         setGames([]);
         setError(null);
         return;
@@ -488,8 +484,6 @@ const GamesDashboard = ({ navigate, className = "" }) => {
             : typeof gameObject === 'string' 
             ? gameObject 
             : gameObject.toString();
-            
-          console.log('Fetching metadata for game address:', gameObjectAddr);
           
           // Add delay between requests to avoid rate limiting
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -500,8 +494,6 @@ const GamesDashboard = ({ navigate, className = "" }) => {
               functionArguments: [gameObjectAddr]
             }
           });
-
-          console.log('Metadata response for', gameObjectAddr, ':', metadataResponse);
 
           if (metadataResponse && metadataResponse.length >= 11) {
             const [name, version, moduleAddress, minBet, maxBet, houseEdgeBps, maxPayout, capabilityClaimed, websiteUrl, iconUrl, description] = metadataResponse;
@@ -520,19 +512,15 @@ const GamesDashboard = ({ navigate, className = "" }) => {
               iconUrl: iconUrl.toString(),
               description: description.toString()
             });
-          } else {
-            console.warn(`Invalid metadata response for game ${gameObjectAddr}:`, metadataResponse);
           }
         } catch (gameError) {
-          console.warn(`Failed to fetch metadata for game:`, gameError);
+          // Silently skip failed games
         }
       }
 
-      console.log('Final games data:', gamesData);
       setGames(gamesData);
       setError(null);
     } catch (err) {
-      console.error('Error fetching games:', err);
       if (err.message?.includes('429') || err.message?.includes('rate')) {
         setError('Rate limited - will retry automatically');
       } else {
@@ -654,7 +642,7 @@ const GamesDashboard = ({ navigate, className = "" }) => {
                     <div className="text-xs text-gray-400">v{game.version}</div>
                   </div>
                 </div>
-                <div className={`w-2 h-2 rounded-full ${game.capabilityClaimed ? 'bg-green-400' : 'bg-yellow-400'} animate-pulse`}></div>
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
               </div>
 
               <div className="text-sm text-gray-300 mb-3">
@@ -987,9 +975,9 @@ const InsertCoinButton = ({ onClick, disabled, loading, className = "" }) => {
           </>
         ) : (
           <>
-            <CoinImage size={24} className="group-hover:animate-spin" />
+            <CoinImage size={24} className="group-hover:animate-spin"  />
             <span className="tracking-wider font-black">INSERT COIN</span>
-            <CoinImage size={24} className="group-hover:animate-pulse" />
+            <CoinImage size={24} className="group-hover:animate-spin" />
           </>
         )}
       </div>
@@ -1070,7 +1058,7 @@ const CashoutButton = ({ onClick, disabled, loading, amount, className = "" }) =
           <>
             <AptosLogo size={24} className="group-hover:animate-spin" />
             <span className="tracking-wider font-black">CASHOUT</span>
-            <AptosLogo size={24} className="group-hover:animate-pulse" />
+            <AptosLogo size={24} className="group-hover:animate-spin" />
           </>
         )}
       </div>
@@ -1134,6 +1122,7 @@ const InvestorPortal: React.FC = () => {
   const [dataLoading, setDataLoading] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [successAnimationType, setSuccessAnimationType] = useState<'deposit' | 'withdraw' | null>(null);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
   // Animated values
@@ -1193,8 +1182,6 @@ const InvestorPortal: React.FC = () => {
       const portfolioValue = ccitBalance * nav;
       const aptBalance = Number(aptBalanceResponse) / Math.pow(10, APT_DECIMALS);
       
-      console.log('Portfolio data fetched:', { ccitBalance, navRaw, nav, portfolioValue, aptBalance });
-      
       setData(prev => ({
         ...prev,
         ccitBalance: isNaN(ccitBalance) ? 0 : ccitBalance,
@@ -1204,8 +1191,6 @@ const InvestorPortal: React.FC = () => {
       }));
       
     } catch (error) {
-      console.error('Error fetching portfolio data:', error);
-      
       if (error.message?.includes('429') || error.message?.includes('rate')) {
         setData(prev => ({ ...prev, error: 'Rate limited - retrying...' }));
       } else {
@@ -1239,7 +1224,6 @@ const InvestorPortal: React.FC = () => {
           }
         });
       } catch (totalTreasuryError) {
-        console.log('treasury_balance not found, trying fallback calculation');
         // If total treasury function doesn't exist, calculate as central * 1.2
         const centralValue = Number(centralResponse[0]) / Math.pow(10, APT_DECIMALS);
         totalTreasuryResponse = [centralValue * 1.2 * Math.pow(10, APT_DECIMALS)];
@@ -1259,8 +1243,6 @@ const InvestorPortal: React.FC = () => {
       const totalSupply = Number(supplyResponse[0]) / Math.pow(10, CCIT_DECIMALS);
       const gameReserves = Math.max(0, totalTreasury - centralTreasury);
       
-      console.log('Treasury data fetched:', { centralTreasury, totalTreasury, totalSupply, gameReserves });
-      
       setData(prev => ({
         ...prev,
         centralTreasury: isNaN(centralTreasury) ? 0 : centralTreasury,
@@ -1271,8 +1253,6 @@ const InvestorPortal: React.FC = () => {
       }));
       
     } catch (error) {
-      console.error('Error fetching treasury data:', error);
-      
       if (error.message?.includes('429') || error.message?.includes('rate')) {
         setData(prev => ({ ...prev, error: 'Rate limited - retrying...' }));
         return;
@@ -1298,8 +1278,6 @@ const InvestorPortal: React.FC = () => {
         
         const centralTreasury = Number(centralResponse[0]) / Math.pow(10, APT_DECIMALS);
         const totalSupply = Number(supplyResponse[0]) / Math.pow(10, CCIT_DECIMALS);
-        
-        console.log('Fallback treasury data:', { centralTreasury, totalSupply });
         
         setData(prev => ({
           ...prev,
@@ -1386,8 +1364,12 @@ const InvestorPortal: React.FC = () => {
         transactionHash: transaction.hash,
       });
 
+      setSuccessAnimationType('deposit');
       setShowSuccessAnimation(true);
-      setTimeout(() => setShowSuccessAnimation(false), 3000);
+      setTimeout(() => {
+        setShowSuccessAnimation(false);
+        setSuccessAnimationType(null);
+      }, 3000);
 
       toast({
         title: "Success! 🎉",
@@ -1399,7 +1381,6 @@ const InvestorPortal: React.FC = () => {
       await fetchAllData(false);
       
     } catch (error) {
-      console.error('Deposit error:', error);
       toast({
         title: "Transaction failed",
         description: ERROR_MESSAGES.TRANSACTION_FAILED,
@@ -1454,8 +1435,12 @@ const InvestorPortal: React.FC = () => {
         transactionHash: transaction.hash,
       });
 
+      setSuccessAnimationType('withdraw');
       setShowSuccessAnimation(true);
-      setTimeout(() => setShowSuccessAnimation(false), 3000);
+      setTimeout(() => {
+        setShowSuccessAnimation(false);
+        setSuccessAnimationType(null);
+      }, 3000);
 
       toast({
         title: "Success! 💰",
@@ -1467,7 +1452,6 @@ const InvestorPortal: React.FC = () => {
       await fetchAllData(false);
       
     } catch (error) {
-      console.error('Withdraw error:', error);
       toast({
         title: "Transaction failed",
         description: ERROR_MESSAGES.TRANSACTION_FAILED,
@@ -1486,13 +1470,11 @@ const InvestorPortal: React.FC = () => {
       
       // Main data refresh every 30 seconds WITHOUT loading indicator
       const mainDataInterval = setInterval(() => {
-        console.log('Refreshing main data (30s interval)');
         setTimeout(() => fetchAllData(false), Math.random() * 2000); // No loading shown
       }, 30000); // 30 seconds
       
       // Chart data refresh every 5 seconds (just trigger counter updates)
       const chartInterval = setInterval(() => {
-        console.log('Chart update tick (5s interval)');
         setLastUpdateTime(Date.now());
       }, 5000); // 5 seconds
       
@@ -1541,7 +1523,13 @@ const InvestorPortal: React.FC = () => {
       
       {showSuccessAnimation && (
         <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
-          <div className="text-6xl animate-bounce">🎉</div>
+          <div className="animate-bounce">
+            {successAnimationType === 'deposit' ? (
+              <CoinImage size={96} />
+            ) : successAnimationType === 'withdraw' ? (
+              <AptosLogo size={96} />
+            ) : null}
+          </div>
         </div>
       )}
       
@@ -1835,8 +1823,8 @@ const InvestorPortal: React.FC = () => {
                 
                 <QuickAmountSelector
                   amounts={[
-                    roundToNiceAmount(data.aptBalance * 0.25 / data.nav),
-                    roundToNiceAmount(data.aptBalance * 0.5 / data.nav),
+                    roundToNiceAmount(data.ccitBalance * 0.25),
+                    roundToNiceAmount(data.ccitBalance * 0.5),
                     'MAX'
                   ]}
                   onSelect={(amount) => setWithdrawAmount(amount === 'MAX' ? data.ccitBalance.toString() : amount)}

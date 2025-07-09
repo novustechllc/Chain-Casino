@@ -57,7 +57,7 @@ module roulette_game::AptosRoulette {
     //
 
     /// Game version
-    const GAME_VERSION: vector<u8> = b"v2";
+    const GAME_VERSION: vector<u8> = b"v1";
     /// Minimum bet amount (0.01 APT)
     const MIN_BET: u64 = 1000000;
     /// Maximum bet amount (0.1 APT)

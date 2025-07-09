@@ -182,7 +182,6 @@ export function GameHub() {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching registered games...');
       
       // Add delay to help with rate limiting
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -195,12 +194,9 @@ export function GameHub() {
         }
       });
 
-      console.log('Game objects response:', gameObjectsResponse);
       const gameObjects = gameObjectsResponse[0] || [];
-      console.log('Game objects:', gameObjects);
       
       if (!Array.isArray(gameObjects) || gameObjects.length === 0) {
-        console.log('No games found or invalid response');
         setGames([]);
         setError(null);
         return;
@@ -217,8 +213,6 @@ export function GameHub() {
             : typeof gameObject === 'string' 
             ? gameObject 
             : gameObject.toString();
-            
-          console.log('Fetching metadata for game address:', gameObjectAddr);
           
           // Add delay between requests to avoid rate limiting
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -229,8 +223,6 @@ export function GameHub() {
               functionArguments: [gameObjectAddr]
             }
           });
-
-          console.log('Metadata response for', gameObjectAddr, ':', metadataResponse);
 
           if (metadataResponse && metadataResponse.length >= 11) {
             const [name, version, moduleAddress, minBet, maxBet, houseEdgeBps, maxPayout, capabilityClaimed, websiteUrl, iconUrl, description] = metadataResponse;
@@ -249,19 +241,15 @@ export function GameHub() {
               iconUrl: iconUrl.toString(),
               description: description.toString()
             });
-          } else {
-            console.warn(`Invalid metadata response for game ${gameObjectAddr}:`, metadataResponse);
           }
         } catch (gameError) {
-          console.warn(`Failed to fetch metadata for game:`, gameError);
+          // Silently skip failed games
         }
       }
 
-      console.log('Final games data:', gamesData);
       setGames(gamesData);
       setError(null);
     } catch (err) {
-      console.error('Error fetching games:', err);
       if (err.message?.includes('429') || err.message?.includes('rate')) {
         setError('Rate limited - will retry automatically');
       } else {
@@ -277,7 +265,7 @@ export function GameHub() {
     setTimeout(() => fetchRegisteredGames(), 2000);
     
     // Refresh games list every 60 seconds to avoid rate limits
-    const interval = 60000;
+    const interval = setInterval(fetchRegisteredGames, 60000);
 
     return () => clearInterval(interval);
   }, []);
@@ -385,7 +373,7 @@ export function GameHub() {
             </div>
             <div className="text-gray-400">•</div>
             <div className="text-yellow-400">
-              🎮 Games: {games.length} • 
+              🎮 Games: {games.length} 
             </div>
             <div className="text-gray-400">•</div>
             <div className="text-purple-400">
@@ -468,20 +456,14 @@ export function GameHub() {
                         <div className="text-xs text-gray-400">v{game.version}</div>
                       </div>
                     </div>
-                    <div className={`w-3 h-3 rounded-full ${
-                      game.capabilityClaimed ? 'bg-green-400' : 'bg-red-400'
-                    } animate-pulse`}></div>
+                    <div className="w-3 h-3 rounded-full bg-green-400 animate-pulse"></div>
                   </div>
 
                   {/* Game Stats */}
                   <div className="space-y-2 mb-4 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-400">Status:</span>
-                      <span className={`font-bold ${
-                        game.capabilityClaimed ? 'text-green-400' : 'text-red-400'
-                      }`}>
-                        {game.capabilityClaimed ? 'ONLINE' : 'OFFLINE'}
-                      </span>
+                      <span className="font-bold text-green-400">ONLINE</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Min Bet:</span>
@@ -508,42 +490,25 @@ export function GameHub() {
                     </div>
                   )}
 
-                  {/* Action Buttons */}
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => {
-                        if (game.capabilityClaimed && connected) {
-                          // Navigate to game or handle game launch
-                          console.log('Launching game:', game.name);
-                          toast({
-                            title: "Game Launch",
-                            description: `Launching ${game.name}...`,
-                          });
-                        }
-                      }}
-                      disabled={!connected || !game.capabilityClaimed}
-                      className={`w-full px-4 py-3 rounded-lg font-bold text-sm transition-all duration-200 ${
-                        !connected ? 
-                          'bg-gray-600 text-gray-400 cursor-not-allowed' :
-                        !game.capabilityClaimed ? 
-                          'bg-orange-500/20 text-orange-400 border border-orange-400/30' : 
-                          'bg-purple-500/20 text-purple-400 border border-purple-400/30 hover:bg-purple-500/30 hover:scale-105'
-                      }`}
-                    >
-                      {!connected ? '🔗 CONNECT WALLET' : 
-                       !game.capabilityClaimed ? '⏳ GAME OFFLINE' : 
-                       '🎮 PLAY NOW'}
-                    </button>
-                    
-                    {game.websiteUrl && (
-                      <button 
-                        onClick={() => window.open(game.websiteUrl, '_blank')}
-                        className="w-full px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-400/30 rounded-lg text-xs hover:bg-gray-600/30 transition-all duration-200"
-                      >
-                        ℹ️ GAME INFO
-                      </button>
-                    )}
-                  </div>
+                  {/* Action Button */}
+                  <button
+                    onClick={() => {
+                      if (connected) {
+                        toast({
+                          title: "Game Launch",
+                          description: `Launching ${game.name}...`,
+                        });
+                      }
+                    }}
+                    disabled={!connected}
+                    className={`w-full px-4 py-3 rounded-lg font-bold text-sm transition-all duration-200 ${
+                      !connected ? 
+                        'bg-gray-600 text-gray-400 cursor-not-allowed' :
+                        'bg-purple-500/20 text-purple-400 border border-purple-400/30 hover:bg-purple-500/30 hover:scale-105'
+                    }`}
+                  >
+                    {!connected ? '🔗 CONNECT WALLET' : '🎮 PLAY NOW'}
+                  </button>
                 </div>
               ))}
             </div>
