@@ -125,8 +125,8 @@ module casino::InvestorToken {
             string::utf8(b"ChainCasino Investor Token"),
             string::utf8(b"CCIT"),
             8,
-            string::utf8(b""),
-            string::utf8(b"")
+            string::utf8(b"https://chaincasino.eu/ccit-logo.png"),
+            string::utf8(b"https://chaincasino.eu")
         );
 
         let mint_ref = fungible_asset::generate_mint_ref(&constructor_ref);
