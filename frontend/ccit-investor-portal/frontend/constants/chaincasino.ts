@@ -5,7 +5,7 @@ export const NETWORK = import.meta.env.VITE_APP_NETWORK ?? "testnet";
 // ChainCasino Contract Addresses
 export const CASINO_HOUSE_ADDRESS = import.meta.env.VITE_CASINO_HOUSE_ADDRESS;
 export const INVESTOR_TOKEN_ADDRESS = import.meta.env.VITE_INVESTOR_TOKEN_ADDRESS;
-export const SEVEN_OUT_ADDRESS = import.meta.env.VITE_SEVEN_OUT_ADDRESS;
+export const GAMES_ADDRESS = import.meta.env.VITE_GAMES_ADDRESS;
 
 // Legacy FA template constants (keep for compatibility)
 export const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;

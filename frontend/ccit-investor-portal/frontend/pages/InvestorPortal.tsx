@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import { useToast } from '../components/ui/use-toast';
 import { aptosClient } from '../utils/aptosClient';
@@ -434,7 +435,7 @@ const RealTimeTreasuryChart = ({ totalTreasury, className = "" }) => {
 };
 
 // Games Dashboard Component
-const GamesDashboard = ({ className = "" }) => {
+const GamesDashboard = ({ navigate, className = "" }) => {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -443,11 +444,8 @@ const GamesDashboard = ({ className = "" }) => {
     // Initial fetch with delay
     setTimeout(() => fetchRegisteredGames(), 2000);
     
-    // Refresh games list every 30 seconds with random delay to avoid rate limits
-    const interval = setInterval(() => {
-      const randomDelay = Math.random() * 5000; // 0-5 second random delay
-      setTimeout(() => fetchRegisteredGames(), randomDelay);
-    }, 30000);
+    // Refresh games list every 60 seconds with to avoid rate limits
+    const interval = 60000;
     
     return () => clearInterval(interval);
   }, []);
@@ -455,7 +453,6 @@ const GamesDashboard = ({ className = "" }) => {
   const fetchRegisteredGames = async () => {
     try {
       setLoading(true);
-      console.log('Fetching registered games...');
       
       // Add delay to help with rate limiting
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -468,12 +465,9 @@ const GamesDashboard = ({ className = "" }) => {
         }
       });
 
-      console.log('Game objects response:', gameObjectsResponse);
       const gameObjects = gameObjectsResponse[0] || [];
-      console.log('Game objects:', gameObjects);
       
       if (!Array.isArray(gameObjects) || gameObjects.length === 0) {
-        console.log('No games found or invalid response');
         setGames([]);
         setError(null);
         return;
@@ -490,8 +484,6 @@ const GamesDashboard = ({ className = "" }) => {
             : typeof gameObject === 'string' 
             ? gameObject 
             : gameObject.toString();
-            
-          console.log('Fetching metadata for game address:', gameObjectAddr);
           
           // Add delay between requests to avoid rate limiting
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -502,8 +494,6 @@ const GamesDashboard = ({ className = "" }) => {
               functionArguments: [gameObjectAddr]
             }
           });
-
-          console.log('Metadata response for', gameObjectAddr, ':', metadataResponse);
 
           if (metadataResponse && metadataResponse.length >= 11) {
             const [name, version, moduleAddress, minBet, maxBet, houseEdgeBps, maxPayout, capabilityClaimed, websiteUrl, iconUrl, description] = metadataResponse;
@@ -522,19 +512,15 @@ const GamesDashboard = ({ className = "" }) => {
               iconUrl: iconUrl.toString(),
               description: description.toString()
             });
-          } else {
-            console.warn(`Invalid metadata response for game ${gameObjectAddr}:`, metadataResponse);
           }
         } catch (gameError) {
-          console.warn(`Failed to fetch metadata for game:`, gameError);
+          // Silently skip failed games
         }
       }
 
-      console.log('Final games data:', gamesData);
       setGames(gamesData);
       setError(null);
     } catch (err) {
-      console.error('Error fetching games:', err);
       if (err.message?.includes('429') || err.message?.includes('rate')) {
         setError('Rate limited - will retry automatically');
       } else {
@@ -600,15 +586,28 @@ const GamesDashboard = ({ className = "" }) => {
 
   return (
     <div className={`bg-black/60 rounded-xl p-6 border-2 border-purple-400/40 backdrop-blur-sm ${className}`}>
-      <div className="flex items-center justify-between mb-6">
+      <div className="retro-pixel-font text-sm text-purple-300 mb-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>
-          <span className="text-lg text-purple-400 font-bold tracking-wider">
-            🎮 ACTIVE GAMES ({games.length})
-          </span>
+          <div className="w-4 h-4 bg-purple-400 animate-pulse rounded-full"></div>
+          ACTIVE GAMES ({games.length})
         </div>
-        <div className="text-xs text-gray-400">
-          Last updated: {new Date().toLocaleTimeString()}
+        <div className="text-center">
+          <button 
+            onClick={() => navigate('/game-hub')}
+            className="group relative bg-gradient-to-r from-purple-500/20 to-cyan-500/20 
+                     hover:from-purple-500/30 hover:to-cyan-500/30 
+                     border-2 border-purple-400/40 hover:border-purple-400/60
+                     text-white px-8 py-4 rounded-xl font-black text-lg 
+                     transition-all duration-300 hover:scale-105 
+                     shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)]
+                     backdrop-blur-sm"
+          >
+          <div className="flex items-center gap-3">
+            <CoinImage size={24} className="group-hover:animate-spin" />
+            <span className="tracking-wider font-black">GAME HUB</span>
+            <AptosLogo size={24} />
+          </div>
+          </button>
         </div>
       </div>
 
@@ -626,13 +625,24 @@ const GamesDashboard = ({ className = "" }) => {
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="text-2xl">{getGameIcon(game.name, game.iconUrl)}</div>
+                  <div className="text-2xl">
+                    {getGameIcon(game.name, game.iconUrl).startsWith('/') ?
+                      (
+                        <img 
+                          src={getGameIcon(game.name, game.iconUrl)} 
+                          alt={game.name}
+                          className="w-8 h-8 rounded"
+                        />
+                      ) : (
+                        getGameIcon(game.name, game.iconUrl)
+                      )}
+                  </div>
                   <div>
                     <div className="font-bold text-white">{game.name}</div>
                     <div className="text-xs text-gray-400">v{game.version}</div>
                   </div>
                 </div>
-                <div className={`w-2 h-2 rounded-full ${game.capabilityClaimed ? 'bg-green-400' : 'bg-yellow-400'} animate-pulse`}></div>
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
               </div>
 
               <div className="text-sm text-gray-300 mb-3">
@@ -932,23 +942,32 @@ const InsertCoinButton = ({ onClick, disabled, loading, className = "" }) => {
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
       
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(6)].map((_, i) => (
+        {[...Array(8)].map((_, i) => (
           <div
             key={i}
-            className="absolute text-yellow-200 opacity-0 group-hover:opacity-100 group-hover:animate-bounce"
+            className="absolute opacity-0 group-hover:opacity-100 group-hover:animate-bounce"
             style={{
-              left: `${20 + i * 10}%`,
-              top: `${10 + (i % 2) * 20}%`,
-              animationDelay: `${i * 0.1}s`,
-              animationDuration: '2s'
+              left: `${10 + i * 12}%`,
+              top: `${5 + (i % 3) * 15}%`,
+              animationDelay: `${i * 0.15}s`,
+              animationDuration: '2.5s'
             }}
           >
-            💰
+            <CoinImage size={16} />
           </div>
         ))}
       </div>
       
-      <div className="relative z-10 flex items-center gap-3">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1 right-2 opacity-0 group-hover:opacity-100 group-hover:animate-ping">
+          <CoinImage size={20} className="group-hover:animate-spin" />
+        </div>
+        <div className="absolute bottom-1 left-2 opacity-0 group-hover:opacity-100 group-hover:animate-ping animation-delay-500">
+          <CoinImage size={20} className="group-hover:animate-spin" />
+        </div>
+      </div>
+      
+      <div className="relative z-10 flex items-center justify-center gap-3">
         {loading ? (
           <>
             <div className="w-6 h-6 border-3 border-black border-t-transparent rounded-full animate-spin" />
@@ -956,9 +975,9 @@ const InsertCoinButton = ({ onClick, disabled, loading, className = "" }) => {
           </>
         ) : (
           <>
-            <CoinImage size={24} className="group-hover:animate-spin" />
+            <CoinImage size={24} className="group-hover:animate-spin"  />
             <span className="tracking-wider font-black">INSERT COIN</span>
-            <div className="text-2xl group-hover:animate-pulse">🎰</div>
+            <CoinImage size={24} className="group-hover:animate-spin" />
           </>
         )}
       </div>
@@ -1005,7 +1024,7 @@ const CashoutButton = ({ onClick, disabled, loading, amount, className = "" }) =
         {[...Array(8)].map((_, i) => (
           <div
             key={i}
-            className="absolute text-green-200 opacity-0 group-hover:opacity-100 group-hover:animate-bounce"
+            className="absolute opacity-0 group-hover:opacity-100 group-hover:animate-bounce"
             style={{
               left: `${10 + i * 12}%`,
               top: `${5 + (i % 3) * 15}%`,
@@ -1013,19 +1032,23 @@ const CashoutButton = ({ onClick, disabled, loading, amount, className = "" }) =
               animationDuration: '2.5s'
             }}
           >
-            💸
+            <AptosLogo size={16} />
           </div>
         ))}
       </div>
       
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1 right-2 text-yellow-300 opacity-0 group-hover:opacity-100 group-hover:animate-ping">⚡</div>
-        <div className="absolute bottom-1 left-2 text-yellow-300 opacity-0 group-hover:opacity-100 group-hover:animate-ping animation-delay-500">⚡</div>
+        <div className="absolute top-1 right-2 opacity-0 group-hover:opacity-100 group-hover:animate-ping">
+          <AptosLogo size={20} />
+        </div>
+        <div className="absolute bottom-1 left-2 opacity-0 group-hover:opacity-100 group-hover:animate-ping animation-delay-500">
+          <AptosLogo size={20} className="group-hover:animate-spin" />
+        </div>
       </div>
       
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
       
-      <div className="relative z-10 flex items-center gap-3">
+      <div className="relative z-10 flex items-center justify-center gap-3">
         {loading ? (
           <>
             <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
@@ -1033,9 +1056,9 @@ const CashoutButton = ({ onClick, disabled, loading, amount, className = "" }) =
           </>
         ) : (
           <>
-            <CoinImage size={24} className="group-hover:animate-bounce" />
-            <span className="tracking-wider font-black">CASH OUT</span>
-            <div className="text-2xl group-hover:animate-pulse">💰</div>
+            <AptosLogo size={24} className="group-hover:animate-spin" />
+            <span className="tracking-wider font-black">CASHOUT</span>
+            <AptosLogo size={24} className="group-hover:animate-spin" />
           </>
         )}
       </div>
@@ -1045,7 +1068,7 @@ const CashoutButton = ({ onClick, disabled, loading, amount, className = "" }) =
 
 // Quick Amount Selector
 const QuickAmountSelector = ({ amounts, onSelect, symbol = "APT", disabled = false }) => (
-  <div className="grid grid-cols-4 gap-2 mb-4">
+  <div className="grid grid-cols-3 gap-2 mb-4">
     {amounts.map((amount, index) => (
       <button
         key={index}
@@ -1075,6 +1098,7 @@ interface PortalData {
 const InvestorPortal: React.FC = () => {
   const { account, connected, signAndSubmitTransaction } = useWallet();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [data, setData] = useState<PortalData>({
     ccitBalance: 0,
@@ -1098,6 +1122,8 @@ const InvestorPortal: React.FC = () => {
   const [dataLoading, setDataLoading] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [successAnimationType, setSuccessAnimationType] = useState<'deposit' | 'withdraw' | null>(null);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
 
   // Animated values
   const portfolioCounter = useCountUp(data.portfolioValue, 1200, 4);
@@ -1110,6 +1136,14 @@ const InvestorPortal: React.FC = () => {
   const formatAPT = (amount: number): string => amount.toFixed(4);
   const formatCCIT = (amount: number): string => amount.toFixed(3);
   const formatPercentage = (value: number): string => `${value.toFixed(2)}%`;
+
+  // Helper function to round to multiples of 5 or 10
+  const roundToNiceAmount = (amount: number): number => {
+    if (amount === 0) return 0;
+    if (amount < 10) return Math.round(amount * 2) / 2; // Round to 0.5
+    if (amount < 100) return Math.round(amount / 5) * 5; // Round to 5
+    return Math.round(amount / 10) * 10; // Round to 10
+  };
 
   const fetchPortfolioData = async () => {
     if (!account || !connected) return;
@@ -1148,8 +1182,6 @@ const InvestorPortal: React.FC = () => {
       const portfolioValue = ccitBalance * nav;
       const aptBalance = Number(aptBalanceResponse) / Math.pow(10, APT_DECIMALS);
       
-      console.log('Portfolio data fetched:', { ccitBalance, navRaw, nav, portfolioValue, aptBalance });
-      
       setData(prev => ({
         ...prev,
         ccitBalance: isNaN(ccitBalance) ? 0 : ccitBalance,
@@ -1159,8 +1191,6 @@ const InvestorPortal: React.FC = () => {
       }));
       
     } catch (error) {
-      console.error('Error fetching portfolio data:', error);
-      
       if (error.message?.includes('429') || error.message?.includes('rate')) {
         setData(prev => ({ ...prev, error: 'Rate limited - retrying...' }));
       } else {
@@ -1194,7 +1224,6 @@ const InvestorPortal: React.FC = () => {
           }
         });
       } catch (totalTreasuryError) {
-        console.log('treasury_balance not found, trying fallback calculation');
         // If total treasury function doesn't exist, calculate as central * 1.2
         const centralValue = Number(centralResponse[0]) / Math.pow(10, APT_DECIMALS);
         totalTreasuryResponse = [centralValue * 1.2 * Math.pow(10, APT_DECIMALS)];
@@ -1214,8 +1243,6 @@ const InvestorPortal: React.FC = () => {
       const totalSupply = Number(supplyResponse[0]) / Math.pow(10, CCIT_DECIMALS);
       const gameReserves = Math.max(0, totalTreasury - centralTreasury);
       
-      console.log('Treasury data fetched:', { centralTreasury, totalTreasury, totalSupply, gameReserves });
-      
       setData(prev => ({
         ...prev,
         centralTreasury: isNaN(centralTreasury) ? 0 : centralTreasury,
@@ -1226,8 +1253,6 @@ const InvestorPortal: React.FC = () => {
       }));
       
     } catch (error) {
-      console.error('Error fetching treasury data:', error);
-      
       if (error.message?.includes('429') || error.message?.includes('rate')) {
         setData(prev => ({ ...prev, error: 'Rate limited - retrying...' }));
         return;
@@ -1254,8 +1279,6 @@ const InvestorPortal: React.FC = () => {
         const centralTreasury = Number(centralResponse[0]) / Math.pow(10, APT_DECIMALS);
         const totalSupply = Number(supplyResponse[0]) / Math.pow(10, CCIT_DECIMALS);
         
-        console.log('Fallback treasury data:', { centralTreasury, totalSupply });
-        
         setData(prev => ({
           ...prev,
           centralTreasury: isNaN(centralTreasury) ? 0 : centralTreasury,
@@ -1274,8 +1297,10 @@ const InvestorPortal: React.FC = () => {
     }
   };
 
-  const fetchAllData = async () => {
-    setDataLoading(true);
+  const fetchAllData = async (showLoading: boolean = false) => {
+    if (showLoading) {
+      setDataLoading(true);
+    }
     setPrevData(data);
     try {
       await Promise.all([
@@ -1283,8 +1308,15 @@ const InvestorPortal: React.FC = () => {
         fetchTreasuryData()
       ]);
       setLastUpdateTime(Date.now());
+      
+      // Mark first load as complete
+      if (isFirstLoad) {
+        setIsFirstLoad(false);
+      }
     } finally {
-      setDataLoading(false);
+      if (showLoading) {
+        setDataLoading(false);
+      }
     }
   };
 
@@ -1332,8 +1364,12 @@ const InvestorPortal: React.FC = () => {
         transactionHash: transaction.hash,
       });
 
+      setSuccessAnimationType('deposit');
       setShowSuccessAnimation(true);
-      setTimeout(() => setShowSuccessAnimation(false), 3000);
+      setTimeout(() => {
+        setShowSuccessAnimation(false);
+        setSuccessAnimationType(null);
+      }, 3000);
 
       toast({
         title: "Success! 🎉",
@@ -1342,10 +1378,9 @@ const InvestorPortal: React.FC = () => {
 
       setDepositAmount('');
       setShowDepositModal(false);
-      await fetchAllData();
+      await fetchAllData(false);
       
     } catch (error) {
-      console.error('Deposit error:', error);
       toast({
         title: "Transaction failed",
         description: ERROR_MESSAGES.TRANSACTION_FAILED,
@@ -1400,8 +1435,12 @@ const InvestorPortal: React.FC = () => {
         transactionHash: transaction.hash,
       });
 
+      setSuccessAnimationType('withdraw');
       setShowSuccessAnimation(true);
-      setTimeout(() => setShowSuccessAnimation(false), 3000);
+      setTimeout(() => {
+        setShowSuccessAnimation(false);
+        setSuccessAnimationType(null);
+      }, 3000);
 
       toast({
         title: "Success! 💰",
@@ -1410,10 +1449,9 @@ const InvestorPortal: React.FC = () => {
 
       setWithdrawAmount('');
       setShowWithdrawModal(false);
-      await fetchAllData();
+      await fetchAllData(false);
       
     } catch (error) {
-      console.error('Withdraw error:', error);
       toast({
         title: "Transaction failed",
         description: ERROR_MESSAGES.TRANSACTION_FAILED,
@@ -1424,23 +1462,19 @@ const InvestorPortal: React.FC = () => {
     }
   };
 
-  // Enhanced real-time updates with rate limiting protection
+  // Real-time updates with rate limiting protection
   useEffect(() => {
     if (connected) {
-      // Initial fetch with delay
-      setTimeout(() => fetchAllData(), 1000);
+      // Initial fetch with loading indicator
+      setTimeout(() => fetchAllData(true), 1000);
       
-      // Main data refresh every 30 seconds with staggered timing
+      // Main data refresh every 30 seconds WITHOUT loading indicator
       const mainDataInterval = setInterval(() => {
-        console.log('Refreshing main data (30s interval)');
-        setDataLoading(false); // Don't show loading for background updates
-        setTimeout(() => fetchAllData(), Math.random() * 2000); // Random delay 0-2s
+        setTimeout(() => fetchAllData(false), Math.random() * 2000); // No loading shown
       }, 30000); // 30 seconds
       
       // Chart data refresh every 5 seconds (just trigger counter updates)
       const chartInterval = setInterval(() => {
-        console.log('Chart update tick (5s interval)');
-        // Trigger a small state update to refresh charts without full data fetch
         setLastUpdateTime(Date.now());
       }, 5000); // 5 seconds
       
@@ -1489,7 +1523,13 @@ const InvestorPortal: React.FC = () => {
       
       {showSuccessAnimation && (
         <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
-          <div className="text-6xl animate-bounce">🎉</div>
+          <div className="animate-bounce">
+            {successAnimationType === 'deposit' ? (
+              <CoinImage size={96} />
+            ) : successAnimationType === 'withdraw' ? (
+              <AptosLogo size={96} />
+            ) : null}
+          </div>
         </div>
       )}
       
@@ -1651,20 +1691,22 @@ const InvestorPortal: React.FC = () => {
         </div>
 
         {/* Games Dashboard */}
-        <GamesDashboard className="max-w-7xl mx-auto mb-8" />
+        <GamesDashboard navigate={navigate} className="max-w-7xl mx-auto mb-8" />
 
         {/* Enhanced Terminal Status */}
         <div className="retro-terminal max-w-6xl mx-auto">
-          <div className="retro-terminal-header">
-            ⚡ LIVE SYSTEM STATUS ⚡
+          <div className="retro-pixel-font text-sm text-yellow-300 mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-yellow-400 animate-pulse rounded-full"></div>
+              LIVE SYSTEM STATUS
+            </div>
+            <div className="text-xs text-gray-400">
+              ⚡ REAL-TIME
+            </div>
           </div>
           <div className="retro-terminal-line">
             <span className="retro-terminal-prompt">CCIT:\&gt;</span>
             <span>NAV: ${formatAPT(navCounter.count)} | SUPPLY: {formatCCIT(totalSupplyCounter.count)} CCIT | TREASURY: {formatAPT(data.totalTreasury)} APT</span>
-          </div>
-          <div className="retro-terminal-line">
-            <span className="retro-terminal-prompt">CCIT:\&gt;</span>
-            <span className="text-green-400">TREASURY GROWTH: +{formatAPT(Math.max(0, data.totalTreasury - 2000))} APT TODAY 📈</span>
           </div>
           <div className="retro-terminal-line">
             <span className="retro-terminal-prompt">CCIT:\&gt;</span>
@@ -1708,8 +1750,12 @@ const InvestorPortal: React.FC = () => {
                 />
                 
                 <QuickAmountSelector
-                  amounts={[10, 50, 100, data.aptBalance]}
-                  onSelect={setDepositAmount}
+                  amounts={[
+                    roundToNiceAmount(data.aptBalance * 0.25),
+                    roundToNiceAmount(data.aptBalance * 0.5),
+                    'MAX'
+                  ]}
+                  onSelect={(amount) => setDepositAmount(amount === 'MAX' ? data.aptBalance.toString() : amount)}
                   symbol="APT"
                   disabled={transactionLoading}
                 />
@@ -1776,8 +1822,12 @@ const InvestorPortal: React.FC = () => {
                 />
                 
                 <QuickAmountSelector
-                  amounts={[100, 500, 1000, data.ccitBalance]}
-                  onSelect={setWithdrawAmount}
+                  amounts={[
+                    roundToNiceAmount(data.ccitBalance * 0.25),
+                    roundToNiceAmount(data.ccitBalance * 0.5),
+                    'MAX'
+                  ]}
+                  onSelect={(amount) => setWithdrawAmount(amount === 'MAX' ? data.ccitBalance.toString() : amount)}
                   symbol="CCIT"
                   disabled={transactionLoading}
                 />
@@ -1832,7 +1882,7 @@ const InvestorPortal: React.FC = () => {
                 🎰 CHAINCASINO.APT INVESTOR TERMINAL 🎰
               </div>
               <div className="retro-pixel-font text-sm text-cyan-400 mb-2">
-                POWERED BY APTOS • WHERE DEFI MEETS PLAYERS
+                POWERED BY APTOS • WHERE DEFI MEETS GAMBLING
               </div>
               <div className="text-xs text-gray-400">
                 🚀 Rate-limit optimized • 💎 HODL for maximum gains • ⚡ Smart refresh intervals • 🔄 Auto-retry enabled

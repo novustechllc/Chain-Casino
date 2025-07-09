@@ -3,6 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react';
 
+// Pages
+import { GameHub } from '@/components/games/GameHub';
+
 // Components
 import InvestorPortal from './pages/InvestorPortal';
 import { WalletSelector } from './components/WalletSelector';
@@ -39,11 +42,9 @@ function App() {
               {/* Main investor portal */}
               <Route path="/" element={<InvestorPortal />} />
               
-              {/* Redirect legacy FA template routes */}
-              <Route path="/mint" element={<Navigate to="/" replace />} />
-              <Route path="/create-asset" element={<Navigate to="/" replace />} />
-              <Route path="/my-assets" element={<Navigate to="/" replace />} />
-              
+              {/* Game Hub */}
+              <Route path="/game-hub" element={<GameHub />} />
+
               {/* Catch all - redirect to home */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
