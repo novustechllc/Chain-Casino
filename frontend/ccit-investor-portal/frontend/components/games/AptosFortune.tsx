@@ -431,7 +431,75 @@ export const AptosFortune: React.FC = () => {
                 />
               </div>
 
+              {/* Game Result Display with Effects for 3-match and 2-match */}
+              {gameResult && (
+                <RetroCard className={`mt-6 text-center transition-all duration-500 ${
+                  gameResult.match_type === 3 
+                    ? 'bg-gradient-to-br from-yellow-900/60 to-orange-900/60 border-yellow-400 shadow-[0_0_40px_rgba(255,215,0,0.6)] animate-pulse' 
+                    : gameResult.match_type === 2 
+                    ? 'bg-gradient-to-br from-green-900/50 to-blue-900/50 border-green-400 shadow-[0_0_25px_rgba(34,197,94,0.5)]'
+                    : 'bg-black/60 backdrop-blur-sm'
+                }`}>
+                  
+                  {/* Jackpot Effects (3-match) */}
+                  {gameResult.match_type === 3 && (
+                    <div className="absolute inset-0 pointer-events-none">
+                      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
+                        <div className="flex space-x-1 animate-bounce">
+                          {[...Array(5)].map((_, i) => (
+                            <div key={i} className="w-2 h-2 bg-yellow-400 rounded-full" style={{animationDelay: `${i * 0.1}s`}}></div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-yellow-400/10 to-transparent animate-pulse"></div>
+                    </div>
+                  )}
 
+                  {/* Partial Match Effects (2-match) */}
+                  {gameResult.match_type === 2 && (
+                    <div className="absolute inset-0 pointer-events-none">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-green-400/5 to-transparent animate-pulse"></div>
+                    </div>
+                  )}
+
+                  <div className="relative z-10 p-6">
+                    <div className={`text-3xl font-bold mb-4 retro-pixel-font ${
+                      gameResult.match_type === 3 
+                        ? 'text-yellow-400 animate-pulse' 
+                        : gameResult.match_type === 2 
+                        ? 'text-green-400'
+                        : 'text-white'
+                    }`}>
+                      {gameResult.match_type === 3 ? '🎉 JACKPOT! 🎉' : 
+                       gameResult.match_type === 2 ? '🎯 PARTIAL MATCH!' :
+                       gameResult.match_type === 1 ? '🎁 CONSOLATION' : '😔 No Match'}
+                    </div>
+
+                    <div className={`text-2xl font-bold mb-2 ${
+                      gameResult.match_type === 3 
+                        ? 'text-yellow-400 animate-pulse' 
+                        : gameResult.match_type === 2 
+                        ? 'text-green-400'
+                        : gameResult.payout > 0 ? 'text-green-400' : 'text-gray-400'
+                    }`}>
+                      {gameResult.payout > 0 ? 
+                        `+${formatAPT(gameResult.payout)} APT` : 
+                        'No Payout'
+                      }
+                    </div>
+
+                    <div className="text-sm text-gray-400 space-y-1">
+                      <div>Bet: {formatAPT(gameResult.bet_amount)} APT</div>
+                      <div>Match Type: {
+                        gameResult.match_type === 3 ? 'Jackpot (3 symbols)' :
+                        gameResult.match_type === 2 ? 'Partial (2 symbols)' :
+                        gameResult.match_type === 1 ? 'Consolation (1 symbol)' : 'No match'
+                      }</div>
+                      <div>Session: #{gameResult.session_id}</div>
+                    </div>
+                  </div>
+                </RetroCard>
+              )}
 
             </RetroCard>
 
