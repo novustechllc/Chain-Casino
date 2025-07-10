@@ -16,14 +16,29 @@ import {
   FortuneConfig 
 } from '@/entry-functions/chaincasino';
 
-// AptosFortune constants - will be overridden by contract values
+// AptosFortune constants - updated to match contract values
 const FORTUNE_SYMBOLS = {
   1: { name: 'Cherry', emoji: '🍒', weight: 35 },
   2: { name: 'Bell', emoji: '🔔', weight: 30 },
-  3: { name: 'ChainCasino', logo: true, weight: 25 }, // ChainCasino logo
+  3: { name: 'Coin', logo: true, weight: 25 }, // ChainCasino logo
   4: { name: 'Star', emoji: '⭐', weight: 8 },
-  5: { name: 'Aptos', aptosLogo: true, weight: 2 } // Aptos logo
+  5: { name: 'Diamond', aptosLogo: true, weight: 2 } // Aptos logo
 };
+
+// Coin Image Component
+const CoinImage = ({ size = 64, className = "", spinning = false }) => (
+  <img
+    src="/chaincasino-coin.png"
+    alt="ChainCasino Coin"
+    className={`${className} ${spinning ? 'animate-spin' : ''}`}
+    style={{ 
+      width: size, 
+      height: size,
+      filter: 'drop-shadow(0 0 10px rgba(255, 215, 0, 0.5))',
+      animation: spinning ? 'spin 3s linear infinite' : 'none'
+    }}
+  />
+);
 
 // Aptos Logo Component (from InvestorPortal.tsx)
 const AptosLogo = ({ size = 32, className = "" }) => (
@@ -88,7 +103,7 @@ const SlotMachineReels = ({ reel1, reel2, reel3, isSpinning }) => {
   const renderSymbol = (symbolNumber) => {
     const symbol = FORTUNE_SYMBOLS[symbolNumber];
     if (symbol?.logo) {
-      return <img src="/chaincasino-coin.png" alt="ChainCasino" className="w-14 h-14" />;
+      return <CoinImage size={56} />;
     }
     if (symbol?.aptosLogo) {
       return <AptosLogo size={56} />;
@@ -184,7 +199,6 @@ export const AptosFortune: React.FC = () => {
   const [gameConfig, setGameConfig] = useState<FortuneConfig | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
-  const [totalWinnings, setTotalWinnings] = useState(0);
   const [lastSessionId, setLastSessionId] = useState(0);
 
   // Quick bet amounts - use contract values
@@ -388,8 +402,28 @@ export const AptosFortune: React.FC = () => {
           <h1 className="text-6xl font-bold text-transparent bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 bg-clip-text mb-4 retro-pixel-font animate-pulse">
             🎰 APTOS FORTUNE 🎰
           </h1>
-          <p className="text-yellow-400 text-xl retro-terminal-font">
-            PREMIUM SLOT MACHINE • {gameConfig ? `${gameConfig.house_edge/100}%` : '22%'} HOUSE EDGE • 2X MAX PAYOUT
+          
+          {/* ChainCasino x Aptos Branding */}
+          <div className="text-center mt-4 flex items-center justify-center gap-6 flex-wrap">
+            <div className="flex items-center gap-2">
+              <CoinImage size={40} spinning={false} />
+              <span className="text-yellow-400 font-bold text-lg tracking-wider">
+                CHAINCASINO
+              </span>
+            </div>
+            
+            <div className="text-cyan-400 text-2xl font-black">×</div>
+            
+            <div className="flex items-center gap-2">
+              <AptosLogo size={40} />
+              <span className="text-cyan-400 font-bold text-lg tracking-wider">
+                APTOS
+              </span>
+            </div>
+          </div>
+          
+          <p className="text-yellow-400 text-xl retro-terminal-font mt-4">
+            PREMIUM SLOT MACHINE • {gameConfig ? `${gameConfig.house_edge/100}%` : '22%'} HOUSE EDGE • 20X MAX PAYOUT
           </p>
         </div>
 
@@ -400,8 +434,6 @@ export const AptosFortune: React.FC = () => {
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
               <span className="text-green-400">MACHINE ACTIVE</span>
             </div>
-            <div className="text-gray-400">•</div>
-            <div className="text-orange-400">💰 Total Won: {formatAPT(totalWinnings)} APT</div>
           </div>
         </div>
 
@@ -444,13 +476,6 @@ export const AptosFortune: React.FC = () => {
                   {/* Jackpot Effects (3-match) */}
                   {gameResult.match_type === 3 && (
                     <div className="absolute inset-0 pointer-events-none">
-                      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
-                        <div className="flex space-x-1 animate-bounce">
-                          {[...Array(5)].map((_, i) => (
-                            <div key={i} className="w-2 h-2 bg-yellow-400 rounded-full" style={{animationDelay: `${i * 0.1}s`}}></div>
-                          ))}
-                        </div>
-                      </div>
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-yellow-400/10 to-transparent animate-pulse"></div>
                     </div>
                   )}
@@ -495,7 +520,6 @@ export const AptosFortune: React.FC = () => {
                         gameResult.match_type === 2 ? 'Partial (2 symbols)' :
                         gameResult.match_type === 1 ? 'Consolation (1 symbol)' : 'No match'
                       }</div>
-                      <div>Session: #{gameResult.session_id}</div>
                     </div>
                   </div>
                 </RetroCard>
@@ -584,10 +608,16 @@ export const AptosFortune: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-black/40 border border-green-400/30 rounded-lg p-4">
                 <h3 className="text-green-400 font-bold mb-2">🏆 JACKPOT (3 Match)</h3>
-                  <div className="space-y-1 text-sm">
-                  <div>🏛️ Aptos: 20x</div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <AptosLogo size={20} />
+                    <span>Diamond: 20x</span>
+                  </div>
                   <div>⭐ Star: 12x</div>
-                  <div>🏆 ChainCasino: 6x</div>
+                  <div className="flex items-center gap-2">
+                    <CoinImage size={20} />
+                    <span>Coin: 6x</span>
+                  </div>
                   <div>🔔 Bell: 4x</div>
                   <div>🍒 Cherry: 3x</div>
                 </div>
