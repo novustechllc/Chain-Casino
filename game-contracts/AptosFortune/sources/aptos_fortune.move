@@ -41,14 +41,14 @@ module aptos_fortune::AptosFortune {
     // Game Constants
     //
 
-    /// Minimum bet: 0.1 APT in octas
-    const MIN_BET: u64 = 10000000;
-    /// Maximum bet: 1 APT in octas
-    const MAX_BET: u64 = 100000000;
+    /// Minimum bet: 0.01 APT in octas
+    const MIN_BET: u64 = 1000000;
+    /// Maximum bet: 0.1 APT in octas
+    const MAX_BET: u64 = 10000000;
     /// House edge: 22% (2200 basis points)
     const HOUSE_EDGE_BPS: u64 = 2200;
-    /// Maximum payout: 20x bet (20 APT max)
-    const MAX_PAYOUT: u64 = 2000000000;
+    /// Maximum payout: 20x bet (2 APT max)
+    const MAX_PAYOUT: u64 = 200000000;
     /// Game version
     const GAME_VERSION: vector<u8> = b"v1";
 

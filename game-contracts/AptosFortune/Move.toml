@@ -1,6 +1,7 @@
 [package]
 name = "AptosFortune"
 version = "1.0.0"
+upgrade_policy = "compatible"
 authors = ["Persona Normale"]
 license = "MIT"
 
