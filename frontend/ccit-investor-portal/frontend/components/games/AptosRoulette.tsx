@@ -195,8 +195,10 @@ const AptosRoulette = () => {
   const [winningNumber, setWinningNumber] = useState<number | null>(null);
   const [history, setHistory] = useState<number[]>([]);
   const [showNumberGrid, setShowNumberGrid] = useState(false);
-
-  const prizeNumber = useRef(0);
+  
+  // Result tracking state (like SevenOut)
+  const [waitingForNewResult, setWaitingForNewResult] = useState(false);
+  const [lastResultHash, setLastResultHash] = useState<string>('');
 
   // Available bet types
   const BET_TYPES: BetSelection[] = [
@@ -240,6 +242,7 @@ const AptosRoulette = () => {
         
         if (!gameIsReady) {
           setConfigError('Game is not ready. Please ensure AptosRoulette is properly initialized.');
+          setIsLoading(false); // ✅ Fix: Always clear loading state
           return;
         }
         
@@ -305,10 +308,12 @@ const AptosRoulette = () => {
         const result = parseRouletteResult(res);
         if (result && result.total_wagered > 0) {
           setLastResult(result);
+          setLastResultHash(JSON.stringify(result));  // Store hash for comparison
           setHistory(prev => [result.winning_number, ...prev.slice(0, 19)]);
         }
       } catch (error) {
         // No existing result, which is fine
+        console.log('No existing results found');
       }
     };
 
@@ -336,7 +341,8 @@ const AptosRoulette = () => {
       return;
     }
 
-    setIsSpinning(true);
+    setWaitingForNewResult(true);
+    // Don't start spinning until transaction is confirmed
 
     try {
       let payload;
@@ -367,8 +373,34 @@ const AptosRoulette = () => {
         description: `${formatAPT(amount)} APT bet placed. Spinning the wheel...`,
       });
 
-      // Start polling for result
-      pollForResult();
+      // Start spinning wheel and checking for result after 1 second delay (like SevenOut)
+      setTimeout(() => {
+        setIsSpinning(true); // Start wheel spinning after transaction confirmation
+        
+        // Start polling for result every 2 seconds (like SevenOut)
+        const pollInterval = setInterval(() => {
+          checkForResult().then(() => {
+            // Stop polling once we have a result
+            if (!waitingForNewResult) {
+              clearInterval(pollInterval);
+            }
+          });
+        }, 2000);
+        
+        // Cleanup after 60 seconds max
+        setTimeout(() => {
+          clearInterval(pollInterval);
+          if (waitingForNewResult) {
+            setWaitingForNewResult(false);
+            setIsSpinning(false);
+            toast({
+              title: 'Result Timeout',
+              description: 'Could not fetch the game result. Please check manually.',
+              variant: 'destructive'
+            });
+          }
+        }, 60000);
+      }, 1000);
     } catch (error) {
       console.error('❌ Bet failed:', error);
       toast({
@@ -377,76 +409,77 @@ const AptosRoulette = () => {
         variant: 'destructive',
       });
       setIsSpinning(false);
+      setWaitingForNewResult(false);
     }
   };
 
-  // Poll for game result
-  const pollForResult = async () => {
-    let attempts = 0;
-    const maxAttempts = 30;
-    const interval = 1000;
+  // Check for result (handling error gracefully when result doesn't exist)
+  const checkForResult = async () => {
+    if (!account) return;
+    
+    try {
+      console.log('🔍 Checking for result...');
+      
+      // Try to get result directly - will fail if doesn't exist
+      const res = await aptosClient().view({
+        payload: {
+          function: `${GAMES_ADDRESS}::AptosRoulette::get_latest_result`,
+          functionArguments: [account.address]
+        }
+      });
 
-    const poll = setInterval(async () => {
-      attempts++;
-      try {
-        const res = await aptosClient().view({
-          payload: {
-            function: `${GAMES_ADDRESS}::AptosRoulette::get_latest_result`,
-            functionArguments: [account!.address],
-          },
-        });
-
-        const newResult = parseRouletteResult(res);
+      const newResult = parseRouletteResult(res);
+      console.log('🎯 Result found:', newResult);
+      
+      // Check if this is a valid result with actual data
+      if (newResult && newResult.total_wagered > 0) {
+        const resultHash = JSON.stringify(newResult);
         
-        if (newResult && newResult.total_wagered > 0 && 
-            (!lastResult || JSON.stringify(newResult) !== JSON.stringify(lastResult))) {
+        // If this is a new result (different hash), process it
+        if (resultHash !== lastResultHash) {
+          console.log(`🆕 New result found!`);
           
           setLastResult(newResult);
-          prizeNumber.current = newResult.winning_number;
+          setLastResultHash(resultHash);
           setWinningNumber(newResult.winning_number);
+          setWaitingForNewResult(false);
 
           const color = getNumberColor(newResult.winning_number);
           const resultText = `${newResult.winning_number} ${color.toUpperCase()}`;
-
-          if (newResult.net_result) {
-            toast({ 
-              title: '🎉 Winner!', 
-              description: `${resultText}! You won ${formatAPT(newResult.total_payout)} APT!`,
-              variant: "default"
-            });
-          } else {
-            toast({ 
-              title: '💸 House Wins', 
-              description: `${resultText}. Better luck next time!`,
-              variant: 'destructive' 
-            });
-          }
-          
           setHistory(prev => [newResult.winning_number, ...prev.slice(0, 19)]);
-          clearInterval(poll);
-          
-          // Stop spinning after wheel animation
+
+          // Continue spinning for 2 more seconds like SevenOut
           setTimeout(() => {
+            console.log('🛑 Stopping roulette wheel...');
             setIsSpinning(false);
             setBetSelection(null);
             setSelectedNumber(null);
             setBetAmount('');
-          }, 6000);
+            
+            if (newResult.net_result) {
+              toast({ 
+                title: '🎉 Winner!', 
+                description: `${resultText}! You won ${formatAPT(newResult.total_payout)} APT!`,
+                variant: "default"
+              });
+            } else {
+              toast({ 
+                title: '💸 House Wins', 
+                description: `${resultText}. Better luck next time!`,
+                variant: 'destructive' 
+              });
+            }
+          }, 2000);
+        } else {
+          console.log('📡 Same result, still waiting for new result...');
         }
-      } catch (e) {
-        // Normal to fail while waiting for result
+      } else {
+        console.log('📡 Result exists but no valid data yet...');
       }
-
-      if (attempts >= maxAttempts) {
-        clearInterval(poll);
-        setIsSpinning(false);
-        toast({ 
-          title: 'Result Timeout', 
-          description: 'Could not fetch the game result. Please check manually.',
-          variant: 'destructive' 
-        });
-      }
-    }, interval);
+    } catch (error) {
+      // This is expected when no result exists yet - not an error
+      console.log('📡 No result yet (expected while waiting)...');
+    }
   };
 
   // Quick bet amounts
@@ -625,17 +658,25 @@ const AptosRoulette = () => {
             <RetroCard className="p-6" glowOnHover>
               <div className="text-center mb-4">
                 <h3 className="text-2xl text-yellow-400 font-bold retro-terminal-font">
-                  {isSpinning ? '🌀 SPINNING...' : '🎲 PLACE YOUR BETS'}
+                  {waitingForNewResult ? '⏳ WAITING FOR RESULT...' : 
+                   isSpinning ? '🌀 SPINNING...' : 
+                   '🎲 PLACE YOUR BETS'}
                 </h3>
               </div>
               
               <div className="flex justify-center items-center h-[400px] bg-black/30 border border-purple-400/30 rounded-lg overflow-hidden">
-                <RouletteWheel
-                  start={isSpinning}
-                  winningBet={winningNumber !== null ? String(winningNumber) : undefined}
-                  onSpinningEnd={() => {}}
-                  withAnimation={true}
-                />
+                {/* Roulette Wheel with error boundary */}
+                <div className="w-full h-full flex items-center justify-center">
+                  <RouletteWheel
+                    start={isSpinning}
+                    winningBet={winningNumber !== null ? String(winningNumber) : "0"}
+                    onSpinningEnd={() => {
+                      console.log('🎡 Wheel animation completed');
+                    }}
+                    withAnimation={true}
+                    addRest={true}
+                  />
+                </div>
             </div>
 
               {/* Recent History */}
@@ -693,7 +734,7 @@ const AptosRoulette = () => {
                   onChange={(e) => setBetAmount(e.target.value)}
                   placeholder={gameConfig ? `Min ${formatAPT(gameConfig.min_bet)}` : '0.001'}
                   className="bg-black/50 border-cyan-400/50 text-white placeholder-gray-500"
-                  disabled={isSpinning}
+                  disabled={isSpinning || waitingForNewResult}
                 />
                 
                 {/* Quick Bet Buttons */}
@@ -705,7 +746,7 @@ const AptosRoulette = () => {
                       variant="outline"
                       size="sm"
                       className="flex-1 bg-black/30 border-cyan-400/50 text-cyan-400 hover:bg-cyan-400/20"
-                      disabled={isSpinning}
+                      disabled={isSpinning || waitingForNewResult}
                     >
                       {label}
                     </Button>
@@ -730,7 +771,7 @@ const AptosRoulette = () => {
                           ${bet.type === 'black' ? 'bg-gray-800/80 hover:bg-gray-700 border-gray-600' : ''}
                           ${betSelection?.type === bet.type && betSelection?.betValue === bet.betValue ? 'ring-2 ring-yellow-400' : ''}
                         `}
-                        disabled={isSpinning}
+                        disabled={isSpinning || waitingForNewResult}
                       >
                         {bet.label}
                       </Button>
@@ -751,7 +792,7 @@ const AptosRoulette = () => {
                           text-xs py-2 transition-all duration-200
                           ${betSelection?.type === bet.type && betSelection?.betValue === bet.betValue ? 'ring-2 ring-yellow-400 bg-purple-600' : 'bg-black/30 border-purple-400/50 text-purple-400 hover:bg-purple-400/20'}
                         `}
-                        disabled={isSpinning}
+                        disabled={isSpinning || waitingForNewResult}
                       >
                         {bet.label}
                       </Button>
@@ -769,7 +810,7 @@ const AptosRoulette = () => {
                       w-full py-2 transition-all duration-200
                       ${showNumberGrid ? 'ring-2 ring-yellow-400 bg-green-600' : 'bg-black/30 border-green-400/50 text-green-400 hover:bg-green-400/20'}
                     `}
-                    disabled={isSpinning}
+                    disabled={isSpinning || waitingForNewResult}
                   >
                     {selectedNumber !== null ? `Number ${selectedNumber}` : 'Select Number'}
                   </Button>
@@ -781,9 +822,11 @@ const AptosRoulette = () => {
                 <Button
                   onClick={handlePlaceBet}
                   className="w-full text-xl py-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 border-2 border-green-400 text-white font-bold"
-                  disabled={isSpinning || !betSelection || !betAmount || parseFloat(betAmount) <= 0}
+                  disabled={isSpinning || waitingForNewResult || !betSelection || !betAmount || parseFloat(betAmount) <= 0}
                 >
-                  {isSpinning ? '🌀 SPINNING...' : '🎲 SPIN THE WHEEL'}
+                  {waitingForNewResult ? '⏳ WAITING FOR RESULT...' : 
+                   isSpinning ? '🌀 SPINNING...' : 
+                   '🎲 SPIN THE WHEEL'}
                 </Button>
 
                 {betSelection && (
@@ -791,7 +834,7 @@ const AptosRoulette = () => {
                     onClick={clearBet}
                     variant="outline"
                     className="w-full bg-black/30 border-red-400/50 text-red-400 hover:bg-red-400/20"
-                    disabled={isSpinning}
+                    disabled={isSpinning || waitingForNewResult}
                   >
                     Clear Bet
                   </Button>
