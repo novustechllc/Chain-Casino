@@ -79,96 +79,89 @@ const RetroCard = ({ children, className = "", glowOnHover = false }) => {
   );
 };
 
-// 2D Slot Machine Reels Component
+// Slot Machine Reels Component - Real Casino Style
 const SlotMachineReels = ({ reel1, reel2, reel3, isSpinning }) => {
-  // Render symbol function
+  const [spinning, setSpinning] = useState(false);
+  const [finalResult, setFinalResult] = useState({ reel1, reel2, reel3 });
+  const intervalRef = useRef();
+  
   const renderSymbol = (symbolNumber) => {
     const symbol = FORTUNE_SYMBOLS[symbolNumber];
     if (symbol?.logo) {
-      return (
-        <img
-          src="/chaincasino-coin.png"
-          alt="ChainCasino"
-          className="w-16 h-16 mx-auto"
-          style={{
-            filter: 'drop-shadow(0 0 8px rgba(255, 215, 0, 0.6))',
-          }}
-        />
-      );
+      return <img src="/chaincasino-coin.png" alt="ChainCasino" className="w-14 h-14" />;
     }
     if (symbol?.aptosLogo) {
-      return (
-        <div className="flex justify-center">
-          <AptosLogo size={64} />
-        </div>
-      );
+      return <AptosLogo size={56} />;
     }
+    return <div className="text-4xl">{symbol?.emoji || '?'}</div>;
+  };
+
+  const Reel = ({ finalSymbol }) => {
+    const [currentSymbol, setCurrentSymbol] = useState(finalSymbol);
+    
+    useEffect(() => {
+      if (spinning) {
+        const interval = setInterval(() => {
+          setCurrentSymbol(Math.floor(Math.random() * 5) + 1);
+        }, 150);
+        return () => clearInterval(interval);
+      } else {
+        setCurrentSymbol(finalSymbol);
+      }
+    }, [spinning, finalSymbol]);
+
     return (
-      <div className="text-4xl" style={{ lineHeight: '1' }}>
-        {symbol?.emoji || '?'}
+      <div className="relative bg-white/10 border-2 border-gray-400 rounded-lg h-24 w-20 overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center">
+          {renderSymbol(currentSymbol)}
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/40 pointer-events-none" />
       </div>
     );
   };
 
-  // Create spinning symbols array for animation
-  const getSpinningSymbols = () => {
-    const symbols = [];
-    for (let i = 1; i <= 5; i++) {
-      symbols.push(i);
+  useEffect(() => {
+    if (isSpinning && !spinning) {
+      setSpinning(true);
+      
+      // Check for new result every 500ms
+      intervalRef.current = setInterval(() => {
+        // Check if we have a new result (compare with previous)
+        if (reel1 !== finalResult.reel1 || reel2 !== finalResult.reel2 || reel3 !== finalResult.reel3) {
+          clearInterval(intervalRef.current);
+          setFinalResult({ reel1, reel2, reel3 });
+          
+          // Spin for 2 more seconds then stop
+          setTimeout(() => {
+            setSpinning(false);
+          }, 2000);
+        }
+      }, 500);
     }
-    return [...symbols, ...symbols, ...symbols]; // Triple for smooth animation
-  };
+    
+    return () => clearInterval(intervalRef.current);
+  }, [isSpinning, reel1, reel2, reel3, finalResult, spinning]);
 
-  const spinningSymbols = getSpinningSymbols();
+  // Reset when not spinning
+  useEffect(() => {
+    if (!isSpinning) {
+      setSpinning(false);
+      setFinalResult({ reel1, reel2, reel3 });
+      clearInterval(intervalRef.current);
+    }
+  }, [isSpinning, reel1, reel2, reel3]);
 
   return (
     <div className="flex justify-center">
       <div className="bg-gradient-to-br from-yellow-900/40 to-orange-900/40 border-4 border-yellow-500/50 rounded-xl p-6 backdrop-blur-sm">
-        {/* Slot Machine Frame */}
         <div className="bg-black/60 border-2 border-yellow-400/30 rounded-lg p-4 mb-4">
           <div className="grid grid-cols-3 gap-4">
-            {/* Reel 1 */}
-            <div className="relative bg-white/10 border-2 border-gray-400 rounded-lg h-24 w-20 overflow-hidden">
-              <div className="absolute inset-0 flex items-center justify-center">
-                {isSpinning ? (
-                  <div className="animate-bounce">
-                    {renderSymbol(Math.floor(Math.random() * 5) + 1)}
-                  </div>
-                ) : (
-                  renderSymbol(reel1)
-                )}
-              </div>
-            </div>
-
-            {/* Reel 2 */}
-            <div className="relative bg-white/10 border-2 border-gray-400 rounded-lg h-24 w-20 overflow-hidden">
-              <div className="absolute inset-0 flex items-center justify-center">
-                {isSpinning ? (
-                  <div className="animate-pulse">
-                    {renderSymbol(Math.floor(Math.random() * 5) + 1)}
-                  </div>
-                ) : (
-                  renderSymbol(reel2)
-                )}
-              </div>
-            </div>
-
-            {/* Reel 3 */}
-            <div className="relative bg-white/10 border-2 border-gray-400 rounded-lg h-24 w-20 overflow-hidden">
-              <div className="absolute inset-0 flex items-center justify-center">
-                {isSpinning ? (
-                  <div className="animate-spin">
-                    {renderSymbol(Math.floor(Math.random() * 5) + 1)}
-                  </div>
-                ) : (
-                  renderSymbol(reel3)
-                )}
-              </div>
-            </div>
+            <Reel finalSymbol={finalResult.reel1} />
+            <Reel finalSymbol={finalResult.reel2} />
+            <Reel finalSymbol={finalResult.reel3} />
           </div>
         </div>
 
-        {/* Slot Machine Title */}
         <div className="text-center">
           <div className="text-yellow-400 font-bold text-lg retro-pixel-font">
             🎰 APTOS FORTUNE 🎰
@@ -191,7 +184,6 @@ export const AptosFortune: React.FC = () => {
   const [gameConfig, setGameConfig] = useState<FortuneConfig | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
-  const [winStreak, setWinStreak] = useState(0);
   const [totalWinnings, setTotalWinnings] = useState(0);
   const [lastSessionId, setLastSessionId] = useState(0);
 
@@ -323,29 +315,6 @@ export const AptosFortune: React.FC = () => {
         setIsSpinning(false);
         await loadPlayerResult();
         setIsLoading(false);
-
-        // Check for win and update streaks
-        if (gameResult && gameResult.payout > 0) {
-          setWinStreak(prev => prev + 1);
-          setTotalWinnings(prev => prev + gameResult.payout);
-          
-          const matchTypeText = gameResult.match_type === 3 ? 'JACKPOT!' :
-                               gameResult.match_type === 2 ? 'PARTIAL WIN!' :
-                               'CONSOLATION!';
-          
-          toast({
-            title: `🎰 ${matchTypeText}`,
-            description: `Won ${formatAPT(gameResult.payout)} APT!`,
-            variant: "default"
-          });
-        } else {
-          setWinStreak(0);
-          toast({
-            title: "No Win",
-            description: "Better luck next spin!",
-            variant: "destructive"
-          });
-        }
       }, 2000);
 
     } catch (error) {
@@ -432,8 +401,6 @@ export const AptosFortune: React.FC = () => {
               <span className="text-green-400">MACHINE ACTIVE</span>
             </div>
             <div className="text-gray-400">•</div>
-            <div className="text-yellow-400">🎯 Win Streak: {winStreak}</div>
-            <div className="text-gray-400">•</div>
             <div className="text-orange-400">💰 Total Won: {formatAPT(totalWinnings)} APT</div>
           </div>
         </div>
@@ -464,31 +431,7 @@ export const AptosFortune: React.FC = () => {
                 />
               </div>
 
-              {/* Last Result Display */}
-              {gameResult && (
-                <div className="bg-black/40 border border-yellow-400/30 rounded-lg p-4 mb-6">
-                  <div className="text-yellow-400 font-bold mb-2">Last Spin Result:</div>
-                  <div className="grid grid-cols-3 gap-4 text-center mb-4">
-                    {[gameResult.reel1, gameResult.reel2, gameResult.reel3].map((reel, i) => (
-                      <div key={i} className="bg-black/60 border border-gray-600 rounded-lg p-3">
-                        <div className="text-2xl mb-1">{FORTUNE_SYMBOLS[reel]?.emoji}</div>
-                        <div className="text-xs text-gray-400">{FORTUNE_SYMBOLS[reel]?.name}</div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-400">
-                      Match Type: {gameResult.match_type === 3 ? 'Jackpot' :
-                                  gameResult.match_type === 2 ? 'Partial' :
-                                  gameResult.match_type === 1 ? 'Consolation' : 'No Match'}
-                    </span>
-                    <span className={gameResult.payout > 0 ? 'text-green-400' : 'text-red-400'}>
-                      {gameResult.payout > 0 ? '+' : ''}{formatAPT(gameResult.payout)} APT
-                    </span>
-                  </div>
-                </div>
-              )}
+
 
             </RetroCard>
 
