@@ -611,12 +611,12 @@ export const AptosFortune: React.FC = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2">
                     <AptosLogo size={20} />
-                    <span>Diamond: 20x</span>
+                    <span>Aptos: 20x</span>
                   </div>
                   <div>⭐ Star: 12x</div>
                   <div className="flex items-center gap-2">
                     <CoinImage size={20} />
-                    <span>Coin: 6x</span>
+                    <span>ChainCasino: 6x</span>
                   </div>
                   <div>🔔 Bell: 4x</div>
                   <div>🍒 Cherry: 3x</div>
