@@ -7,6 +7,7 @@ import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react';
 import { GameHub } from '@/components/games/GameHub';
 import { SevenOut } from '@/components/games/SevenOut';
 import { AptosFortune } from '@/components/games/AptosFortune';
+import AptosRoulette from '@/components/games/AptosRoulette';
 
 // Components
 import InvestorPortal from './pages/InvestorPortal';
@@ -52,6 +53,9 @@ function App() {
 
               {/* AptosFortune game route */}
               <Route path="/fortune" element={<AptosFortune />} />
+
+              {/* AptosRoulette game route */}
+              <Route path="/roulette" element={<AptosRoulette />} />
 
               {/* Catch all - redirect to home */}
               <Route path="*" element={<Navigate to="/" replace />} />
