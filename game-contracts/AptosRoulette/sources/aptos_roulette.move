@@ -1148,6 +1148,28 @@ module roulette_game::AptosRoulette {
         }
     }
 
+    #[view]
+    /// Get game configuration (min/max bet, house edge)
+    public fun get_game_config(): (u64, u64, u64, u64) acquires GameRegistry {
+        assert!(is_initialized(), E_NOT_INITIALIZED);
+        let registry = borrow_global<GameRegistry>(@roulette_game);
+        let game_object = registry.game_object;
+        let (
+            _name,
+            _version,
+            _module_address,
+            min_bet,
+            max_bet,
+            house_edge_bps,
+            max_payout,
+            _claimed,
+            _web,
+            _icon,
+            _desc
+        ) = CasinoHouse::get_game_metadata(game_object);
+        (min_bet, max_bet, house_edge_bps, max_payout)
+    }
+
     /// Clear game result (for testing)
     public entry fun clear_game_result(player: &signer) acquires SpinResult {
         let player_addr = signer::address_of(player);

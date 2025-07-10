@@ -31,6 +31,40 @@ module roulette_game::AptosRouletteIntegrationTests {
     const MIN_BET: u64 = 1000000; // 0.01 APT
     const MAX_BET: u64 = 10000000; // 0.1 APT
 
+    /// Sets up the entire ecosystem: accounts, funding, casino, and game registration/initialization.
+    /// This is the single source of truth for test setup to ensure consistency.
+    fun setup_and_initialize_roulette(): (signer, signer, signer, signer) {
+        let (_, casino_signer, roulette_signer, whale_investor, player) =
+            setup_roulette_ecosystem();
+
+        // PHASE 1: CASINO SETUP
+        CasinoHouse::init_module_for_test(&casino_signer);
+        InvestorToken::init_module_for_test(&casino_signer);
+        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
+
+        // PHASE 2: GAME REGISTRATION
+        CasinoHouse::register_game(
+            &casino_signer,
+            ROULETTE_ADDR,
+            string::utf8(b"AptosRoulette"),
+            string::utf8(b"v1"),
+            MIN_BET,
+            MAX_BET,
+            270,
+            350000000,
+            string::utf8(b"https://chaincasino.apt/roulette"),
+            string::utf8(
+                b"https://chaincasino.apt/icons/roulette.png"
+            ),
+            string::utf8(b"European Roulette with comprehensive betting options")
+        );
+
+        // PHASE 3: GAME INITIALIZATION
+        AptosRoulette::initialize_game(&roulette_signer);
+
+        (casino_signer, roulette_signer, whale_investor, player)
+    }
+
     fun setup_roulette_ecosystem(): (signer, signer, signer, signer, signer) {
         let aptos_framework = account::create_account_for_test(@aptos_framework);
         let casino_signer = account::create_account_for_test(CASINO_ADDR);
@@ -65,35 +99,7 @@ module roulette_game::AptosRouletteIntegrationTests {
 
     #[test]
     fun test_roulette_initialization_and_basic_gameplay() {
-        let (_, casino_signer, roulette_signer, whale_investor, player) =
-            setup_roulette_ecosystem();
-
-        // === PHASE 1: CASINO SETUP ===
-        CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init_module_for_test(&casino_signer);
-
-        // Provide initial liquidity
-        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
-
-        // === PHASE 2: GAME REGISTRATION ===
-        CasinoHouse::register_game(
-            &casino_signer,
-            ROULETTE_ADDR,
-            string::utf8(b"AptosRoulette"),
-            string::utf8(b"v2"),
-            MIN_BET,
-            MAX_BET,
-            270, // 2.7% house edge (European roulette)
-            350000000, // max_payout: 35x max_bet = 35 * 10M = 350M
-            string::utf8(b"https://chaincasino.apt/roulette"),
-            string::utf8(
-                b"https://chaincasino.apt/icons/roulette.png"
-            ),
-            string::utf8(b"European Roulette with comprehensive betting options")
-        );
-
-        // === PHASE 3: GAME INITIALIZATION ===
-        AptosRoulette::initialize_game(&roulette_signer);
+        let (_, _, _, player) = setup_and_initialize_roulette();
 
         // Verify initialization success
         assert!(AptosRoulette::is_initialized(), 1);
@@ -416,32 +422,7 @@ module roulette_game::AptosRouletteIntegrationTests {
     #[test]
     #[expected_failure(abort_code = roulette_game::AptosRoulette::E_INVALID_AMOUNT)]
     fun test_bet_amount_too_low() {
-        let (_, casino_signer, roulette_signer, whale_investor, player) =
-            setup_roulette_ecosystem();
-
-        // Setup complete ecosystem
-        CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init_module_for_test(&casino_signer);
-        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
-
-        CasinoHouse::register_game(
-            &casino_signer,
-            ROULETTE_ADDR,
-            string::utf8(b"AptosRoulette"),
-            string::utf8(b"v2"),
-            MIN_BET,
-            MAX_BET,
-            270,
-            350000000,
-            string::utf8(b"https://chaincasino.apt/roulette"),
-            string::utf8(
-                b"https://chaincasino.apt/icons/roulette.png"
-            ),
-            string::utf8(b"European Roulette with comprehensive betting options")
-        );
-
-        AptosRoulette::initialize_game(&roulette_signer);
-
+        let (_, _, _, player) = setup_and_initialize_roulette();
         // Try to bet below minimum - should fail
         AptosRoulette::test_only_bet_number(&player, 7, MIN_BET - 1);
     }
@@ -449,32 +430,7 @@ module roulette_game::AptosRouletteIntegrationTests {
     #[test]
     #[expected_failure(abort_code = roulette_game::AptosRoulette::E_INVALID_AMOUNT)]
     fun test_bet_amount_too_high() {
-        let (_, casino_signer, roulette_signer, whale_investor, player) =
-            setup_roulette_ecosystem();
-
-        // Setup complete ecosystem
-        CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init_module_for_test(&casino_signer);
-        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
-
-        CasinoHouse::register_game(
-            &casino_signer,
-            ROULETTE_ADDR,
-            string::utf8(b"AptosRoulette"),
-            string::utf8(b"v2"),
-            MIN_BET,
-            MAX_BET,
-            270,
-            1050000000,
-            string::utf8(b"https://chaincasino.apt/roulette"),
-            string::utf8(
-                b"https://chaincasino.apt/icons/roulette.png"
-            ),
-            string::utf8(b"European Roulette with comprehensive betting options")
-        );
-
-        AptosRoulette::initialize_game(&roulette_signer);
-
+        let (_, _, _, player) = setup_and_initialize_roulette();
         // Try to bet above maximum - should fail
         AptosRoulette::test_only_bet_number(&player, 7, MAX_BET + 1);
     }
@@ -482,32 +438,7 @@ module roulette_game::AptosRouletteIntegrationTests {
     #[test]
     #[expected_failure(abort_code = roulette_game::AptosRoulette::E_INVALID_NUMBER)]
     fun test_invalid_number() {
-        let (_, casino_signer, roulette_signer, whale_investor, player) =
-            setup_roulette_ecosystem();
-
-        // Setup complete ecosystem
-        CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init_module_for_test(&casino_signer);
-        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
-
-        CasinoHouse::register_game(
-            &casino_signer,
-            ROULETTE_ADDR,
-            string::utf8(b"AptosRoulette"),
-            string::utf8(b"v2"),
-            MIN_BET,
-            MAX_BET,
-            270,
-            350000000,
-            string::utf8(b"https://chaincasino.apt/roulette"),
-            string::utf8(
-                b"https://chaincasino.apt/icons/roulette.png"
-            ),
-            string::utf8(b"European Roulette with comprehensive betting options")
-        );
-
-        AptosRoulette::initialize_game(&roulette_signer);
-
+        let (_, _, _, player) = setup_and_initialize_roulette();
         // Try to bet on invalid number (>36) - should fail
         AptosRoulette::test_only_bet_number(&player, 37, STANDARD_BET);
     }
@@ -515,32 +446,7 @@ module roulette_game::AptosRouletteIntegrationTests {
     #[test]
     #[expected_failure(abort_code = roulette_game::AptosRoulette::E_INVALID_DOZEN)]
     fun test_invalid_dozen() {
-        let (_, casino_signer, roulette_signer, whale_investor, player) =
-            setup_roulette_ecosystem();
-
-        // Setup complete ecosystem
-        CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init_module_for_test(&casino_signer);
-        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
-
-        CasinoHouse::register_game(
-            &casino_signer,
-            ROULETTE_ADDR,
-            string::utf8(b"AptosRoulette"),
-            string::utf8(b"v2"),
-            MIN_BET,
-            MAX_BET,
-            270,
-            350000000,
-            string::utf8(b"https://chaincasino.apt/roulette"),
-            string::utf8(
-                b"https://chaincasino.apt/icons/roulette.png"
-            ),
-            string::utf8(b"European Roulette with comprehensive betting options")
-        );
-
-        AptosRoulette::initialize_game(&roulette_signer);
-
+        let (_, _, _, player) = setup_and_initialize_roulette();
         // Try to bet on invalid dozen (4) - should fail
         AptosRoulette::test_only_place_bet(
             &player,
@@ -554,32 +460,7 @@ module roulette_game::AptosRouletteIntegrationTests {
     #[test]
     #[expected_failure(abort_code = roulette_game::AptosRoulette::E_INVALID_COLUMN)]
     fun test_invalid_column() {
-        let (_, casino_signer, roulette_signer, whale_investor, player) =
-            setup_roulette_ecosystem();
-
-        // Setup complete ecosystem
-        CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init_module_for_test(&casino_signer);
-        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
-
-        CasinoHouse::register_game(
-            &casino_signer,
-            ROULETTE_ADDR,
-            string::utf8(b"AptosRoulette"),
-            string::utf8(b"v2"),
-            MIN_BET,
-            MAX_BET,
-            270,
-            350000000,
-            string::utf8(b"https://chaincasino.apt/roulette"),
-            string::utf8(
-                b"https://chaincasino.apt/icons/roulette.png"
-            ),
-            string::utf8(b"European Roulette with comprehensive betting options")
-        );
-
-        AptosRoulette::initialize_game(&roulette_signer);
-
+        let (_, _, _, player) = setup_and_initialize_roulette();
         // Try to bet on invalid column (0) - should fail
         AptosRoulette::test_only_place_bet(
             &player,
@@ -602,32 +483,7 @@ module roulette_game::AptosRouletteIntegrationTests {
     #[test]
     #[expected_failure(abort_code = roulette_game::AptosRoulette::E_ALREADY_INITIALIZED)]
     fun test_double_initialization() {
-        let (_, casino_signer, roulette_signer, whale_investor, _) =
-            setup_roulette_ecosystem();
-
-        // Setup complete ecosystem
-        CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init_module_for_test(&casino_signer);
-        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
-
-        CasinoHouse::register_game(
-            &casino_signer,
-            ROULETTE_ADDR,
-            string::utf8(b"AptosRoulette"),
-            string::utf8(b"v2"),
-            MIN_BET,
-            MAX_BET,
-            270,
-            350000000,
-            string::utf8(b"https://chaincasino.apt/roulette"),
-            string::utf8(
-                b"https://chaincasino.apt/icons/roulette.png"
-            ),
-            string::utf8(b"European Roulette with comprehensive betting options")
-        );
-
-        AptosRoulette::initialize_game(&roulette_signer);
-
+        let (_, roulette_signer, _, _) = setup_and_initialize_roulette();
         // Try to initialize again - should fail
         AptosRoulette::initialize_game(&roulette_signer);
     }
@@ -635,32 +491,7 @@ module roulette_game::AptosRouletteIntegrationTests {
     #[test]
     #[expected_failure(abort_code = roulette_game::AptosRoulette::E_MISMATCHED_BET_ARRAYS)]
     fun test_mismatched_bet_arrays() {
-        let (_, casino_signer, roulette_signer, whale_investor, player) =
-            setup_roulette_ecosystem();
-
-        // Setup complete ecosystem
-        CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init_module_for_test(&casino_signer);
-        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
-
-        CasinoHouse::register_game(
-            &casino_signer,
-            ROULETTE_ADDR,
-            string::utf8(b"AptosRoulette"),
-            string::utf8(b"v2"),
-            MIN_BET,
-            MAX_BET,
-            270,
-            350000000,
-            string::utf8(b"https://chaincasino.apt/roulette"),
-            string::utf8(
-                b"https://chaincasino.apt/icons/roulette.png"
-            ),
-            string::utf8(b"European Roulette with comprehensive betting options")
-        );
-
-        AptosRoulette::initialize_game(&roulette_signer);
-
+        let (_, _, _, player) = setup_and_initialize_roulette();
         // Try multi-bet with mismatched arrays - should fail
         let bet_flags = vector[0, 4]; // 2 elements
         let bet_values = vector[7, 1, 2]; // 3 elements (mismatch)
@@ -679,32 +510,7 @@ module roulette_game::AptosRouletteIntegrationTests {
     #[test]
     #[expected_failure(abort_code = roulette_game::AptosRoulette::E_TOO_MANY_BETS)]
     fun test_too_many_bets() {
-        let (_, casino_signer, roulette_signer, whale_investor, player) =
-            setup_roulette_ecosystem();
-
-        // Setup complete ecosystem
-        CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init_module_for_test(&casino_signer);
-        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
-
-        CasinoHouse::register_game(
-            &casino_signer,
-            ROULETTE_ADDR,
-            string::utf8(b"AptosRoulette"),
-            string::utf8(b"v2"),
-            MIN_BET,
-            MAX_BET,
-            270,
-            350000000,
-            string::utf8(b"https://chaincasino.apt/roulette"),
-            string::utf8(
-                b"https://chaincasino.apt/icons/roulette.png"
-            ),
-            string::utf8(b"European Roulette with comprehensive betting options")
-        );
-
-        AptosRoulette::initialize_game(&roulette_signer);
-
+        let (_, _, _, player) = setup_and_initialize_roulette();
         // Try to place more than MAX_BETS_PER_TRANSACTION (10) bets - should fail
         let bet_flags = vector[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // 11 elements
         let bet_values = vector[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
@@ -746,31 +552,7 @@ module roulette_game::AptosRouletteIntegrationTests {
 
     #[test]
     fun test_comprehensive_bet_scenarios() {
-        let (_, casino_signer, roulette_signer, whale_investor, player) =
-            setup_roulette_ecosystem();
-
-        // Setup complete ecosystem
-        CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init_module_for_test(&casino_signer);
-        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
-
-        CasinoHouse::register_game(
-            &casino_signer,
-            ROULETTE_ADDR,
-            string::utf8(b"AptosRoulette"),
-            string::utf8(b"v2"),
-            MIN_BET,
-            MAX_BET,
-            270,
-            350000000,
-            string::utf8(b"https://chaincasino.apt/roulette"),
-            string::utf8(
-                b"https://chaincasino.apt/icons/roulette.png"
-            ),
-            string::utf8(b"European Roulette with comprehensive betting options")
-        );
-
-        AptosRoulette::initialize_game(&roulette_signer);
+        let (_, _, _, player) = setup_and_initialize_roulette();
 
         // Test multiple bet amounts
         let bet_amounts = vector[MIN_BET, STANDARD_BET, MAX_BET];
@@ -829,31 +611,7 @@ module roulette_game::AptosRouletteIntegrationTests {
 
     #[test]
     fun test_complex_multi_bet_scenarios() {
-        let (_, casino_signer, roulette_signer, whale_investor, player) =
-            setup_roulette_ecosystem();
-
-        // Setup complete ecosystem
-        CasinoHouse::init_module_for_test(&casino_signer);
-        InvestorToken::init_module_for_test(&casino_signer);
-        InvestorToken::deposit_and_mint(&whale_investor, WHALE_CAPITAL);
-
-        CasinoHouse::register_game(
-            &casino_signer,
-            ROULETTE_ADDR,
-            string::utf8(b"AptosRoulette"),
-            string::utf8(b"v2"),
-            MIN_BET,
-            MAX_BET,
-            270,
-            350000000,
-            string::utf8(b"https://chaincasino.apt/roulette"),
-            string::utf8(
-                b"https://chaincasino.apt/icons/roulette.png"
-            ),
-            string::utf8(b"European Roulette with comprehensive betting options")
-        );
-
-        AptosRoulette::initialize_game(&roulette_signer);
+        let (_, _, _, player) = setup_and_initialize_roulette();
 
         // Test comprehensive multi-bet with all bet types
         let bet_flags = vector[
