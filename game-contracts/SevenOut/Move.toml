@@ -1,7 +1,9 @@
 [package]
 name = "SevenOut"
 version = "1.0.0"
-authors = []
+upgrade_policy = "compatible"
+authors = ["Persona Normale"]
+license = "MIT"
 
 [addresses]
 casino = "_"

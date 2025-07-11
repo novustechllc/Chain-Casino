@@ -16,6 +16,16 @@ import {
   FortuneConfig 
 } from '@/entry-functions/chaincasino';
 
+// Add CSS for pixelated images
+const pixelatedStyle = `
+  .pixelated {
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+`;
+
 // AptosFortune constants - updated to match contract values
 const FORTUNE_SYMBOLS = {
   1: { name: 'Cherry', emoji: '🍒', weight: 35 },
@@ -352,11 +362,6 @@ export const AptosFortune: React.FC = () => {
       await aptosClient().waitForTransaction({ transactionHash: response.hash });
       
       setGameResult(null);
-      toast({
-        title: "Result Cleared",
-        description: "Ready for next spin!",
-        variant: "default"
-      });
     } catch (error) {
       console.error('Clear result error:', error);
     }
@@ -366,14 +371,27 @@ export const AptosFortune: React.FC = () => {
   if (!account) {
     return (
       <div className="retro-body min-h-screen relative">
+        <style>{pixelatedStyle}</style>
         <div className="retro-scanlines"></div>
         <div className="retro-pixel-grid"></div>
         
         <div className="container mx-auto px-4 py-8 relative z-10">
           <div className="text-center">
-            <h1 className="text-6xl font-bold text-transparent bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 bg-clip-text mb-8 retro-pixel-font">
-              🎰 APTOS FORTUNE 🎰
-            </h1>
+            <div className="flex items-center justify-center gap-4 mb-8">
+              <img 
+                src="/slot-8bit-emoji.png" 
+                alt="Slot Machine" 
+                className="w-16 h-16 pixelated animate-pulse"
+              />
+              <h1 className="text-6xl font-bold text-transparent bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 bg-clip-text retro-pixel-font">
+                APTOS FORTUNE
+              </h1>
+              <img 
+                src="/slot-8bit-emoji.png" 
+                alt="Slot Machine" 
+                className="w-16 h-16 pixelated animate-pulse"
+              />
+            </div>
             <RetroCard className="max-w-md mx-auto bg-black/60 backdrop-blur-sm border-yellow-500/50">
               <div className="text-center py-8">
                 <div className="text-6xl mb-4 animate-bounce">🔗</div>
@@ -393,15 +411,28 @@ export const AptosFortune: React.FC = () => {
 
   return (
     <div className="retro-body min-h-screen relative">
+      <style>{pixelatedStyle}</style>
       <div className="retro-scanlines"></div>
       <div className="retro-pixel-grid"></div>
       
       <div className="container mx-auto px-4 py-8 relative z-10">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-6xl font-bold text-transparent bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 bg-clip-text mb-4 retro-pixel-font animate-pulse">
-            🎰 APTOS FORTUNE 🎰
-          </h1>
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <img 
+              src="/slot-8bit-emoji.png" 
+              alt="Slot Machine" 
+              className="w-16 h-16 pixelated animate-pulse"
+            />
+            <h1 className="text-6xl font-bold text-transparent bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 bg-clip-text retro-pixel-font animate-pulse">
+              APTOS FORTUNE
+            </h1>
+            <img 
+              src="/slot-8bit-emoji.png" 
+              alt="Slot Machine" 
+              className="w-16 h-16 pixelated animate-pulse"
+            />
+          </div>
           
           {/* ChainCasino x Aptos Branding */}
           <div className="text-center mt-4 flex items-center justify-center gap-6 flex-wrap">
@@ -443,12 +474,12 @@ export const AptosFortune: React.FC = () => {
             
             {/* Left Column - Slot Machine */}
             <RetroCard glowOnHover={true} className="bg-black/60 backdrop-blur-sm">
-              <div className="retro-pixel-font text-sm text-yellow-300 mb-6 flex items-center justify-between">
+              <div className="retro-pixel-font text-base text-yellow-300 mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 bg-orange-400 animate-pulse rounded-full"></div>
                   SLOT MACHINE
                 </div>
-                <div className="text-xs text-gray-400">
+                <div className="text-sm text-gray-400">
                   🎰 SPIN TO WIN
                 </div>
               </div>
@@ -496,7 +527,7 @@ export const AptosFortune: React.FC = () => {
                         : 'text-white'
                     }`}>
                       {gameResult.match_type === 3 ? '🎉 JACKPOT! 🎉' : 
-                       gameResult.match_type === 2 ? '🎯 PARTIAL MATCH!' :
+                       gameResult.match_type === 2 ? '🌟 PARTIAL MATCH!' :
                        gameResult.match_type === 1 ? '🎁 CONSOLATION' : '😔 No Match'}
                     </div>
 
@@ -529,19 +560,22 @@ export const AptosFortune: React.FC = () => {
 
             {/* Right Column - Betting Interface */}
             <RetroCard glowOnHover={true} className="bg-black/60 backdrop-blur-sm">
-              <div className="retro-pixel-font text-sm text-yellow-300 mb-6 flex items-center justify-between">
+              <div className="retro-pixel-font text-base text-yellow-300 mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 bg-green-400 animate-pulse rounded-full"></div>
                   PLACE YOUR BET
                 </div>
-                <div className="text-xs text-gray-400">
-                  💰 BET CONTROLS
+                <div className="text-sm text-gray-400">
+                  BET CONTROLS
                 </div>
               </div>
 
               {/* Bet Amount Input */}
               <div className="space-y-4 mb-6">
-                <label className="retro-terminal-font text-yellow-300 font-bold">Bet Amount (APT)</label>
+                <label className="retro-terminal-font text-yellow-300 font-bold flex items-center gap-2">
+                  <AptosLogo size={20} />
+                  Bet Amount (APT)
+                </label>
                 <input
                   type="number"
                   value={betAmount}
@@ -577,7 +611,7 @@ export const AptosFortune: React.FC = () => {
               <button
                 onClick={spinReels}
                 disabled={isLoading || isSpinning || !betAmount}
-                className={`w-full py-4 rounded-lg font-bold text-lg transition-all duration-300 ${
+                                  className={`w-full py-4 rounded-lg font-bold text-base transition-all duration-300 ${
                   isLoading || isSpinning || !betAmount
                     ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
@@ -600,7 +634,7 @@ export const AptosFortune: React.FC = () => {
 
           {/* Payout Table */}
           <RetroCard className="mt-8 bg-black/60 backdrop-blur-sm">
-            <div className="retro-pixel-font text-sm text-yellow-300 mb-4 flex items-center gap-2">
+            <div className="retro-pixel-font text-base text-yellow-300 mb-6 flex items-center gap-2">
               <div className="w-4 h-4 bg-blue-400 animate-pulse rounded-full"></div>
               PAYOUT TABLE
             </div>
@@ -624,7 +658,7 @@ export const AptosFortune: React.FC = () => {
               </div>
               
               <div className="bg-black/40 border border-yellow-400/30 rounded-lg p-4">
-                <h3 className="text-yellow-400 font-bold mb-2">🎯 PARTIAL (2 Match)</h3>
+                <h3 className="text-yellow-400 font-bold mb-2">🌟 PARTIAL (2 Match)</h3>
                 <div className="text-sm">
                   Any 2 matching symbols: 0.5x
                 </div>

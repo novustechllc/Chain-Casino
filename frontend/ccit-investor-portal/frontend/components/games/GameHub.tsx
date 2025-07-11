@@ -123,7 +123,6 @@ const FloatingTitle = () => {
       </div>
       
       {/* Animated decorative elements */}
-      <div className="absolute -top-10 left-1/4 text-4xl animate-bounce animation-delay-300">🎯</div>
       <div className="absolute -top-8 right-1/4 text-3xl animate-bounce animation-delay-700">🎰</div>
       <div className="absolute -bottom-4 left-1/3 text-2xl animate-bounce animation-delay-500">🎲</div>
       <div className="absolute -bottom-6 right-1/3 text-2xl animate-bounce animation-delay-900">🃏</div>
@@ -276,12 +275,63 @@ export function GameHub() {
     const iconMap: { [key: string]: string } = {
       'SevenOut': '🎲',
       'SlotMachine': '🎰',
-      'Roulette': '🎯',
+      'Roulette': '🎡',
       'Blackjack': '🃏',
       'Dice': '🎲',
       'default': '🎮'
     };
     return iconMap[name] || iconMap.default;
+  };
+
+  const getGameRoute = (game: GameData) => {
+    // If websiteUrl is provided and not empty, use it as external link
+    if (game.websiteUrl && game.websiteUrl !== '') {
+      return game.websiteUrl;
+    }
+    
+    // Otherwise map to local routes based on game name
+    const routeMap: { [key: string]: string } = {
+      'SevenOut': '/seven-out',
+      'AptosRoulette': '/aptos-roulette', 
+      'AptosFortune': '/aptos-fortune',
+      'SlotMachine': '/slot-machine',
+      'Roulette': '/roulette',
+      'Dice': '/dice',
+      'Blackjack': '/blackjack'
+    };
+    
+    return routeMap[game.name] || null;
+  };
+
+  const handleGameClick = (game: GameData) => {
+    if (!connected) {
+      toast({
+        title: "Wallet Required",
+        description: "Please connect your wallet to play games",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const route = getGameRoute(game);
+    if (!route) {
+      toast({
+        title: "Game Unavailable", 
+        description: `${game.name} is not yet available`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Always open in new tab/page for better gaming experience
+    if (route.startsWith('http')) {
+      // External URL
+      window.open(route, '_blank', 'noopener,noreferrer');
+    } else {
+      // Local route - open in new tab with full URL
+      const fullUrl = window.location.origin + route;
+      window.open(fullUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   if (loading) {
@@ -490,16 +540,33 @@ export function GameHub() {
                     </div>
                   )}
 
+                  {/* Game Contract Address */}
+                  <div className="mb-4 p-3 bg-black/20 rounded border border-gray-700/30">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-400">Contract:</span>
+                      <div 
+                        className="text-xs text-blue-400 cursor-pointer hover:text-blue-300 transition-colors flex items-center gap-1 group"
+                        onClick={() => {
+                          if (game.objectAddress) {
+                            navigator.clipboard.writeText(game.objectAddress);
+                            toast({
+                              title: "Copied!",
+                              description: `${game.name} contract address copied to clipboard`,
+                              duration: 2000
+                            });
+                          }
+                        }}
+                        title="Click to copy full address"
+                      >
+                        {game.objectAddress?.slice(0, 8)}...{game.objectAddress?.slice(-4)}
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">📋</span>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Action Button */}
                   <button
-                    onClick={() => {
-                      if (connected) {
-                        toast({
-                          title: "Game Launch",
-                          description: `Launching ${game.name}...`,
-                        });
-                      }
-                    }}
+                    onClick={() => handleGameClick(game)}
                     disabled={!connected}
                     className={`w-full px-4 py-3 rounded-lg font-bold text-sm transition-all duration-200 ${
                       !connected ? 

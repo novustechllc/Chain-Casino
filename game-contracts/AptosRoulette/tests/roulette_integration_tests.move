@@ -166,7 +166,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             );
         assert!(balance_after_bet < initial_balance, 31);
 
-        // Get result details
+        // Get result details (11-tuple now)
         let (
             winning_number,
             _winning_color,
@@ -176,13 +176,14 @@ module roulette_game::AptosRouletteIntegrationTests {
             column,
             total_wagered,
             _total_payout,
-            winning_bets,
-            _net_result
+            won,
+            _net_result,
+            _session_id
         ) = AptosRoulette::get_latest_result(PLAYER_ADDR);
 
         assert!(winning_number <= 36, 32);
         assert!(total_wagered == STANDARD_BET, 33);
-        assert!(winning_bets <= 1, 34); // Can only win 0 or 1 bets in single bet
+        assert!(won == true || won == false, 34); // Can win or lose
         assert!(dozen >= 0 && dozen <= 3, 35);
         assert!(column >= 0 && column <= 3, 36);
 
@@ -192,7 +193,7 @@ module roulette_game::AptosRouletteIntegrationTests {
         // === PHASE 7: TEST COLOR BETS ===
         // Test red bet
         AptosRoulette::test_only_bet_red_black(&player, true, STANDARD_BET);
-        let (winning_number_red, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_red, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_red <= 36, 37);
 
@@ -200,7 +201,7 @@ module roulette_game::AptosRouletteIntegrationTests {
 
         // Test black bet
         AptosRoulette::test_only_bet_red_black(&player, false, STANDARD_BET);
-        let (winning_number_black, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_black, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_black <= 36, 38);
 
@@ -215,7 +216,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             vector::empty<u8>(),
             STANDARD_BET
         );
-        let (winning_number_even, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_even, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_even <= 36, 39);
 
@@ -229,7 +230,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             vector::empty<u8>(),
             STANDARD_BET
         );
-        let (winning_number_odd, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_odd, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_odd <= 36, 40);
 
@@ -244,7 +245,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             vector::empty<u8>(),
             STANDARD_BET
         );
-        let (winning_number_high, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_high, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_high <= 36, 41);
 
@@ -258,7 +259,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             vector::empty<u8>(),
             STANDARD_BET
         );
-        let (winning_number_low, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_low, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_low <= 36, 42);
 
@@ -273,7 +274,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             vector::empty<u8>(),
             STANDARD_BET
         );
-        let (winning_number_dozen1, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_dozen1, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_dozen1 <= 36, 43);
 
@@ -287,7 +288,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             vector::empty<u8>(),
             STANDARD_BET
         );
-        let (winning_number_dozen2, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_dozen2, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_dozen2 <= 36, 44);
 
@@ -301,7 +302,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             vector::empty<u8>(),
             STANDARD_BET
         );
-        let (winning_number_dozen3, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_dozen3, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_dozen3 <= 36, 45);
 
@@ -316,7 +317,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             vector::empty<u8>(),
             STANDARD_BET
         );
-        let (winning_number_col1, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_col1, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_col1 <= 36, 46);
 
@@ -330,7 +331,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             vector::empty<u8>(),
             STANDARD_BET
         );
-        let (winning_number_col2, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_col2, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_col2 <= 36, 47);
 
@@ -344,7 +345,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             vector::empty<u8>(),
             STANDARD_BET
         );
-        let (winning_number_col3, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_col3, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_col3 <= 36, 48);
 
@@ -359,7 +360,7 @@ module roulette_game::AptosRouletteIntegrationTests {
             vector::empty<u8>(),
             STANDARD_BET
         );
-        let (winning_number_generic, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_generic, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_generic <= 36, 49);
 
@@ -373,46 +374,13 @@ module roulette_game::AptosRouletteIntegrationTests {
             vector[1, 2], // numbers 1 and 2
             STANDARD_BET
         );
-        let (winning_number_split, _, _, _, _, _, _, _, _, _) =
+        let (winning_number_split, _, _, _, _, _, _, _, _, _, _) =
             AptosRoulette::get_latest_result(PLAYER_ADDR);
         assert!(winning_number_split <= 36, 50);
 
         AptosRoulette::clear_game_result(&player);
 
-        // === PHASE 13: TEST MULTI-BET FUNCTIONALITY ===
-        // Test multiple bets in single transaction
-        let bet_flags = vector[0, 4, 7]; // straight up, red/black, dozen
-        let bet_values = vector[7, 1, 2]; // number 7, red, second dozen
-        let bet_numbers_list = vector[vector::empty<u8>(), vector::empty<u8>(), vector::empty<u8>()];
-        let amounts = vector[STANDARD_BET, STANDARD_BET, STANDARD_BET];
-
-        AptosRoulette::test_only_place_multi_bet(
-            &player,
-            bet_flags,
-            bet_values,
-            bet_numbers_list,
-            amounts
-        );
-
-        let (
-            winning_number_multi,
-            _,
-            _,
-            _,
-            _,
-            _,
-            total_wagered_multi,
-            _total_payout_multi,
-            winning_bets_multi,
-            _
-        ) = AptosRoulette::get_latest_result(PLAYER_ADDR);
-        assert!(winning_number_multi <= 36, 51);
-        assert!(total_wagered_multi == STANDARD_BET * 3, 52);
-        assert!(winning_bets_multi <= 3, 53); // Can win 0-3 bets
-
-        AptosRoulette::clear_game_result(&player);
-
-        // === PHASE 14: VERIFY SYSTEM STABILITY ===
+        // === PHASE 13: VERIFY SYSTEM STABILITY ===
         assert!(AptosRoulette::is_ready(), 54);
         assert!(CasinoHouse::treasury_balance() > 0, 55);
     }
@@ -489,68 +457,6 @@ module roulette_game::AptosRouletteIntegrationTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = roulette_game::AptosRoulette::E_MISMATCHED_BET_ARRAYS)]
-    fun test_mismatched_bet_arrays() {
-        let (_, _, _, player) = setup_and_initialize_roulette();
-        // Try multi-bet with mismatched arrays - should fail
-        let bet_flags = vector[0, 4]; // 2 elements
-        let bet_values = vector[7, 1, 2]; // 3 elements (mismatch)
-        let bet_numbers_list = vector[vector::empty<u8>(), vector::empty<u8>()];
-        let amounts = vector[STANDARD_BET, STANDARD_BET];
-
-        AptosRoulette::test_only_place_multi_bet(
-            &player,
-            bet_flags,
-            bet_values,
-            bet_numbers_list,
-            amounts
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = roulette_game::AptosRoulette::E_TOO_MANY_BETS)]
-    fun test_too_many_bets() {
-        let (_, _, _, player) = setup_and_initialize_roulette();
-        // Try to place more than MAX_BETS_PER_TRANSACTION (10) bets - should fail
-        let bet_flags = vector[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // 11 elements
-        let bet_values = vector[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-        let bet_numbers_list = vector[
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>()
-        ];
-        let amounts = vector[
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET
-        ];
-
-        AptosRoulette::test_only_place_multi_bet(
-            &player,
-            bet_flags,
-            bet_values,
-            bet_numbers_list,
-            amounts
-        );
-    }
-
-    #[test]
     fun test_comprehensive_bet_scenarios() {
         let (_, _, _, player) = setup_and_initialize_roulette();
 
@@ -560,23 +466,23 @@ module roulette_game::AptosRouletteIntegrationTests {
         while (i < vector::length(&bet_amounts)) {
             let amount = *vector::borrow(&bet_amounts, i);
 
-            // Test number bet
+            // Test number bet (11-tuple)
             AptosRoulette::test_only_bet_number(&player, 7, amount);
-            let (winning_number_test, _, _, _, _, _, total_wagered_test, _, _, _) =
+            let (winning_number_test, _, _, _, _, _, total_wagered_test, _, _, _, _) =
                 AptosRoulette::get_latest_result(PLAYER_ADDR);
             assert!(winning_number_test <= 36, 100 + i);
             assert!(total_wagered_test == amount, 150 + i);
             AptosRoulette::clear_game_result(&player);
 
-            // Test red bet
+            // Test red bet (11-tuple)
             AptosRoulette::test_only_bet_red_black(&player, true, amount);
-            let (winning_number_red_test, _, _, _, _, _, total_wagered_red_test, _, _, _) =
+            let (winning_number_red_test, _, _, _, _, _, total_wagered_red_test, _, _, _, _) =
                 AptosRoulette::get_latest_result(PLAYER_ADDR);
             assert!(winning_number_red_test <= 36, 200 + i);
             assert!(total_wagered_red_test == amount, 250 + i);
             AptosRoulette::clear_game_result(&player);
 
-            // Test dozen bet
+            // Test dozen bet (11-tuple)
             AptosRoulette::test_only_place_bet(
                 &player,
                 7, // ENTRY_DOZEN
@@ -585,7 +491,7 @@ module roulette_game::AptosRouletteIntegrationTests {
                 amount
             );
             let (
-                winning_number_dozen_test, _, _, _, _, _, total_wagered_dozen_test, _, _, _
+                winning_number_dozen_test, _, _, _, _, _, total_wagered_dozen_test, _, _, _, _
             ) = AptosRoulette::get_latest_result(PLAYER_ADDR);
             assert!(winning_number_dozen_test <= 36, 300 + i);
             assert!(total_wagered_dozen_test == amount, 350 + i);
@@ -598,7 +504,7 @@ module roulette_game::AptosRouletteIntegrationTests {
         let number = 0u8;
         while (number <= 36) {
             AptosRoulette::test_only_bet_number(&player, number, MIN_BET);
-            let (winning_number, _, _, _, _, _, _, _, _, _) =
+            let (winning_number, _, _, _, _, _, _, _, _, _, _) =
                 AptosRoulette::get_latest_result(PLAYER_ADDR);
             assert!(winning_number <= 36, 400 + (number as u64));
             AptosRoulette::clear_game_result(&player);
@@ -610,76 +516,46 @@ module roulette_game::AptosRouletteIntegrationTests {
     }
 
     #[test]
-    fun test_complex_multi_bet_scenarios() {
+    fun test_single_bet_comprehensive_coverage() {
         let (_, _, _, player) = setup_and_initialize_roulette();
 
-        // Test comprehensive multi-bet with all bet types
-        let bet_flags = vector[
-            0, // straight up
-            1, // split
-            2, // street
-            3, // corner
-            4, // red/black
-            5, // even/odd
-            6, // high/low
-            7, // dozen
-            8, // column
-            9 // line
-        ];
-        let bet_values = vector[
-            7, // number 7
-            0, // not used for split
-            1, // first street
-            1, // first corner
-            1, // red
-            1, // even
-            1, // high
-            1, // first dozen
-            1, // first column
-            1 // first line
-        ];
-        let bet_numbers_list = vector[
-            vector::empty<u8>(),
-            vector[1, 2], // split 1-2
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>(),
-            vector::empty<u8>()
-        ];
-        let amounts = vector[
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET,
-            MIN_BET
-        ];
+        // Test all bet types using separate vectors (Move 2 pattern)
+        let bet_flags = vector[0u8, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8, 9u8];
+        let bet_values = vector[7u8, 0u8, 1u8, 1u8, 1u8, 1u8, 1u8, 1u8, 1u8, 1u8];
 
-        AptosRoulette::test_only_place_multi_bet(
-            &player,
-            bet_flags,
-            bet_values,
-            bet_numbers_list,
-            amounts
-        );
+        let i = 0;
+        while (i < vector::length(&bet_flags)) {
+            let bet_flag = *vector::borrow(&bet_flags, i);
+            let bet_value = *vector::borrow(&bet_values, i);
+            
+            // Special case for split bet which needs bet_numbers
+            let bet_numbers = if (bet_flag == 1u8) {
+                vector[1u8, 2u8] // split 1-2
+            } else {
+                vector::empty<u8>()
+            };
 
-        let (winning_number, _, _, _, _, _, total_wagered, total_payout, winning_bets, _) =
-            AptosRoulette::get_latest_result(PLAYER_ADDR);
+            AptosRoulette::test_only_place_bet(
+                &player,
+                bet_flag,
+                bet_value,
+                bet_numbers,
+                MIN_BET
+            );
 
-        assert!(winning_number <= 36, 600);
-        assert!(total_wagered == MIN_BET * 10, 601);
-        assert!(winning_bets <= 10, 602);
-        assert!(total_payout >= 0, 603);
+            let (winning_number, _, _, _, _, _, total_wagered, total_payout, won, _, _) =
+                AptosRoulette::get_latest_result(PLAYER_ADDR);
+
+            assert!(winning_number <= 36, 600 + i);
+            assert!(total_wagered == MIN_BET, 610 + i);
+            assert!(total_payout >= 0, 620 + i);
+            assert!(won == true || won == false, 630 + i);
+
+            AptosRoulette::clear_game_result(&player);
+            i = i + 1;
+        };
 
         // Verify system is still stable
-        assert!(AptosRoulette::is_ready(), 604);
+        assert!(AptosRoulette::is_ready(), 700);
     }
 }

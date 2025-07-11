@@ -39,18 +39,14 @@ module roulette_game::AptosRoulette {
     const E_INVALID_DOZEN: u64 = 7;
     /// Invalid column (must be 1-3)
     const E_INVALID_COLUMN: u64 = 8;
-    /// Mismatched bet arrays
-    const E_MISMATCHED_BET_ARRAYS: u64 = 9;
-    /// Too many bets in single transaction
-    const E_TOO_MANY_BETS: u64 = 10;
     /// Invalid split bet
-    const E_INVALID_SPLIT: u64 = 11;
+    const E_INVALID_SPLIT: u64 = 9;
     /// Invalid street bet
-    const E_INVALID_STREET: u64 = 12;
+    const E_INVALID_STREET: u64 = 10;
     /// Invalid corner bet
-    const E_INVALID_CORNER: u64 = 13;
+    const E_INVALID_CORNER: u64 = 11;
     /// Invalid line bet
-    const E_INVALID_LINE: u64 = 14;
+    const E_INVALID_LINE: u64 = 12;
 
     //
     // Constants
@@ -62,8 +58,6 @@ module roulette_game::AptosRoulette {
     const MIN_BET: u64 = 1000000;
     /// Maximum bet amount (0.1 APT)
     const MAX_BET: u64 = 10000000;
-    /// Maximum bets per transaction
-    const MAX_BETS_PER_TRANSACTION: u64 = 10;
 
     // Entry function bet type flags
     const ENTRY_STRAIGHT_UP: u8 = 0;
@@ -134,12 +128,6 @@ module roulette_game::AptosRoulette {
         winning_numbers: vector<u8>
     }
 
-    /// Session ID for tracking game sessions
-    struct SessionId has copy, drop, store {
-        player: address,
-        sequence: u64
-    }
-
     /// Individual bet information
     struct BetInfo has copy, drop, store {
         bet_type: BetType,
@@ -155,11 +143,10 @@ module roulette_game::AptosRoulette {
         is_high: bool,
         dozen: u8,
         column: u8,
-        all_bets: vector<BetInfo>,
+        bet_info: BetInfo,
         total_wagered: u64,
         total_payout: u64,
-        winning_bets: u8,
-        session_id: SessionId,
+        session_id: u64,
         net_result: bool
     }
 
@@ -200,8 +187,7 @@ module roulette_game::AptosRoulette {
         winning_color: String,
         total_wagered: u64,
         total_payout: u64,
-        winning_bets: u8,
-        total_bets: u8,
+        won: bool,
         treasury_used: address,
         sequence: u64
     }
@@ -498,7 +484,7 @@ module roulette_game::AptosRoulette {
     }
 
     //
-    // Entry Functions - Modern Clean Interface
+    // Entry Functions - Single Bet Interface
     //
 
     #[randomness]
@@ -512,44 +498,9 @@ module roulette_game::AptosRoulette {
     ) acquires GameAuth, SpinResult, GameRegistry {
         // Decode to validated enum
         let bet_type = decode_bet_type(bet_flag, bet_value, bet_numbers);
-
+        
         // Execute single bet
-        let bets = vector[bet_type];
-        let amounts = vector[amount];
-        execute_multi_bet_internal(player, bets, amounts);
-    }
-
-    #[randomness]
-    /// Multiple bets in single transaction
-    entry fun place_multi_bet(
-        player: &signer,
-        bet_flags: vector<u8>,
-        bet_values: vector<u8>,
-        bet_numbers_list: vector<vector<u8>>,
-        amounts: vector<u64>
-    ) acquires GameAuth, SpinResult, GameRegistry {
-        let num_bets = vector::length(&bet_flags);
-        assert!(
-            num_bets > 0 && num_bets <= MAX_BETS_PER_TRANSACTION,
-            E_TOO_MANY_BETS
-        );
-        assert!(vector::length(&bet_values) == num_bets, E_MISMATCHED_BET_ARRAYS);
-        assert!(vector::length(&bet_numbers_list) == num_bets, E_MISMATCHED_BET_ARRAYS);
-        assert!(vector::length(&amounts) == num_bets, E_MISMATCHED_BET_ARRAYS);
-
-        // Convert all to enums
-        let bet_types = vector::empty<BetType>();
-        let i = 0;
-        while (i < num_bets) {
-            let bet_flag = *vector::borrow(&bet_flags, i);
-            let bet_value = *vector::borrow(&bet_values, i);
-            let bet_numbers = *vector::borrow(&bet_numbers_list, i);
-            let bet_type = decode_bet_type(bet_flag, bet_value, bet_numbers);
-            vector::push_back(&mut bet_types, bet_type);
-            i = i + 1;
-        };
-
-        execute_multi_bet_internal(player, bet_types, amounts);
+        execute_single_bet_internal(player, bet_type, amount);
     }
 
     //
@@ -562,9 +513,7 @@ module roulette_game::AptosRoulette {
         player: &signer, number: u8, amount: u64
     ) acquires GameAuth, SpinResult, GameRegistry {
         let bet_type = create_straight_up_bet(number);
-        let bets = vector[bet_type];
-        let amounts = vector[amount];
-        execute_multi_bet_internal(player, bets, amounts);
+        execute_single_bet_internal(player, bet_type, amount);
     }
 
     #[randomness]
@@ -573,9 +522,7 @@ module roulette_game::AptosRoulette {
         player: &signer, is_red: bool, amount: u64
     ) acquires GameAuth, SpinResult, GameRegistry {
         let bet_type = create_red_black_bet(is_red);
-        let bets = vector[bet_type];
-        let amounts = vector[amount];
-        execute_multi_bet_internal(player, bets, amounts);
+        execute_single_bet_internal(player, bet_type, amount);
     }
 
     #[randomness]
@@ -584,9 +531,7 @@ module roulette_game::AptosRoulette {
         player: &signer, is_even: bool, amount: u64
     ) acquires GameAuth, SpinResult, GameRegistry {
         let bet_type = create_even_odd_bet(is_even);
-        let bets = vector[bet_type];
-        let amounts = vector[amount];
-        execute_multi_bet_internal(player, bets, amounts);
+        execute_single_bet_internal(player, bet_type, amount);
     }
 
     #[randomness]
@@ -595,9 +540,7 @@ module roulette_game::AptosRoulette {
         player: &signer, is_high: bool, amount: u64
     ) acquires GameAuth, SpinResult, GameRegistry {
         let bet_type = create_high_low_bet(is_high);
-        let bets = vector[bet_type];
-        let amounts = vector[amount];
-        execute_multi_bet_internal(player, bets, amounts);
+        execute_single_bet_internal(player, bet_type, amount);
     }
 
     #[randomness]
@@ -606,9 +549,7 @@ module roulette_game::AptosRoulette {
         player: &signer, dozen: u8, amount: u64
     ) acquires GameAuth, SpinResult, GameRegistry {
         let bet_type = create_dozen_bet(dozen);
-        let bets = vector[bet_type];
-        let amounts = vector[amount];
-        execute_multi_bet_internal(player, bets, amounts);
+        execute_single_bet_internal(player, bet_type, amount);
     }
 
     #[randomness]
@@ -617,34 +558,22 @@ module roulette_game::AptosRoulette {
         player: &signer, column: u8, amount: u64
     ) acquires GameAuth, SpinResult, GameRegistry {
         let bet_type = create_column_bet(column);
-        let bets = vector[bet_type];
-        let amounts = vector[amount];
-        execute_multi_bet_internal(player, bets, amounts);
+        execute_single_bet_internal(player, bet_type, amount);
     }
 
     //
-    // Core Logic - Enum-Powered Execution
+    // Core Logic - Single Bet Execution
     //
 
-    /// Internal multi-bet execution using enum system
-    fun execute_multi_bet_internal(
-        player: &signer, bet_types: vector<BetType>, amounts: vector<u64>
+    /// Internal single-bet execution using enum system
+    fun execute_single_bet_internal(
+        player: &signer, bet_type: BetType, amount: u64
     ) acquires GameAuth, SpinResult, GameRegistry {
-        let num_bets = vector::length(&bet_types);
-        assert!(num_bets == vector::length(&amounts), E_MISMATCHED_BET_ARRAYS);
-
-        // Validate all amounts and calculate total
-        let total_amount = 0u64;
-        let i = 0;
-        while (i < num_bets) {
-            let amount = *vector::borrow(&amounts, i);
-            assert!(
-                amount >= MIN_BET && amount <= MAX_BET,
-                E_INVALID_AMOUNT
-            );
-            total_amount = total_amount + amount;
-            i = i + 1;
-        };
+        // Validate amount
+        assert!(
+            amount >= MIN_BET && amount <= MAX_BET,
+            E_INVALID_AMOUNT
+        );
 
         let player_addr = signer::address_of(player);
 
@@ -658,10 +587,9 @@ module roulette_game::AptosRoulette {
                 is_high: _,
                 dozen: _,
                 column: _,
-                all_bets: _,
+                bet_info: _,
                 total_wagered: _,
                 total_payout: _,
-                winning_bets: _,
                 session_id: _,
                 net_result: _
             } = old_result;
@@ -672,7 +600,7 @@ module roulette_game::AptosRoulette {
             coin::paired_metadata<aptos_framework::aptos_coin::AptosCoin>();
         let aptos_metadata = option::extract(&mut aptos_metadata_option);
         let bet_fa = primary_fungible_store::withdraw(
-            player, aptos_metadata, total_amount
+            player, aptos_metadata, amount
         );
 
         // Get game capability and place bet with casino
@@ -685,39 +613,9 @@ module roulette_game::AptosRoulette {
         // Spin the roulette wheel with secure randomness
         let winning_number = randomness::u8_range(0, 37); // 0-36
 
-        // Calculate all bet results using pattern matching
-        let bet_infos = vector::empty<BetInfo>();
-        let total_payout = 0u64;
-        let winning_bets = 0u8;
-
-        i = 0;
-        while (i < num_bets) {
-            let bet_type = *vector::borrow(&bet_types, i);
-            let amount = *vector::borrow(&amounts, i);
-            let bet_result = calculate_bet_result(bet_type, winning_number, amount);
-
-            if (bet_result.won) {
-                total_payout = total_payout + bet_result.payout;
-                winning_bets = winning_bets + 1;
-            };
-
-            let bet_info = BetInfo { bet_type, amount, result: bet_result };
-            vector::push_back(&mut bet_infos, bet_info);
-
-            // Emit individual bet event
-            event::emit(
-                BetPlacedEvent {
-                    player: player_addr,
-                    bet_description: bet_result.description,
-                    amount,
-                    payout: bet_result.payout,
-                    won: bet_result.won,
-                    sequence: account::get_sequence_number(player_addr)
-                }
-            );
-
-            i = i + 1;
-        };
+        // Calculate bet result using pattern matching
+        let bet_result = calculate_bet_result(bet_type, winning_number, amount);
+        let total_payout = bet_result.payout;
 
         // Determine winning properties
         let winning_color =
@@ -754,10 +652,10 @@ module roulette_game::AptosRoulette {
         };
 
         // Generate session ID
-        let session_id = SessionId {
-            player: player_addr,
-            sequence: account::get_sequence_number(player_addr)
-        };
+        let session_id = account::get_sequence_number(player_addr);
+
+        // Create bet info
+        let bet_info = BetInfo { bet_type, amount, result: bet_result };
 
         // Store comprehensive result
         let spin_result = SpinResult {
@@ -767,15 +665,26 @@ module roulette_game::AptosRoulette {
             is_high: is_high_win,
             dozen: dozen_win,
             column: column_win,
-            all_bets: bet_infos,
-            total_wagered: total_amount,
+            bet_info,
+            total_wagered: amount,
             total_payout,
-            winning_bets,
             session_id,
-            net_result: total_payout > total_amount
+            net_result: total_payout > amount
         };
 
         move_to(player, spin_result);
+
+        // Emit individual bet event
+        event::emit(
+            BetPlacedEvent {
+                player: player_addr,
+                bet_description: bet_result.description,
+                amount,
+                payout: bet_result.payout,
+                won: bet_result.won,
+                sequence: session_id
+            }
+        );
 
         // Emit complete spin event
         event::emit(
@@ -783,12 +692,11 @@ module roulette_game::AptosRoulette {
                 player: player_addr,
                 winning_number,
                 winning_color,
-                total_wagered: total_amount,
+                total_wagered: amount,
                 total_payout,
-                winning_bets,
-                total_bets: (num_bets as u8),
+                won: bet_result.won,
                 treasury_used: treasury_source,
-                sequence: account::get_sequence_number(player_addr)
+                sequence: session_id
             }
         );
     }
@@ -1045,7 +953,7 @@ module roulette_game::AptosRoulette {
     /// Get latest spin result for player
     public fun get_latest_result(
         player_addr: address
-    ): (u8, String, bool, bool, u8, u8, u64, u64, u8, bool) acquires SpinResult {
+    ): (u8, String, bool, bool, u8, u8, u64, u64, bool, bool, u64) acquires SpinResult {
         assert!(exists<SpinResult>(player_addr), E_NOT_INITIALIZED);
         let result = borrow_global<SpinResult>(player_addr);
         (
@@ -1057,8 +965,9 @@ module roulette_game::AptosRoulette {
             result.column,
             result.total_wagered,
             result.total_payout,
-            result.winning_bets,
-            result.net_result
+            result.bet_info.result.won,
+            result.net_result,
+            result.session_id
         )
     }
 
@@ -1182,10 +1091,9 @@ module roulette_game::AptosRoulette {
                 is_high: _,
                 dozen: _,
                 column: _,
-                all_bets: _,
+                bet_info: _,
                 total_wagered: _,
                 total_payout: _,
-                winning_bets: _,
                 session_id: _,
                 net_result: _
             } = old_result;
@@ -1227,24 +1135,6 @@ module roulette_game::AptosRoulette {
             bet_value,
             bet_numbers,
             amount
-        );
-    }
-
-    #[test_only]
-    #[lint::allow_unsafe_randomness]
-    public entry fun test_only_place_multi_bet(
-        player: &signer,
-        bet_flags: vector<u8>,
-        bet_values: vector<u8>,
-        bet_numbers_list: vector<vector<u8>>,
-        amounts: vector<u64>
-    ) acquires GameAuth, SpinResult, GameRegistry {
-        place_multi_bet(
-            player,
-            bet_flags,
-            bet_values,
-            bet_numbers_list,
-            amounts
         );
     }
 }

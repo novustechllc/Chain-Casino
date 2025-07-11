@@ -1,7 +1,9 @@
 [package]
 name = "ChainCasino"
 version = "0.0.1"
-authors = ["PersonaNormale"]
+upgrade_policy = "compatible"
+authors = ["Persona Normale"]
+license = "MIT"
 
 [addresses]
 casino = "_"
