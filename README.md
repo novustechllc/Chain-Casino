@@ -1,4 +1,4 @@
-# 🎰 ChainCasino
+# ChainCasino
 
 > **"The first on-chain casino protocol where a token-backed treasury powers multiple games, and investors earn real yield through rising NAV as the house wins."**
 
@@ -13,18 +13,7 @@ ChainCasino is a decentralized casino protocol on **Aptos** that merges casino g
 
 ChainCasino turns **"The House Always Wins"** into **"The Investor Always Earns."**
 
----
-
-## 🚀 Quick Start
-
-```bash
-# Compile and test
-aptos move compile
-aptos move test
-
-# Deploy to testnet
-aptos move publish --named-addresses casino=<YOUR_ADDRESS>
-```
+![ChainCasino Banner](./.github/assets/Banner_Final.jpg)
 
 ---
 
@@ -151,16 +140,16 @@ flowchart TD
     end
 
     subgraph "🎮 Game Ecosystem"
-        DiceGame[🎲 DiceGame<br/>• 1-6 Number Guessing<br/>• 5x Payout Multiplier]
-        SlotGame[🎰 SlotMachine<br/>• 3-Reel Mechanics<br/>• Weighted Symbols]
-        RouletteGame[🎯 AptosRoulette<br/>• European Roulette<br/>• External Module]
+        SevenOut[🎲 SevenOut<br/>• Two-dice Over/Under 7<br/>• 1.933x Payout]
+        RouletteGame[🎯 AptosRoulette<br/>• European Roulette<br/>• Multiple Bet Types]
+        FortuneGame[🎰 AptosFortune<br/>• Premium Slot Machine<br/>• Partial Match Payouts]
     end
 
     subgraph "💳 Treasury Isolation"
         Central[🏦 Central Treasury<br/>• Investor Funds<br/>• Large Payouts<br/>• Liquidity Provider]
-        DiceTreasury[💎 Dice Treasury<br/>@unique_address_1]
-        SlotTreasury[🎰 Slot Treasury<br/>@unique_address_2]
-        RouletteTreasury[🎯 Roulette Treasury<br/>@unique_address_3]
+        SevenOutTreasury[💎 SevenOut Treasury<br/>@unique_address_1]
+        RouletteTreasury[🎯 Roulette Treasury<br/>@unique_address_2]
+        FortuneTreasury[🎰 Fortune Treasury<br/>@unique_address_3]
     end
 
     %% Investment Flow
@@ -169,20 +158,23 @@ flowchart TD
     CCIT <-->|redeem at current NAV| Investor
 
     %% Game Operation Flow
-    Casino -->|Route based on balance| DiceTreasury
-    Casino -->|Route based on balance| SlotTreasury
+    Casino -->|Route based on balance| SevenOutTreasury
     Casino -->|Route based on balance| RouletteTreasury
+    Casino -->|Route based on balance| FortuneTreasury
 
     %% Auto-Rebalancing
-    DiceTreasury -.->|Excess → Central| Central
-    SlotTreasury -.->|Excess → Central| Central
-    Central -.->|Liquidity Injection| DiceTreasury
-    Central -.->|Liquidity Injection| SlotTreasury
+    SevenOutTreasury -.->|Excess → Central| Central
+    RouletteTreasury -.->|Excess → Central| Central
+    FortuneTreasury -.->|Excess → Central| Central
+    Central -.->|Liquidity Injection| SevenOutTreasury
+    Central -.->|Liquidity Injection| RouletteTreasury
+    Central -.->|Liquidity Injection| FortuneTreasury
 
     %% NAV Calculation
     Central -->|Balance Aggregation| CCIT
-    DiceTreasury -->|Balance Aggregation| CCIT
-    SlotTreasury -->|Balance Aggregation| CCIT
+    SevenOutTreasury -->|Balance Aggregation| CCIT
+    RouletteTreasury -->|Balance Aggregation| CCIT
+    FortuneTreasury -->|Balance Aggregation| CCIT
 
     classDef investment fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef casino fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
@@ -191,8 +183,8 @@ flowchart TD
 
     class Investor,CCIT investment
     class Casino casino
-    class DiceGame,SlotGame,RouletteGame game
-    class Central,DiceTreasury,SlotTreasury,RouletteTreasury treasury
+    class SevenOut,RouletteGame,FortuneGame game
+    class Central,SevenOutTreasury,RouletteTreasury,FortuneTreasury treasury
 ```
 
 ### Treasury Auto-Rebalancing System
@@ -220,12 +212,20 @@ The central coordination module that manages game registration through a capabil
 NAV-based token system where investors earn yield through treasury growth. Implements proportional minting/burning with 0.1% redemption fees. Real-time NAV calculation aggregates all treasury balances across the entire system.
 
 ### 3. Game Modules
-- **DiceGame**: Single die guessing (1-6) with 5x payout and 16.67% house edge
-- **SlotMachine**: 3-reel slot with weighted symbols, up to 100x payout, 15.5% house edge
-- **AlwaysLoseGame**: Testing utility that always pays 3x bet (treasury drain testing)
+- **SevenOut**: Two-dice Over/Under 7 game with 1.933x payout and 2.78% house edge
+- **AptosRoulette**: European roulette with comprehensive betting options and 2.70% house edge
+- **AptosFortune**: Premium slot machine with partial match payouts and 22% house edge
 
 ### 4. External Game Support
 Modular architecture enables external developers to create games in separate packages while maintaining shared treasury access through capability-based authorization.
+
+### 5. Frontend Application
+Complete React-based user interface with:
+- InvestorPortal for CCIT token management
+- GameHub for game discovery
+- Individual game interfaces
+- Real-time portfolio tracking
+- Wallet integration
 
 ---
 
@@ -256,126 +256,42 @@ sources/
 ├── casino/
 │   ├── casino_house.move       # Core registry and treasury management
 │   └── investor_token.move     # CCIT fungible asset implementation
-├── games/
-│   ├── dice.move               # Single die guessing game
-│   ├── slot.move               # Three-reel slot machine
-│   └── always_lose_game.move   # Testing utility
-└── tests/
-    ├── unit/                   # Module-specific unit tests
-    ├── integration/            # Cross-module integration tests
-    └── end_to_end/             # Complete user journey tests
+└── games/
+    ├── dice.move               # [TEST ONLY] Reference dice implementation
+    ├── slot.move               # [TEST ONLY] Reference slot implementation
+    └── always_lose_game.move   # [TEST ONLY] Treasury drain testing
 
 game-contracts/
-└── AptosRoulette/              # External roulette game package
-    ├── sources/
-    │   └── aptos_roulette.move
-    └── tests/
+├── SevenOut/                   # Two-dice Over/Under 7 game
+│   ├── sources/seven_out.move
+│   └── tests/seven_out_tests.move
+├── AptosRoulette/              # European roulette implementation
+│   ├── sources/aptos_roulette.move
+│   └── tests/roulette_integration_tests.move
+└── AptosFortune/               # Premium slot machine
+    ├── sources/aptos_fortune.move
+    └── tests/aptos_fortune_tests.move
+
+frontend/
+└── ccit-investor-portal/       # React frontend application
+    ├── frontend/
+    │   ├── components/games/   # Individual game UIs
+    │   ├── pages/             # Main portal pages
+    │   └── App.tsx
+    ├── package.json
+    └── vite.config.ts
 ```
 
 ---
-
-## 🚀 Deployment Guide
-
-### Prerequisites
-- Aptos CLI installed and configured
-- Sufficient APT for deployment and initial treasury funding
-- Deploying account with appropriate permissions
-
-### Step-by-Step Deployment
-
-**1. Deploy Core System**
-```bash
-# Deploy main casino modules
-aptos move publish --named-addresses casino=<CASINO_ADDRESS>
-```
-
-**2. Initialize InvestorToken**
-```bash
-aptos move run --function-id <CASINO_ADDRESS>::InvestorToken::init
-```
-
-**3. Fund Initial Treasury**
-```bash
-# Recommended: 1000+ APT for production
-aptos move run --function-id <CASINO_ADDRESS>::InvestorToken::deposit_and_mint \
-  --args u64:100000000000  # 1000 APT in octas
-```
-
-**4. Register and Initialize Games**
-```bash
-# Register DiceGame
-aptos move run --function-id <CASINO_ADDRESS>::CasinoHouse::register_game \
-  --args address:<CASINO_ADDRESS> string:"DiceGame" string:"v1" \
-  u64:1000000 u64:50000000 u64:1667 u64:250000000 \
-  string:"https://chaincasino.apt/dice" \
-  string:"https://chaincasino.apt/icons/dice.png" \
-  string:"Classic 1-6 dice guessing game with 5x payout"
-
-# Initialize DiceGame
-aptos move run --function-id <CASINO_ADDRESS>::DiceGame::initialize_game
-
-# Register SlotMachine
-aptos move run --function-id <CASINO_ADDRESS>::CasinoHouse::register_game \
-  --args address:<CASINO_ADDRESS> string:"SlotMachine" string:"v1" \
-  u64:1000000 u64:50000000 u64:1550 u64:12500000000 \
-  string:"https://chaincasino.apt/slots" \
-  string:"https://chaincasino.apt/icons/slots.png" \
-  string:"3-reel slot machine with weighted symbols"
-
-# Initialize SlotMachine
-aptos move run --function-id <CASINO_ADDRESS>::SlotMachine::initialize_game
-```
-
-### Financial Requirements
-
-**Initial Treasury Funding**
-- DiceGame: 1.25 APT minimum (250M octas × 5x payout)
-- SlotMachine: 625 APT minimum (12.5B octas × 5x payout)
-- Operational buffer: 100+ APT
-- **Total recommended: 1000+ APT**
-
----
-
-## 🎮 Game Integration
-
-### Adding New Games
-
-External developers can integrate games by referencing the casino module and implementing the required game structure.
-
-**1. Add Casino Dependency**
-```toml
-[dependencies.ChainCasino]
-git = "https://github.com/PersonaNormale/ChainCasino.git"
-rev = "main"
-```
-
-**2. Implement Game Module**
-```move
-module external_game::NewGame {
-    use casino::CasinoHouse::{Self, GameCapability};
-    
-    public entry fun initialize_game(admin: &signer) {
-        let capability = CasinoHouse::get_game_capability(admin, game_object);
-        // Store capability and implement game logic
-    }
-}
-```
-
-**3. Register with Casino**
-```bash
-aptos move run --function-id casino::CasinoHouse::register_game \
-  --args address:<GAME_ADDRESS> string:"NewGame" string:"v1" \
-  <min_bet> <max_bet> <house_edge_bps> <max_payout> \
-  <website_url> <icon_url> <description>
-```
 
 ---
 
 ## 📊 Economics
 
 ### House Edge & Returns
-- **DiceGame**: 16.67% house edge (1/6 winning odds, 5x payout)
-- **SlotMachine**: 15.5% house edge (weighted symbols, up to 100x payout)
+- **SevenOut**: 2.78% house edge (Over/Under 7 with 1.933x payout)
+- **AptosRoulette**: 2.70% house edge (European single-zero roulette)
+- **AptosFortune**: 22% house edge (frequent wins with partial matches)
 - **Investor Returns**: CCIT appreciates through NAV growth as treasury accumulates profits
 
 ### Treasury Mechanics
@@ -386,49 +302,14 @@ aptos move run --function-id casino::CasinoHouse::register_game \
 
 ---
 
-## 🔍 Key Features
+## 🖥️ Frontend Development
 
-### 🚀 Key Concepts
-- **NAV-Based Tokenomics**: Minting and redemption adjust supply while maintaining NAV stability
-- **Modular Game Authorization**: Games are independent contracts with capability-based access
-- **On-Chain Fairness**: Aptos randomness ensures verifiable game outcomes
-- **Block-STM Compatibility**: Parallel execution through isolated resource addresses
-
-### 🔬 Move 2 Features
-- **Fungible Assets**: Modern FA standard implementation with CCIT token
-- **Randomness**: Secure on-chain randomness for all games
-- **Object Composability**: Advanced object relationships and inheritance
-
----
-
-## 🛡️ Security Guarantees
-
-1. **Capability-Based Access**: Only authorized games can access treasury functions
-2. **Unforgeable Tokens**: Move 2 guarantees capabilities cannot be forged or copied
-3. **Resource Safety**: Linear type system prevents resource duplication
-4. **Randomness Security**: Production functions prevent test-and-abort attacks
-
----
-
-## 📈 Monitoring & Analytics
-
-### Key Metrics
-- **Treasury Growth**: Track NAV appreciation over time
-- **Game Performance**: Monitor individual game profitability
-- **Volume Analytics**: Analyze betting patterns and treasury usage
-- **Rebalancing Events**: Track automatic treasury adjustments
-
-### View Functions
-```move
-// Core metrics
-InvestorToken::nav()                    // Current NAV per token
-InvestorToken::total_supply()           // Total CCIT tokens
-CasinoHouse::treasury_balance()         // Total treasury balance
-
-// Game-specific metrics
-CasinoHouse::game_treasury_balance()    // Individual game treasury
-CasinoHouse::get_game_metadata()        // Game configuration
-```
+### Components
+- `InvestorPortal` - Main dashboard for CCIT management
+- `GameHub` - Game discovery and navigation
+- `SevenOut` - Two-dice game interface
+- `AptosRoulette` - Roulette betting interface
+- `AptosFortune` - Slot machine interface
 
 ---
 
