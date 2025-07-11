@@ -1,4 +1,4 @@
-# 🎰 ChainCasino
+# ChainCasino
 
 > **"The first on-chain casino protocol where a token-backed treasury powers multiple games, and investors earn real yield through rising NAV as the house wins."**
 
@@ -13,19 +13,7 @@ ChainCasino is a decentralized casino protocol on **Aptos** that merges casino g
 
 ChainCasino turns **"The House Always Wins"** into **"The Investor Always Earns."**
 
----
-
-## 🚀 Quick Start
-
-```bash
-# Compile and test core contracts
-aptos move compile
-aptos move test
-
-# Start frontend
-cd frontend/ccit-investor-portal
-npm install && npm run dev
-```
+![ChainCasino Banner](./.github/assets/Banner_Final.jpg)
 
 ---
 
@@ -315,13 +303,6 @@ frontend/
 ---
 
 ## 🖥️ Frontend Development
-
-### Architecture
-- **React 18** with TypeScript
-- **Vite** for development and building
-- **Tailwind CSS** + shadcn/ui components
-- **Aptos Wallet Adapter** for wallet integration
-- **React Router** for navigation
 
 ### Components
 - `InvestorPortal` - Main dashboard for CCIT management
