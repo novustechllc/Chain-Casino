@@ -4,10 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react';
 
 // Pages
-import { GameHub } from '@/components/games/GameHub';
-import { SevenOut } from '@/components/games/SevenOut';
-import { AptosFortune } from '@/components/games/AptosFortune';
-import AptosRoulette from '@/components/games/AptosRoulette';
+import { GameHub } from './components/games/GameHub';
+import { SevenOut } from './components/games/SevenOut';
+import { AptosFortune } from './components/games/AptosFortune';
+import AptosRoulette from './components/games/AptosRoulette';
 
 // Components
 import InvestorPortal from './pages/InvestorPortal';

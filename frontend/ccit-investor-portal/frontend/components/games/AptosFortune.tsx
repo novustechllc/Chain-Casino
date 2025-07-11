@@ -3,6 +3,7 @@ import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { 
   GAMES_ADDRESS,
   formatAPT
@@ -203,6 +204,12 @@ const SlotMachineReels = ({ reel1, reel2, reel3, isSpinning }) => {
 export const AptosFortune: React.FC = () => {
   const { account, signAndSubmitTransaction } = useWallet();
   const { toast } = useToast();
+
+  // Set page title and favicon
+  useDocumentTitle({ 
+    title: 'AptosFortune - ChainCasino', 
+    favicon: '/icons/aptos-fortune.png' 
+  });
 
   const [betAmount, setBetAmount] = useState('');
   const [gameResult, setGameResult] = useState<FortuneResult | null>(null);

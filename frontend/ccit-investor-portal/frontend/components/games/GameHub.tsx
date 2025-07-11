@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { 
   GAMES_ADDRESS, 
   CASINO_HOUSE_ADDRESS, 
@@ -176,6 +177,9 @@ export function GameHub() {
   const navigate = useNavigate();
   const { connected } = useWallet();
   const { toast } = useToast();
+
+  // Set page title
+  useDocumentTitle({ title: 'Game Hub - ChainCasino' });
 
   const fetchRegisteredGames = async () => {
     try {
