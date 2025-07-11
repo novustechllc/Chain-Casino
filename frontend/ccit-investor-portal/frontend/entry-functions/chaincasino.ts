@@ -217,7 +217,7 @@ export interface FortuneConfig {
   max_payout: number;
 }
 
-// AptosRoulette entry functions
+// AptosRoulette entry functions (simplified - single bet only)
 export const placeRouletteBet = (args: {
   betFlag: number;
   betValue: number;
@@ -240,19 +240,93 @@ export const placeRouletteBet = (args: {
   };
 };
 
-export const placeMultiRouletteBet = (args: {
-  betFlags: number[];
-  betValues: number[];
-  betNumbersList: number[][];
-  amounts: number[];
+// Convenience entry functions for specific bet types
+export const betRouletteNumber = (args: {
+  number: number;
+  amount: number;
 }): InputTransactionData => {
-  const { betFlags, betValues, betNumbersList, amounts } = args;
+  const { number, amount } = args;
   
   return {
     data: {
-      function: `${GAMES_ADDRESS}::AptosRoulette::place_multi_bet`,
+      function: `${GAMES_ADDRESS}::AptosRoulette::bet_number`,
       typeArguments: [],
-      functionArguments: [betFlags, betValues, betNumbersList, amounts.map(String)],
+      functionArguments: [number, amount.toString()],
+    },
+  };
+};
+
+export const betRouletteRedBlack = (args: {
+  isRed: boolean;
+  amount: number;
+}): InputTransactionData => {
+  const { isRed, amount } = args;
+  
+  return {
+    data: {
+      function: `${GAMES_ADDRESS}::AptosRoulette::bet_red_black`,
+      typeArguments: [],
+      functionArguments: [isRed, amount.toString()],
+    },
+  };
+};
+
+export const betRouletteEvenOdd = (args: {
+  isEven: boolean;
+  amount: number;
+}): InputTransactionData => {
+  const { isEven, amount } = args;
+  
+  return {
+    data: {
+      function: `${GAMES_ADDRESS}::AptosRoulette::bet_even_odd`,
+      typeArguments: [],
+      functionArguments: [isEven, amount.toString()],
+    },
+  };
+};
+
+export const betRouletteHighLow = (args: {
+  isHigh: boolean;
+  amount: number;
+}): InputTransactionData => {
+  const { isHigh, amount } = args;
+  
+  return {
+    data: {
+      function: `${GAMES_ADDRESS}::AptosRoulette::bet_high_low`,
+      typeArguments: [],
+      functionArguments: [isHigh, amount.toString()],
+    },
+  };
+};
+
+export const betRouletteDozen = (args: {
+  dozen: number;
+  amount: number;
+}): InputTransactionData => {
+  const { dozen, amount } = args;
+  
+  return {
+    data: {
+      function: `${GAMES_ADDRESS}::AptosRoulette::bet_dozen`,
+      typeArguments: [],
+      functionArguments: [dozen, amount.toString()],
+    },
+  };
+};
+
+export const betRouletteColumn = (args: {
+  column: number;
+  amount: number;
+}): InputTransactionData => {
+  const { column, amount } = args;
+  
+  return {
+    data: {
+      function: `${GAMES_ADDRESS}::AptosRoulette::bet_column`,
+      typeArguments: [],
+      functionArguments: [column, amount.toString()],
     },
   };
 };
@@ -269,83 +343,54 @@ export const clearRouletteResult = (): InputTransactionData => {
 
 // AptosRoulette view functions
 export const getRouletteViewFunctions = () => ({
+  getLatestResult: `${GAMES_ADDRESS}::AptosRoulette::get_latest_result`,
   gameConfig: `${GAMES_ADDRESS}::AptosRoulette::get_game_config`,
   payoutTable: `${GAMES_ADDRESS}::AptosRoulette::get_payout_table`,
   isReady: `${GAMES_ADDRESS}::AptosRoulette::is_ready`,
-  latestResult: `${GAMES_ADDRESS}::AptosRoulette::get_latest_result`,
+  isInitialized: `${GAMES_ADDRESS}::AptosRoulette::is_initialized`,
+  isRegistered: `${GAMES_ADDRESS}::AptosRoulette::is_registered`,
 });
 
-// NEW: CasinoHouse view functions for modern games
-export const getCasinoHouseViewFunctions = () => ({
-  getRegisteredGames: `${CASINO_HOUSE_ADDRESS}::CasinoHouse::get_registered_games`,
-  getGameMetadata: `${CASINO_HOUSE_ADDRESS}::CasinoHouse::get_game_metadata`,
-});
-
-// Type definitions for AptosRoulette
-export interface RouletteResult {
-  winning_number: number;
-  winning_color: string;
-  is_even: boolean;
-  is_high: boolean;
-  dozen: number;
-  column: number;
-  total_wagered: number;
-  total_payout: number;
-  winning_bets: number;
-  net_result: boolean;
-}
-
-export interface RouletteConfig {
-  min_bet: number;
-  max_bet: number;
-  house_edge_bps: number;
-  max_payout: number;
-}
-
-export interface RoulettePayoutTable {
-  single: number;        // 35:1
-  even_money: number;    // 1:1
-  dozen_column: number;  // 2:1
-  split: number;         // 17:1
-  street: number;        // 11:1
-  corner: number;        // 8:1
-  line: number;          // 5:1
-}
-
-// Result parsing functions
-export const parseRouletteResult = (moveResult: any[]): RouletteResult => {
+// Parse roulette result from 11-tuple
+export const parseRouletteResult = (data: any[]): RouletteResult => {
+  const [winning_number, winning_color, is_even, is_high, dozen, column, total_wagered, total_payout, won, net_result, session_id] = data;
   return {
-    winning_number: Number(moveResult[0]),
-    winning_color: String(moveResult[1]),
-    is_even: Boolean(moveResult[2]),
-    is_high: Boolean(moveResult[3]),
-    dozen: Number(moveResult[4]),
-    column: Number(moveResult[5]),
-    total_wagered: Number(moveResult[6]),
-    total_payout: Number(moveResult[7]),
-    winning_bets: Number(moveResult[8]),
-    net_result: Boolean(moveResult[9]),
+    winning_number: Number(winning_number),
+    winning_color: String(winning_color),
+    is_even: Boolean(is_even),
+    is_high: Boolean(is_high),
+    dozen: Number(dozen),
+    column: Number(column),
+    total_wagered: Number(total_wagered),
+    total_payout: Number(total_payout),
+    won: Boolean(won),
+    net_result: Boolean(net_result),
+    session_id: Number(session_id),
   };
 };
 
-export const parseRouletteConfig = (moveResult: any[]): RouletteConfig => {
+// Parse roulette config from 4-tuple  
+export const parseRouletteConfig = (data: any[]): RouletteConfig => {
+  const [min_bet, max_bet, house_edge_bps, max_payout] = data;
   return {
-    min_bet: Number(moveResult[0]),
-    max_bet: Number(moveResult[1]),
-    house_edge_bps: Number(moveResult[2]),
-    max_payout: Number(moveResult[3]),
+    min_bet: Number(min_bet),
+    max_bet: Number(max_bet),
+    house_edge_bps: Number(house_edge_bps),
+    max_payout: Number(max_payout),
   };
 };
 
-export const parseRoulettePayoutTable = (moveResult: any[]): RoulettePayoutTable => {
+// Parse roulette payout table from 7-tuple
+export const parseRoulettePayoutTable = (data: any[]): RoulettePayoutTable => {
+  const [single, even_money, dozen_column, split, street, corner, line] = data;
   return {
-    single: Number(moveResult[0]),
-    even_money: Number(moveResult[1]),
-    dozen_column: Number(moveResult[2]),
-    split: Number(moveResult[3]),
-    street: Number(moveResult[4]),
-    corner: Number(moveResult[5]),
-    line: Number(moveResult[6]),
+    single: Number(single),
+    even_money: Number(even_money),
+    dozen_column: Number(dozen_column),
+    split: Number(split),
+    street: Number(street),
+    corner: Number(corner),
+    line: Number(line),
   };
 };
 
@@ -362,3 +407,35 @@ export const BET_FLAGS = {
   COLUMN: 8,
   LINE: 9,
 } as const;
+
+// AptosRoulette interfaces and functions
+export interface RouletteResult {
+  winning_number: number;
+  winning_color: string;
+  is_even: boolean;
+  is_high: boolean;
+  dozen: number;
+  column: number;
+  total_wagered: number;
+  total_payout: number;
+  won: boolean;
+  net_result: boolean;
+  session_id: number;
+}
+
+export interface RouletteConfig {
+  min_bet: number;
+  max_bet: number;
+  house_edge_bps: number;
+  max_payout: number;
+}
+
+export interface RoulettePayoutTable {
+  single: number;
+  even_money: number;
+  dozen_column: number;
+  split: number;
+  street: number;
+  corner: number;
+  line: number;
+}

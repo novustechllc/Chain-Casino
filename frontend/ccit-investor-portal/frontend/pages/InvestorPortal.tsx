@@ -77,20 +77,24 @@ const FloatingTitle = () => {
       <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/20 via-purple-500/20 to-yellow-400/20 blur-3xl animate-pulse"></div>
       
       {/* Main title */}
-      <h1 className={`
-        relative z-10 text-center font-black text-5xl md:text-7xl lg:text-8xl
-        bg-gradient-to-r from-cyan-400 via-purple-500 via-yellow-400 to-cyan-400
-        bg-size-200 bg-pos-0 hover:bg-pos-100
-        transition-all duration-1000 ease-in-out
-        text-transparent bg-clip-text
-        drop-shadow-[0_0_30px_rgba(0,255,255,0.7)]
-        ${glitchActive ? 'animate-pulse scale-105' : 'scale-100'}
-      `}>
-        🎰 CCIT INVESTOR PORTAL 🎰
-      </h1>
+      <div className="flex items-center justify-center gap-4 mb-4">
+        <CoinImage size={64} className={glitchActive ? 'animate-pulse scale-105' : 'scale-100'} />
+        <h1 className={`
+          relative z-10 text-center font-black text-5xl md:text-7xl lg:text-8xl
+          bg-gradient-to-r from-cyan-400 via-purple-500 via-yellow-400 to-cyan-400
+          bg-size-200 bg-pos-0 hover:bg-pos-100
+          transition-all duration-1000 ease-in-out
+          text-transparent bg-clip-text
+          drop-shadow-[0_0_30px_rgba(0,255,255,0.7)]
+          ${glitchActive ? 'animate-pulse scale-105' : 'scale-100'}
+        `}>
+          CCIT INVESTOR PORTAL
+        </h1>
+        <CoinImage size={64} className={glitchActive ? 'animate-pulse scale-105' : 'scale-100'} />
+      </div>
       
       {/* Subtitle with enhanced branding */}
-      <div className="text-center mt-4 flex items-center justify-center gap-6 flex-wrap">
+      <div className="text-center flex items-center justify-center gap-6 flex-wrap">
         <div className="flex items-center gap-2">
           <CoinImage size={40} spinning={false} />
           <span className="text-yellow-400 font-bold text-lg tracking-wider">
@@ -252,17 +256,6 @@ const RealTimeNAVChart = ({ currentNAV, className = "" }) => {
                   fill={isUpTrend ? "#10b981" : "#ef4444"}
                   className="animate-pulse"
                 />
-                {index === navHistory.length - 1 && (
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r="6"
-                    fill="none"
-                    stroke={isUpTrend ? "#10b981" : "#ef4444"}
-                    strokeWidth="2"
-                    className="animate-ping"
-                  />
-                )}
               </g>
             );
           })}
@@ -277,7 +270,7 @@ const RealTimeNAVChart = ({ currentNAV, className = "" }) => {
       
       <div className="flex justify-between text-xs text-gray-400">
         <span>📊 {navHistory.length}/36 points • 3min history</span>
-        <span>⚡ Updates every 5s</span>
+        <span>⚡ Updates every 30s</span>
       </div>
     </div>
   );
@@ -403,17 +396,6 @@ const RealTimeTreasuryChart = ({ totalTreasury, className = "" }) => {
                   fill={up ? '#10b981' : '#ef4444'}
                   className="animate-pulse"
                 />
-                {i === history.length - 1 && (
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r="5"
-                    fill="none"
-                    stroke={up ? '#10b981' : '#ef4444'}
-                    strokeWidth="2"
-                    className="animate-ping"
-                  />
-                )}
               </g>
             );
           })}
@@ -428,14 +410,14 @@ const RealTimeTreasuryChart = ({ totalTreasury, className = "" }) => {
 
       <div className="flex justify-between text-xs text-gray-400">
         <span>🏦 {history.length}/36 points • 3min history</span>
-        <span>⚡ Updates every 5s</span>
+        <span>⚡ Updates every 30s</span>
       </div>
     </div>
   );
 };
 
 // Games Dashboard Component
-const GamesDashboard = ({ navigate, className = "" }) => {
+const GamesDashboard = ({ navigate, toast, className = "" }) => {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -538,7 +520,7 @@ const GamesDashboard = ({ navigate, className = "" }) => {
     const iconMap = {
       'SevenOut': '🎲',
       'SlotMachine': '🎰',
-      'Roulette': '🎯',
+      'Roulette': '🎡',
       'Blackjack': '🃏',
       'Dice': '🎲',
       'default': '🎮'
@@ -617,15 +599,16 @@ const GamesDashboard = ({ navigate, className = "" }) => {
           <div>No games registered yet</div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {games.map((game, index) => (
             <div
               key={game.objectAddress}
-              className="bg-black/40 rounded-lg p-4 border border-purple-400/30 hover:border-purple-400/60 transition-all duration-300 hover:scale-105"
+              className="bg-black/40 rounded-lg p-6 border border-purple-400/30 hover:border-purple-400/60 transition-all duration-300 hover:scale-105 group"
             >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="text-2xl">
+              {/* Game Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="text-3xl">
                     {getGameIcon(game.name, game.iconUrl).startsWith('/') ?
                       (
                         <img 
@@ -638,47 +621,76 @@ const GamesDashboard = ({ navigate, className = "" }) => {
                       )}
                   </div>
                   <div>
-                    <div className="font-bold text-white">{game.name}</div>
+                    <div className="font-bold text-white text-lg">{game.name}</div>
                     <div className="text-xs text-gray-400">v{game.version}</div>
                   </div>
                 </div>
-                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                <div className="w-3 h-3 rounded-full bg-green-400 animate-pulse"></div>
               </div>
 
-              <div className="text-sm text-gray-300 mb-3">
-                {game.description}
-              </div>
-
-              <div className="space-y-1 text-xs">
+              {/* Game Stats */}
+              <div className="space-y-2 mb-4 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">House Edge:</span>
-                  <span className="text-yellow-400 font-bold">{game.houseEdge.toFixed(2)}%</span>
+                  <span className="text-gray-400">Status:</span>
+                  <span className="font-bold text-green-400">ONLINE</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Min Bet:</span>
-                  <span className="text-cyan-400">{game.minBet.toFixed(3)} APT</span>
+                  <span className="text-yellow-400">{game.minBet.toFixed(4)} APT</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Max Bet:</span>
-                  <span className="text-cyan-400">{game.maxBet.toFixed(1)} APT</span>
+                  <span className="text-yellow-400">{game.maxBet.toFixed(4)} APT</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">House Edge:</span>
+                  <span className="text-purple-400">{game.houseEdge.toFixed(2)}%</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Max Payout:</span>
-                  <span className="text-green-400">{game.maxPayout.toFixed(1)} APT</span>
+                  <span className="text-green-400">{game.maxPayout.toFixed(4)} APT</span>
                 </div>
               </div>
 
-              {game.websiteUrl && game.websiteUrl !== '' && (
-                <div className="mt-3">
-                  <a
-                    href={game.websiteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-                  >
-                    🔗 Play Game
-                  </a>
+              {/* Game Description */}
+              {game.description && (
+                <div className="mb-4 p-3 bg-black/30 rounded border border-gray-600/30">
+                  <p className="text-xs text-gray-300">{game.description}</p>
                 </div>
+              )}
+
+              {/* Game Contract Address */}
+              <div className="mb-4 p-3 bg-black/20 rounded border border-gray-700/30">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">Contract:</span>
+                  <div 
+                    className="text-xs text-blue-400 cursor-pointer hover:text-blue-300 transition-colors flex items-center gap-1 group"
+                    onClick={() => {
+                      if (game.objectAddress) {
+                        navigator.clipboard.writeText(game.objectAddress);
+                        toast({
+                          title: "Copied!",
+                          description: `${game.name} contract address copied to clipboard`,
+                          duration: 2000
+                        });
+                      }
+                    }}
+                    title="Click to copy full address"
+                  >
+                    {game.objectAddress?.slice(0, 8)}...{game.objectAddress?.slice(-4)}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">📋</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              {game.websiteUrl && game.websiteUrl !== '' && (
+                <button
+                  onClick={() => window.open(game.websiteUrl, '_blank', 'noopener,noreferrer')}
+                  className="w-full px-4 py-3 rounded-lg font-bold text-sm transition-all duration-200 bg-purple-500/20 text-purple-400 border border-purple-400/30 hover:bg-purple-500/30 hover:scale-105"
+                >
+                  🎮 PLAY NOW
+                </button>
               )}
             </div>
           ))}
@@ -1096,7 +1108,7 @@ interface PortalData {
 }
 
 const InvestorPortal: React.FC = () => {
-  const { account, connected, signAndSubmitTransaction } = useWallet();
+  const { account, connected, signAndSubmitTransaction, network } = useWallet();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -1486,7 +1498,12 @@ const InvestorPortal: React.FC = () => {
   }, [connected]);
 
   const timeSinceUpdate = Math.floor((Date.now() - lastUpdateTime) / 1000);
-  const navChange = 2.34;
+  
+  // Calculate dynamic NAV change based on current vs initial NAV
+  const navChange = prevData.nav > 0 
+    ? ((data.nav - prevData.nav) / prevData.nav) * 100
+    : 0;
+  
   const profitLoss = data.portfolioValue - (data.ccitBalance * 1.0);
   const profitLossPercentage = data.ccitBalance > 0 ? (profitLoss / (data.ccitBalance * 1.0)) * 100 : 0;
 
@@ -1548,6 +1565,46 @@ const InvestorPortal: React.FC = () => {
             <div className="text-yellow-400">
               📊 Charts: 5s • 📄 Data: 30s
             </div>
+            <div className="text-gray-400">•</div>
+            <div className="text-orange-400 text-xs">
+              🌐 Network: {network?.name || 'Unknown'}
+            </div>
+            <div className="text-gray-400">•</div>
+            <div 
+              className="text-purple-400 text-xs cursor-pointer hover:text-purple-300 transition-colors flex items-center gap-1 group"
+              onClick={() => {
+                if (CASINO_HOUSE_ADDRESS) {
+                  navigator.clipboard.writeText(CASINO_HOUSE_ADDRESS);
+                  toast({
+                    title: "Copied!",
+                    description: "Casino contract address copied to clipboard",
+                    duration: 2000
+                  });
+                }
+              }}
+              title="Click to copy full address"
+            >
+              🏦 Casino: {CASINO_HOUSE_ADDRESS?.slice(0, 8)}...{CASINO_HOUSE_ADDRESS?.slice(-4)}
+              <span className="opacity-0 group-hover:opacity-100 transition-opacity">📋</span>
+            </div>
+            <div className="text-gray-400">•</div>
+            <div 
+              className="text-cyan-400 text-xs cursor-pointer hover:text-cyan-300 transition-colors flex items-center gap-1 group"
+              onClick={() => {
+                if (INVESTOR_TOKEN_ADDRESS) {
+                  navigator.clipboard.writeText(INVESTOR_TOKEN_ADDRESS);
+                  toast({
+                    title: "Copied!",
+                    description: "CCIT token address copied to clipboard",
+                    duration: 2000
+                  });
+                }
+              }}
+              title="Click to copy full address"
+            >
+              💎 CCIT: {INVESTOR_TOKEN_ADDRESS?.slice(0, 8)}...{INVESTOR_TOKEN_ADDRESS?.slice(-4)}
+              <span className="opacity-0 group-hover:opacity-100 transition-opacity">📋</span>
+            </div>
             {data.error && data.error.includes('Rate limited') && (
               <>
                 <div className="text-gray-400">•</div>
@@ -1598,9 +1655,11 @@ const InvestorPortal: React.FC = () => {
                 </ValueChangeIndicator>
               </div>
               <div className="retro-stat-line">
-                <span className="retro-stat-name">24H CHANGE:</span>
-                <span className="retro-stat-value text-green-400 animate-pulse font-bold">
-                  +{formatPercentage(navChange)} 📈
+                <span className="retro-stat-name">SESSION CHANGE:</span>
+                <span className={`retro-stat-value animate-pulse font-bold ${
+                  navChange >= 0 ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {navChange >= 0 ? '+' : ''}{formatPercentage(navChange)} {navChange >= 0 ? '📈' : '📉'}
                 </span>
               </div>
               <div className="retro-stat-line">
@@ -1644,6 +1703,19 @@ const InvestorPortal: React.FC = () => {
               </div>
               <div className="text-xs text-gray-400">
                 🏦 GROWING STRONG
+              </div>
+            </div>
+
+            {/* Treasury Live Action Disclaimer */}
+            <div className="bg-gradient-to-r from-orange-900/30 to-yellow-900/30 border border-yellow-400/40 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="font-bold text-yellow-400 text-sm">WANT TO SEE TREASURY IN ACTION?</div>
+              </div>
+              <div className="text-xs text-gray-300 space-y-1">
+                <div>• Play some games to see <span className="text-yellow-400 font-bold">immediate treasury updates</span></div>
+                <div>• Win/lose events instantly affect treasury reserves</div>
+                <div>• Treasury data refreshes <span className="text-cyan-400 font-bold">every 30 seconds</span></div>
+                <div>• Your investment share grows with casino profits! 💰</div>
               </div>
             </div>
             
@@ -1691,7 +1763,7 @@ const InvestorPortal: React.FC = () => {
         </div>
 
         {/* Games Dashboard */}
-        <GamesDashboard navigate={navigate} className="max-w-7xl mx-auto mb-8" />
+        <GamesDashboard navigate={navigate} toast={toast} className="max-w-7xl mx-auto mb-8" />
 
         {/* Enhanced Terminal Status */}
         <div className="retro-terminal max-w-6xl mx-auto">
@@ -1710,15 +1782,15 @@ const InvestorPortal: React.FC = () => {
           </div>
           <div className="retro-terminal-line">
             <span className="retro-terminal-prompt">CCIT:\&gt;</span>
-            <span className="text-green-400">ALL SYSTEMS OPERATIONAL - PROFIT SHARING ACTIVE ✅</span>
+            <span className="text-green-400">ALL SYSTEMS OPERATIONAL - PROFIT SHARING ACTIVE</span>
           </div>
           <div className="retro-terminal-line">
             <span className="retro-terminal-prompt">CCIT:\&gt;</span>
-            <span className="text-yellow-400">RATE LIMIT PROTECTION: ACTIVE | SMART RETRY: ENABLED ⚡</span>
+            <span className="text-yellow-400">RATE LIMIT PROTECTION: ACTIVE | SMART RETRY: ENABLED</span>
           </div>
           <div className="retro-terminal-line">
             <span className="retro-terminal-prompt">CCIT:\&gt;</span>
-            <span className="text-cyan-400">LIVE PORTFOLIO TRACKING | AUTO-REFRESH: ENABLED 📊</span>
+            <span className="text-cyan-400">LIVE PORTFOLIO TRACKING | AUTO-REFRESH: ENABLED</span>
           </div>
           <div className="retro-terminal-line">
             <span className="retro-terminal-prompt">CCIT:\&gt;</span>
@@ -1879,7 +1951,7 @@ const InvestorPortal: React.FC = () => {
             <CoinImage size={48} spinning={dataLoading} />
             <div className="text-center">
               <div className="retro-pixel-font text-2xl text-cyan-400 mb-2">
-                🎰 CHAINCASINO.APT INVESTOR TERMINAL 🎰
+                CHAINCASINO INVESTOR TERMINAL
               </div>
               <div className="retro-pixel-font text-sm text-cyan-400 mb-2">
                 POWERED BY APTOS • WHERE DEFI MEETS GAMBLING
@@ -1890,6 +1962,43 @@ const InvestorPortal: React.FC = () => {
             </div>
             <AptosLogo size={48} />
           </div>
+          
+          {/* GitHub Credits */}
+          <div className="border-t border-gray-600/30 pt-6 mt-6">
+            <div className="flex items-center justify-center gap-4 mb-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-300 text-sm">Made in 2 weeks on</span>
+                <AptosLogo size={24} />
+                <span className="text-cyan-400 font-bold">Aptos</span>
+              </div>
+              <div className="text-gray-400">•</div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-300 text-sm">by</span>
+                <a 
+                  href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-purple-400 hover:text-purple-300 transition-colors font-bold"
+                >
+                  PersonaNormale
+                </a>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-center gap-3">
+              <a 
+                href="https://github.com/PersonaNormale/ChainCasino" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors bg-black/30 px-4 py-2 rounded-lg border border-gray-600/30 hover:border-gray-500/50"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clipRule="evenodd" />
+                </svg>
+                <span>View on GitHub</span>
+              </a>
+            </div>
+          </div>
         </footer>
       </div>
     </div>
@@ -1897,3 +2006,4 @@ const InvestorPortal: React.FC = () => {
 };
 
 export default InvestorPortal;
+

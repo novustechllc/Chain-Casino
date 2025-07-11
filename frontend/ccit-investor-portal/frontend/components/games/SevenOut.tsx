@@ -22,6 +22,68 @@ import {
   GameConfig 
 } from '@/entry-functions/chaincasino';
 
+// Add CSS for pixelated images
+const pixelatedStyle = `
+  .pixelated {
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+`;
+
+
+// Coin Image Component  
+const CoinImage = ({ size = 64, className = "", spinning = false }) => (
+  <img
+    src="/chaincasino-coin.png"
+    alt="ChainCasino Coin"
+    className={`${className} ${spinning ? 'animate-spin' : ''}`}
+    style={{ 
+      width: size, 
+      height: size,
+      filter: 'drop-shadow(0 0 10px rgba(255, 215, 0, 0.5))',
+      animation: spinning ? 'spin 3s linear infinite' : 'none'
+    }}
+  />
+);
+
+// Aptos Logo Component
+const AptosLogo = ({ size = 32, className = "" }) => (
+  <div className="relative">
+    <img
+      src="/aptos-logo.png"
+      alt="Aptos"
+      className={`${className}`}
+      style={{ 
+        width: size, 
+        height: size,
+        filter: 'drop-shadow(0 0 8px rgba(0, 195, 255, 0.5))'
+      }}
+      onError={(e) => {
+        // Fallback to CSS version if image not found
+        const target = e.target as HTMLImageElement;
+        target.style.display = 'none';
+        const nextSibling = target.nextSibling as HTMLElement;
+        if (nextSibling) {
+          nextSibling.style.display = 'flex';
+        }
+      }}
+    />
+    {/* Fallback CSS logo */}
+    <div 
+      className={`${className} flex items-center justify-center hidden`}
+      style={{ width: size, height: size }}
+    >
+      <div className="relative">
+        <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+          A
+        </div>
+        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+      </div>
+    </div>
+  </div>
+);
 
 // Enhanced RetroCard component matching GameHub/InvestorPortal patterns
 const RetroCard = ({ children, className = "", glowOnHover = false }) => {
@@ -424,6 +486,7 @@ export const SevenOut: React.FC = () => {
   if (!account) {
     return (
       <div className="retro-body min-h-screen relative">
+        <style>{pixelatedStyle}</style>
         <div className="retro-scanlines"></div>
         <div className="retro-pixel-grid"></div>
         
@@ -450,16 +513,49 @@ export const SevenOut: React.FC = () => {
 
   return (
     <div className="retro-body min-h-screen relative">
+      <style>{pixelatedStyle}</style>
       <div className="retro-scanlines"></div>
       <div className="retro-pixel-grid"></div>
       
       <div className="container mx-auto px-4 py-8 relative z-10">
         {/* Enhanced Header */}
         <div className="text-center mb-8 relative">
-          <h1 className="text-6xl font-bold text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-yellow-400 bg-clip-text mb-4 retro-pixel-font animate-pulse">
-            🎲 SEVENOUT 🎲
-          </h1>
-          <p className="text-cyan-400 text-xl retro-terminal-font">
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <img 
+              src="/dice-8bit-emoji.png" 
+              alt="Dice" 
+              className="w-16 h-16 pixelated animate-pulse"
+            />
+            <h1 className="text-6xl font-bold text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-yellow-400 bg-clip-text retro-pixel-font animate-pulse">
+              SEVENOUT
+            </h1>
+            <img 
+              src="/dice-8bit-emoji.png" 
+              alt="Dice" 
+              className="w-16 h-16 pixelated animate-pulse"
+            />
+          </div>
+          
+          {/* ChainCasino x Aptos Branding */}
+          <div className="text-center mt-4 flex items-center justify-center gap-6 flex-wrap">
+            <div className="flex items-center gap-2">
+              <CoinImage size={40} spinning={false} />
+              <span className="text-yellow-400 font-bold text-lg tracking-wider">
+                CHAINCASINO
+              </span>
+            </div>
+            
+            <div className="text-cyan-400 text-2xl font-black">×</div>
+            
+            <div className="flex items-center gap-2">
+              <AptosLogo size={40} />
+              <span className="text-cyan-400 font-bold text-lg tracking-wider">
+                APTOS
+              </span>
+            </div>
+          </div>
+          
+          <p className="text-cyan-400 text-xl retro-terminal-font mt-4">
             BET UP OR DOWN • 2.78% HOUSE EDGE • 1.933x PAYOUT
           </p>
         </div>
@@ -473,16 +569,8 @@ export const SevenOut: React.FC = () => {
             </div>
             <div className="text-gray-400">•</div>
             <div className="text-yellow-400">
-              🎯 Live Gaming
+              🎲 Live Gaming
             </div>
-            {gameResult && (
-              <>
-                <div className="text-gray-400">•</div>
-                <div className="text-purple-400">
-                  Last Roll: {gameResult.dice_sum}
-                </div>
-              </>
-            )}
           </div>
         </div>
 
@@ -492,19 +580,22 @@ export const SevenOut: React.FC = () => {
             
             {/* Left Column - Betting Interface */}
             <RetroCard glowOnHover={true} className="bg-black/60 backdrop-blur-sm">
-              <div className="retro-pixel-font text-sm text-cyan-300 mb-6 flex items-center justify-between">
+              <div className="retro-pixel-font text-base text-cyan-300 mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 bg-purple-400 animate-pulse rounded-full"></div>
                   CHOOSE YOUR STAKES
                 </div>
-                <div className="text-xs text-gray-400">
-                  💰 PLACE BETS
+                <div className="text-sm text-gray-400">
+                  PLACE BETS
                 </div>
               </div>
 
               {/* Bet Amount Input */}
               <div className="space-y-4 mb-6">
-                <label className="retro-terminal-font text-purple-300 font-bold">Bet Amount (APT)</label>
+                <label className="retro-terminal-font text-purple-300 font-bold flex items-center gap-2">
+                  <AptosLogo size={20} />
+                  Bet Amount (APT)
+                </label>
                 <input
                   type="number"
                   value={betAmount}
@@ -569,7 +660,7 @@ export const SevenOut: React.FC = () => {
                   className="retro-button retro-button-danger h-24 text-xl"
                 >
                   <div className="text-center">
-                    <div className="retro-pixel-font text-2xl">DOWN</div>
+                    <div className="retro-pixel-font text-xl">DOWN</div>
                   </div>
                 </button>
                 
@@ -579,7 +670,7 @@ export const SevenOut: React.FC = () => {
                   className="retro-button retro-button-success h-24 text-xl"
                 >
                   <div className="text-center">
-                    <div className="retro-pixel-font text-2xl">UP</div>
+                    <div className="retro-pixel-font text-xl">UP</div>
                   </div>
                 </button>
               </div>
@@ -613,12 +704,12 @@ export const SevenOut: React.FC = () => {
             {/* Right Column - Game Result Display */}
             {gameResult ? (
               <RetroCard glowOnHover={true} className="bg-black/60 backdrop-blur-sm">
-                <div className="retro-pixel-font text-sm text-cyan-300 mb-6 flex items-center justify-between">
+                <div className="retro-pixel-font text-base text-cyan-300 mb-6 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-yellow-400 animate-pulse rounded-full"></div>
                     TABLE RESULTS
                   </div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-sm text-gray-400">
                     🎲 LAST ROLL
                   </div>
                 </div>
@@ -641,7 +732,7 @@ export const SevenOut: React.FC = () => {
                     <div className="text-center">
                       <div className="text-yellow-400 retro-pixel-font text-xs mb-1">STATUS</div>
                       <div className={`text-lg font-bold ${winStreak >= 3 ? 'text-gold animate-bounce' : winStreak > 0 ? 'text-green-400' : 'text-gray-500'}`}>
-                        {winStreak >= 5 ? '🔥 HOT!' : winStreak >= 3 ? '⚡ ON FIRE' : winStreak > 0 ? '💰 WINNING' : '🎯 READY'}
+                        {winStreak >= 5 ? '🔥 HOT!' : winStreak >= 3 ? '⚡ ON FIRE' : winStreak > 0 ? '💰 WINNING' : '🎲 READY'}
                       </div>
                     </div>
                   </div>
@@ -650,9 +741,9 @@ export const SevenOut: React.FC = () => {
                 {/* 3D Dice Display */}
                 <div className="mb-6">
                   <div className="text-center mb-4">
-                    <div className="retro-pixel-font text-sm text-cyan-300 mb-2">
-                      {(isPlaying || waitingForNewResult) ? 'ROLLING...' : '3D DICE ROLL'}
-                    </div>
+                                      <div className="retro-pixel-font text-base text-cyan-300 mb-4">
+                    {(isPlaying || waitingForNewResult) ? 'ROLLING...' : '3D DICE ROLL'}
+                  </div>
                   </div>
                   {(isPlaying || waitingForNewResult) ? (
                     <DiceRoll3D die1={1} die2={1} isRolling={true} />
@@ -732,8 +823,8 @@ export const SevenOut: React.FC = () => {
               <RetroCard className="bg-black/40 backdrop-blur-sm border-dashed border-gray-600">
                 <div className="text-center py-20 text-gray-500">
                   <div className="text-6xl mb-4 opacity-50">🎲</div>
-                  <div className="retro-pixel-font text-lg mb-2">NO ACTIVE GAME</div>
-                  <div className="retro-terminal-font text-sm">Place a bet to roll the dice</div>
+                  <div className="retro-pixel-font text-xl mb-4">NO ACTIVE GAME</div>
+                  <div className="retro-terminal-font text-base">Place a bet to roll the dice</div>
                   
                   {/* Show streak even when no active game */}
                   {(winStreak > 0 || bestStreak > 0) && (
