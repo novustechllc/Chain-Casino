@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { aptosClient } from '@/utils/aptosClient';
@@ -266,6 +267,12 @@ const AptosLogo = ({ size = 32, className = "" }) => (
 const AptosRoulette = () => {
   const { account, connected, signAndSubmitTransaction } = useWallet();
   const { toast } = useToast();
+
+  // Set page title and favicon
+  useDocumentTitle({ 
+    title: 'AptosRoulette - ChainCasino', 
+    favicon: '/icons/aptos-roulette.png' 
+  });
   
   // Contract state
   const [gameConfig, setGameConfig] = useState<RouletteConfig | null>(null);

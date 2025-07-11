@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import * as THREE from 'three';
 import { 
   GAMES_ADDRESS,
@@ -264,6 +265,12 @@ export const SevenOut: React.FC = () => {
   const { account, signAndSubmitTransaction } = useWallet();
   const { toast } = useToast();
 
+  // Set page title and favicon
+  useDocumentTitle({ 
+    title: 'SevenOut - ChainCasino', 
+    favicon: '/icons/seven-out.png' 
+  });
+
   const [betAmount, setBetAmount] = useState('');
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
@@ -419,11 +426,7 @@ export const SevenOut: React.FC = () => {
         checkExistingResult();
       }, 1000);
       
-      toast({
-        title: "Dice Rolled!",
-        description: `Bet ${betOver ? 'UP' : 'DOWN'} for ${betAmount} APT`,
-        variant: "default"
-      });
+      // Removed obnoxious "Dice Rolled!" toast notification
     } catch (error) {
       console.error('Game play failed:', error);
       setWaitingForNewResult(false);
@@ -448,11 +451,7 @@ export const SevenOut: React.FC = () => {
       await aptosClient().waitForTransaction({ transactionHash: response.hash });
       
       setGameResult(null);
-      toast({
-        title: "Table Cleared",
-        description: "Ready for next round",
-        variant: "default"
-      });
+      // Removed obvious "Table Cleared" toast notification
     } catch (error) {
       console.error('Clear table failed:', error);
       toast({

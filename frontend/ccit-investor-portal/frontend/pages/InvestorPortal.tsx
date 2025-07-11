@@ -134,6 +134,19 @@ const RealTimeNAVChart = ({ currentNAV, className = "" }) => {
           return prev; // Don't add duplicate values
         }
         
+        // If this is a big jump from startup (>5% change), start fresh
+        if (prev.length > 0 && prev.length < 5) {
+          const lastValue = prev[prev.length - 1].value;
+          const percentChange = Math.abs((currentNAV - lastValue) / lastValue);
+          if (percentChange > 0.05) {
+            // Big jump detected - start fresh with current value
+            return [{
+              value: currentNAV,
+              timestamp: Date.now()
+            }];
+          }
+        }
+        
         const newHistory = [...prev, {
           value: currentNAV,
           timestamp: Date.now()
@@ -147,14 +160,38 @@ const RealTimeNAVChart = ({ currentNAV, className = "" }) => {
     }
   }, [currentNAV, maxDataPoints]);
 
+  // Helper function for NAV-specific scaling - simplified approach like treasury
+  const getNavScaling = () => {
+    if (navHistory.length < 2) {
+      // Not enough data, use current value with reasonable range
+      const current = navHistory[navHistory.length - 1]?.value || 1.0;
+      const range = current * 0.02; // 2% range around current
+      return {
+        minValue: current - range,
+        maxValue: current + range,
+        valueRange: range * 2
+      };
+    }
+    
+    // Use ALL current data since we've filtered out startup jumps
+    const minRaw = Math.min(...navHistory.map(h => h.value));
+    const maxRaw = Math.max(...navHistory.map(h => h.value));
+    const dataRange = maxRaw - minRaw;
+    
+    // Simple scaling: expand the actual range by 30% for breathing room
+    const margin = Math.max(dataRange * 0.3, maxRaw * 0.005); // At least 0.5% margin
+    const minValue = minRaw - margin;
+    const maxValue = maxRaw + margin;
+    
+    return { minValue, maxValue, valueRange: maxValue - minValue };
+  };
+
   const getChartPath = () => {
     if (navHistory.length < 2) return "";
     
     const width = 400;
     const height = 120;
-    const minValue = Math.min(...navHistory.map(h => h.value)) * 0.9995;
-    const maxValue = Math.max(...navHistory.map(h => h.value)) * 1.0005;
-    const valueRange = maxValue - minValue || 0.01;
+    const { minValue, valueRange } = getNavScaling();
     
     const points = navHistory.map((point, index) => {
       const x = (index / (navHistory.length - 1)) * width;
@@ -170,6 +207,18 @@ const RealTimeNAVChart = ({ currentNAV, className = "" }) => {
 
   const latestChange = navHistory.length >= 2 ? 
     ((navHistory[navHistory.length - 1].value - navHistory[navHistory.length - 2].value) / navHistory[navHistory.length - 2].value) * 100 : 0;
+
+  // Show collecting data state like treasury chart
+  if (navHistory.length < 2) {
+    return (
+      <div className={`bg-black/60 rounded-xl p-6 text-center border-2 border-cyan-400/40 ${className}`}>
+        <div className="animate-pulse">
+          <div className="text-cyan-400 mb-2">📈 NAV LIVE STREAM</div>
+          <div className="text-gray-400">Collecting data... {currentNAV > 0 ? `Current: $${currentNAV.toFixed(6)}` : ''}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`bg-black/60 rounded-xl p-6 border-2 border-cyan-400/40 backdrop-blur-sm ${className}`}>
@@ -237,9 +286,7 @@ const RealTimeNAVChart = ({ currentNAV, className = "" }) => {
             if (navHistory.length < 2) return null;
             
             const x = (index / (navHistory.length - 1)) * 400;
-            const minValue = Math.min(...navHistory.map(h => h.value)) * 0.9995;
-            const maxValue = Math.max(...navHistory.map(h => h.value)) * 1.0005;
-            const valueRange = maxValue - minValue || 0.01;
+            const { minValue, valueRange } = getNavScaling();
             const y = 120 - ((point.value - minValue) / valueRange) * 120;
             
             // Validate coordinates before rendering
@@ -270,7 +317,7 @@ const RealTimeNAVChart = ({ currentNAV, className = "" }) => {
       
       <div className="flex justify-between text-xs text-gray-400">
         <span>📊 {navHistory.length}/36 points • 3min history</span>
-        <span>⚡ Updates every 30s</span>
+        <span>📈 Chart: 5s • 🔗 Data: 30s</span>
       </div>
     </div>
   );
@@ -410,7 +457,7 @@ const RealTimeTreasuryChart = ({ totalTreasury, className = "" }) => {
 
       <div className="flex justify-between text-xs text-gray-400">
         <span>🏦 {history.length}/36 points • 3min history</span>
-        <span>⚡ Updates every 30s</span>
+        <span>📈 Chart: 5s • 🔗 Data: 30s</span>
       </div>
     </div>
   );
@@ -1563,7 +1610,7 @@ const InvestorPortal: React.FC = () => {
             </div>
             <div className="text-gray-400">•</div>
             <div className="text-yellow-400">
-              📊 Charts: 5s • 📄 Data: 30s
+              📈 Charts: 5s • 🔗 Data: 30s
             </div>
             <div className="text-gray-400">•</div>
             <div className="text-orange-400 text-xs">
