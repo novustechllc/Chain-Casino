@@ -17,6 +17,22 @@ ChainCasino turns **"The House Always Wins"** into **"The Investor Always Earns.
 
 ---
 
+## 🎮 Platform Overview
+
+### Investor Portal
+Complete dashboard for CCIT token management and portfolio tracking - the core investment platform.
+
+![Investor Portal Overview](./.github/assets/investor-portal-screenshot.png)
+
+![Investor Portfolio Details](./.github/assets/investor-portal-screenshot1.png)
+
+### Game Hub
+The central hub where players discover and access all registered games.
+
+![Game Hub](./.github/assets/gamehub-screenshot.png)
+
+---
+
 ## 📐 Architecture Overview
 
 ### Core System Flow
@@ -330,11 +346,37 @@ frontend/
 ## 🖥️ Frontend Development
 
 ### Components
-- `InvestorPortal` - Main dashboard for CCIT management
-- `GameHub` - Game discovery and navigation
-- `SevenOut` - Two-dice game interface
-- `AptosRoulette` - Roulette betting interface
-- `AptosFortune` - Slot machine interface
+
+#### InvestorPortal
+Main dashboard for CCIT management with real-time portfolio tracking and treasury insights.
+
+![Investor Portal Dashboard](./.github/assets/investor-portal-screenshot2.png)
+
+#### GameHub
+Game discovery and navigation interface showing all available games and their statistics.
+
+![Game Hub Interface](./.github/assets/gamehub-screenshot.png)
+
+#### SevenOut
+Two-dice Over/Under 7 game with simple betting interface and real-time results.
+
+![SevenOut Game](./.github/assets/dice-screenshot.png)
+
+#### AptosRoulette
+European roulette with comprehensive betting options and animated wheel.
+
+![Roulette Betting Interface](./.github/assets/roulette-screenshot-ui.png)
+
+![Roulette Number Selection](./.github/assets/roulette-screenshot-ui2.png)
+
+![Roulette Game Result](./.github/assets/roulette-screenshot-result.png)
+
+#### AptosFortune
+Premium slot machine with partial match payouts and detailed payout table.
+
+![Slot Machine Interface](./.github/assets/slot-screenshot.png)
+
+![Slot Machine Results](./.github/assets/slot-screenshot2.png)
 
 ---
 

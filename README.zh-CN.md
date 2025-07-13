@@ -17,6 +17,22 @@ ChainCasino 将 **"庄家必胜"** 转化为 **"投资者必赚"**
 
 ---
 
+## 🎮 平台概览
+
+### 投资者门户
+CCIT代币管理和投资组合跟踪的完整仪表板 - 核心投资平台。
+
+![Investor Portal Overview](./.github/assets/investor-portal-screenshot.png)
+
+![Investor Portfolio Details](./.github/assets/investor-portal-screenshot1.png)
+
+### 游戏中心
+玩家发现和访问所有已注册游戏的中央枢纽。
+
+![Game Hub](./.github/assets/gamehub-screenshot.png)
+
+---
+
 ## 📐 架构概览
 
 ### 核心系统流程
@@ -330,11 +346,37 @@ frontend/
 ## 🖥️ 前端开发
 
 ### 组件
-- `InvestorPortal` - CCIT管理的主仪表板
-- `GameHub` - 游戏发现和导航
-- `SevenOut` - 双骰子游戏界面
-- `AptosRoulette` - 轮盘投注界面
-- `AptosFortune` - 老虎机界面
+
+#### InvestorPortal
+CCIT管理的主仪表板，具有实时投资组合跟踪和资金库洞察功能。
+
+![Investor Portal Dashboard](./.github/assets/investor-portal-screenshot2.png)
+
+#### GameHub
+游戏发现和导航界面，显示所有可用游戏及其统计信息。
+
+![Game Hub Interface](./.github/assets/gamehub-screenshot.png)
+
+#### SevenOut
+双骰子大小7游戏，具有简单的投注界面和实时结果。
+
+![SevenOut Game](./.github/assets/dice-screenshot.png)
+
+#### AptosRoulette
+欧洲轮盘，具有全面的投注选项和动画轮盘。
+
+![Roulette Betting Interface](./.github/assets/roulette-screenshot-ui.png)
+
+![Roulette Number Selection](./.github/assets/roulette-screenshot-ui2.png)
+
+![Roulette Game Result](./.github/assets/roulette-screenshot-result.png)
+
+#### AptosFortune
+高级老虎机，具有部分匹配支付和详细支付表。
+
+![Slot Machine Interface](./.github/assets/slot-screenshot.png)
+
+![Slot Machine Results](./.github/assets/slot-screenshot2.png)
 
 ---
 
