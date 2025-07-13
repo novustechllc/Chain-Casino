@@ -24,8 +24,6 @@ Complete dashboard for CCIT token management and portfolio tracking - the core i
 
 ![Investor Portal Overview](./.github/assets/investor-portal-screenshot.png)
 
-![Investor Portfolio Details](./.github/assets/investor-portal-screenshot1.png)
-
 ### Game Hub
 The central hub where players discover and access all registered games.
 
@@ -349,6 +347,10 @@ frontend/
 
 #### InvestorPortal
 Main dashboard for CCIT management with real-time portfolio tracking and treasury insights.
+
+![Investor Portal Overview](./.github/assets/investor-portal-screenshot.png)
+
+![Investor Portfolio Details](./.github/assets/investor-portal-screenshot1.png)
 
 ![Investor Portal Dashboard](./.github/assets/investor-portal-screenshot2.png)
 

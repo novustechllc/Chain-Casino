@@ -24,8 +24,6 @@ CCIT代币管理和投资组合跟踪的完整仪表板 - 核心投资平台。
 
 ![Investor Portal Overview](./.github/assets/investor-portal-screenshot.png)
 
-![Investor Portfolio Details](./.github/assets/investor-portal-screenshot1.png)
-
 ### 游戏中心
 玩家发现和访问所有已注册游戏的中央枢纽。
 
@@ -350,10 +348,14 @@ frontend/
 #### InvestorPortal
 CCIT管理的主仪表板，具有实时投资组合跟踪和资金库洞察功能。
 
+![Investor Portal Overview](./.github/assets/investor-portal-screenshot.png)
+
+![Investor Portfolio Details](./.github/assets/investor-portal-screenshot1.png)
+
 ![Investor Portal Dashboard](./.github/assets/investor-portal-screenshot2.png)
 
 #### GameHub
-游戏发现和导航界面，显示所有可用游戏及其统计信息。
+游戏发现和导航界面，显示所有已注册游戏及其统计信息。
 
 ![Game Hub Interface](./.github/assets/gamehub-screenshot.png)
 
