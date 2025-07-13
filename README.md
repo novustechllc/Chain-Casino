@@ -1,6 +1,6 @@
 # ChainCasino
 
-> **"The first on-chain casino protocol where a token-backed treasury powers multiple games, and investors earn real yield through rising NAV as the house wins."**
+> **Modular on-chain casino where token holders act as the house, earning yield through verifiable statistical advantage, with support for independent games and DeFi pool integration.**
 
 ChainCasino is a decentralized casino protocol on **Aptos** that merges casino gaming with DeFi investing through a sophisticated treasury management system.
 
@@ -229,6 +229,31 @@ Complete React-based user interface with:
 
 ---
 
+## 💻 Technology Stack
+
+### Blockchain Layer
+- **Move 2** - Smart contract language with enhanced security features
+- **Aptos Blockchain** - High-performance Layer 1 with Block-STM parallel execution
+- **Aptos Randomness** - Secure on-chain randomness for games
+- **Aptos SDK** - TypeScript integration for blockchain interactions
+
+### Frontend Stack
+- **React 18** - Modern UI library with hooks and concurrent features
+- **TypeScript** - Type-safe development and enhanced developer experience
+- **Vite** - Lightning-fast build tool and development server
+- **Tailwind CSS** - Utility-first CSS framework for rapid styling
+
+### Wallet Integration
+- **Aptos Wallet Adapter** - Multi-wallet support (Petra, Martian, Pontem)
+- **Wallet Connect** - Cross-platform wallet connection protocol
+
+### Deployment & Infrastructure
+- **Nginx** - Web server and reverse proxy
+- **Aptos CLI** - Smart contract deployment and management
+- **Docker** - Containerization for consistent deployments
+
+---
+
 ## 🔧 Technical Implementation
 
 ### Security Model
@@ -276,7 +301,7 @@ frontend/
 └── ccit-investor-portal/       # React frontend application
     ├── frontend/
     │   ├── components/games/   # Individual game UIs
-    │   ├── pages/             # Main portal pages
+    │   ├── pages/              # Main portal pages
     │   └── App.tsx
     ├── package.json
     └── vite.config.ts
