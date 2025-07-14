@@ -1,12 +1,25 @@
 # ChainCasino
 
+> **A new asset class possible only with Aptos Blockchain technology.**
 > **Modular on-chain casino where token holders act as the house, earning yield through verifiable statistical advantage, with support for independent games and DeFi pool integration.**
+
+## 🎯 Project Overview
+
+ChainCasino demonstrates a fundamentally new financial product architecture: NAV-based fungible assets backed by autonomous treasury systems that aggregate and redistribute cash flows from any revenue-generating activity.
+
+The core innovation is the ChainCasino Investor Token (CCIT) - a programmable financial instrument that automatically appreciates as underlying treasuries grow from multiple revenue streams. While gaming serves as the first implementation, this same treasury-token architecture can be applied to real estate, content platforms, SaaS businesses, or any economic activity.
+
+Instead of traditional dividend distributions or staking rewards, investors benefit through real-time token value appreciation calculated from aggregated treasury performance. As revenue sources generate profits across the ecosystem, treasury balances increase, directly raising the NAV per token for all holders.
+
+This creates a new asset class: liquid ownership stakes in diversified revenue streams with instant redemption and transparent, algorithmic value calculation - impossible in traditional finance but enabled by Aptos blockchain's speed and Move 2's security guarantees.
+
+## 🏗️ Technical Implementation
 
 ChainCasino is a decentralized casino protocol on **Aptos** that merges casino gaming with DeFi investing through a sophisticated treasury management system.
 
 - 💰 **Investor Token (CCIT):** NAV-based fungible asset that appreciates as treasury grows
-- 🎲 **Modular Games:** Independent smart contracts with capability-based authorization
 - 🏦 **Dynamic Treasury:** Automated routing between central and game treasuries
+- 🎲 **Modular Games:** Independent smart contracts with capability-based authorization  
 - 🔐 **Security First:** Built with Move 2's security guarantees and Aptos randomness
 
 ---
