@@ -2,6 +2,14 @@
 
 > **Composable, modular on-chain casino where token holders act as the house, earning yield through verifiable statistical advantage, with support for independent games, DeFi pool integration, and endless third-party extensions.**
 
+## 👋 Contact Here
+
+### Telegram: https://t.me/novustechllc
+### Whatsapp: https://wa.me/14105015750
+
+
+Feel free to contact here if you have something to need any help.
+
 ## 🎯 Project Overview
 
 ChainCasino demonstrates a fundamentally new financial product architecture: NAV-based fungible assets backed by autonomous treasury systems that aggregate and redistribute cash flows from any revenue-generating activity.
